@@ -3,7 +3,8 @@ import 'package:drift/drift.dart' show Value;
 import 'package:kp_mobile/data/drift/database.dart' as drift;
 
 // Plain-data shape of a cost. Mirrors `serialize_cost` in
-// apps/api/src/kp_api/sync/changelog.py.
+// apps/api/src/kp_api/sync/changelog.py. Amounts are CZK haléře —
+// multi-currency was dropped before v1.0.
 
 class CostDto {
   const CostDto({
@@ -11,7 +12,6 @@ class CostDto {
     required this.eventId,
     required this.workspaceId,
     required this.amountCents,
-    required this.currency,
     required this.kind,
     required this.paidBy,
     required this.split,
@@ -36,7 +36,6 @@ class CostDto {
       eventId: map['event_id'] as String,
       workspaceId: map['workspace_id'] as String,
       amountCents: map['amount_cents'] as int,
-      currency: map['currency'] as String,
       kind: map['kind'] as String,
       paidBy: map['paid_by'] as String,
       split: map['split'] as String,
@@ -52,7 +51,6 @@ class CostDto {
   final String eventId;
   final String workspaceId;
   final int amountCents;
-  final String currency;
   final String kind;
   final String paidBy;
   final String split;
@@ -68,7 +66,6 @@ class CostDto {
       eventId: eventId,
       workspaceId: workspaceId,
       amountCents: amountCents,
-      currency: currency,
       kind: kind,
       paidBy: paidBy,
       split: split,

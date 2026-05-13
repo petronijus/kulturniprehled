@@ -2889,17 +2889,6 @@ class $CachedCostsTable extends CachedCosts
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _currencyMeta = const VerificationMeta(
-    'currency',
-  );
-  @override
-  late final GeneratedColumn<String> currency = GeneratedColumn<String>(
-    'currency',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
   static const VerificationMeta _kindMeta = const VerificationMeta('kind');
   @override
   late final GeneratedColumn<String> kind = GeneratedColumn<String>(
@@ -2995,7 +2984,6 @@ class $CachedCostsTable extends CachedCosts
     eventId,
     workspaceId,
     amountCents,
-    currency,
     kind,
     paidBy,
     split,
@@ -3052,14 +3040,6 @@ class $CachedCostsTable extends CachedCosts
       );
     } else if (isInserting) {
       context.missing(_amountCentsMeta);
-    }
-    if (data.containsKey('currency')) {
-      context.handle(
-        _currencyMeta,
-        currency.isAcceptableOrUnknown(data['currency']!, _currencyMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_currencyMeta);
     }
     if (data.containsKey('kind')) {
       context.handle(
@@ -3154,10 +3134,6 @@ class $CachedCostsTable extends CachedCosts
         DriftSqlType.int,
         data['${effectivePrefix}amount_cents'],
       )!,
-      currency: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}currency'],
-      )!,
       kind: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}kind'],
@@ -3208,7 +3184,6 @@ class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
   final String eventId;
   final String workspaceId;
   final int amountCents;
-  final String currency;
   final String kind;
   final String paidBy;
   final String split;
@@ -3223,7 +3198,6 @@ class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
     required this.eventId,
     required this.workspaceId,
     required this.amountCents,
-    required this.currency,
     required this.kind,
     required this.paidBy,
     required this.split,
@@ -3241,7 +3215,6 @@ class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
     map['event_id'] = Variable<String>(eventId);
     map['workspace_id'] = Variable<String>(workspaceId);
     map['amount_cents'] = Variable<int>(amountCents);
-    map['currency'] = Variable<String>(currency);
     map['kind'] = Variable<String>(kind);
     map['paid_by'] = Variable<String>(paidBy);
     map['split'] = Variable<String>(split);
@@ -3264,7 +3237,6 @@ class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
       eventId: Value(eventId),
       workspaceId: Value(workspaceId),
       amountCents: Value(amountCents),
-      currency: Value(currency),
       kind: Value(kind),
       paidBy: Value(paidBy),
       split: Value(split),
@@ -3289,7 +3261,6 @@ class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
       eventId: serializer.fromJson<String>(json['eventId']),
       workspaceId: serializer.fromJson<String>(json['workspaceId']),
       amountCents: serializer.fromJson<int>(json['amountCents']),
-      currency: serializer.fromJson<String>(json['currency']),
       kind: serializer.fromJson<String>(json['kind']),
       paidBy: serializer.fromJson<String>(json['paidBy']),
       split: serializer.fromJson<String>(json['split']),
@@ -3309,7 +3280,6 @@ class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
       'eventId': serializer.toJson<String>(eventId),
       'workspaceId': serializer.toJson<String>(workspaceId),
       'amountCents': serializer.toJson<int>(amountCents),
-      'currency': serializer.toJson<String>(currency),
       'kind': serializer.toJson<String>(kind),
       'paidBy': serializer.toJson<String>(paidBy),
       'split': serializer.toJson<String>(split),
@@ -3327,7 +3297,6 @@ class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
     String? eventId,
     String? workspaceId,
     int? amountCents,
-    String? currency,
     String? kind,
     String? paidBy,
     String? split,
@@ -3342,7 +3311,6 @@ class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
     eventId: eventId ?? this.eventId,
     workspaceId: workspaceId ?? this.workspaceId,
     amountCents: amountCents ?? this.amountCents,
-    currency: currency ?? this.currency,
     kind: kind ?? this.kind,
     paidBy: paidBy ?? this.paidBy,
     split: split ?? this.split,
@@ -3363,7 +3331,6 @@ class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
       amountCents: data.amountCents.present
           ? data.amountCents.value
           : this.amountCents,
-      currency: data.currency.present ? data.currency.value : this.currency,
       kind: data.kind.present ? data.kind.value : this.kind,
       paidBy: data.paidBy.present ? data.paidBy.value : this.paidBy,
       split: data.split.present ? data.split.value : this.split,
@@ -3383,7 +3350,6 @@ class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
           ..write('eventId: $eventId, ')
           ..write('workspaceId: $workspaceId, ')
           ..write('amountCents: $amountCents, ')
-          ..write('currency: $currency, ')
           ..write('kind: $kind, ')
           ..write('paidBy: $paidBy, ')
           ..write('split: $split, ')
@@ -3403,7 +3369,6 @@ class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
     eventId,
     workspaceId,
     amountCents,
-    currency,
     kind,
     paidBy,
     split,
@@ -3422,7 +3387,6 @@ class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
           other.eventId == this.eventId &&
           other.workspaceId == this.workspaceId &&
           other.amountCents == this.amountCents &&
-          other.currency == this.currency &&
           other.kind == this.kind &&
           other.paidBy == this.paidBy &&
           other.split == this.split &&
@@ -3439,7 +3403,6 @@ class CachedCostsCompanion extends UpdateCompanion<CachedCostRow> {
   final Value<String> eventId;
   final Value<String> workspaceId;
   final Value<int> amountCents;
-  final Value<String> currency;
   final Value<String> kind;
   final Value<String> paidBy;
   final Value<String> split;
@@ -3455,7 +3418,6 @@ class CachedCostsCompanion extends UpdateCompanion<CachedCostRow> {
     this.eventId = const Value.absent(),
     this.workspaceId = const Value.absent(),
     this.amountCents = const Value.absent(),
-    this.currency = const Value.absent(),
     this.kind = const Value.absent(),
     this.paidBy = const Value.absent(),
     this.split = const Value.absent(),
@@ -3472,7 +3434,6 @@ class CachedCostsCompanion extends UpdateCompanion<CachedCostRow> {
     required String eventId,
     required String workspaceId,
     required int amountCents,
-    required String currency,
     required String kind,
     required String paidBy,
     required String split,
@@ -3487,7 +3448,6 @@ class CachedCostsCompanion extends UpdateCompanion<CachedCostRow> {
        eventId = Value(eventId),
        workspaceId = Value(workspaceId),
        amountCents = Value(amountCents),
-       currency = Value(currency),
        kind = Value(kind),
        paidBy = Value(paidBy),
        split = Value(split),
@@ -3500,7 +3460,6 @@ class CachedCostsCompanion extends UpdateCompanion<CachedCostRow> {
     Expression<String>? eventId,
     Expression<String>? workspaceId,
     Expression<int>? amountCents,
-    Expression<String>? currency,
     Expression<String>? kind,
     Expression<String>? paidBy,
     Expression<String>? split,
@@ -3517,7 +3476,6 @@ class CachedCostsCompanion extends UpdateCompanion<CachedCostRow> {
       if (eventId != null) 'event_id': eventId,
       if (workspaceId != null) 'workspace_id': workspaceId,
       if (amountCents != null) 'amount_cents': amountCents,
-      if (currency != null) 'currency': currency,
       if (kind != null) 'kind': kind,
       if (paidBy != null) 'paid_by': paidBy,
       if (split != null) 'split': split,
@@ -3536,7 +3494,6 @@ class CachedCostsCompanion extends UpdateCompanion<CachedCostRow> {
     Value<String>? eventId,
     Value<String>? workspaceId,
     Value<int>? amountCents,
-    Value<String>? currency,
     Value<String>? kind,
     Value<String>? paidBy,
     Value<String>? split,
@@ -3553,7 +3510,6 @@ class CachedCostsCompanion extends UpdateCompanion<CachedCostRow> {
       eventId: eventId ?? this.eventId,
       workspaceId: workspaceId ?? this.workspaceId,
       amountCents: amountCents ?? this.amountCents,
-      currency: currency ?? this.currency,
       kind: kind ?? this.kind,
       paidBy: paidBy ?? this.paidBy,
       split: split ?? this.split,
@@ -3581,9 +3537,6 @@ class CachedCostsCompanion extends UpdateCompanion<CachedCostRow> {
     }
     if (amountCents.present) {
       map['amount_cents'] = Variable<int>(amountCents.value);
-    }
-    if (currency.present) {
-      map['currency'] = Variable<String>(currency.value);
     }
     if (kind.present) {
       map['kind'] = Variable<String>(kind.value);
@@ -3625,7 +3578,6 @@ class CachedCostsCompanion extends UpdateCompanion<CachedCostRow> {
           ..write('eventId: $eventId, ')
           ..write('workspaceId: $workspaceId, ')
           ..write('amountCents: $amountCents, ')
-          ..write('currency: $currency, ')
           ..write('kind: $kind, ')
           ..write('paidBy: $paidBy, ')
           ..write('split: $split, ')
@@ -5082,7 +5034,6 @@ typedef $$CachedCostsTableCreateCompanionBuilder =
       required String eventId,
       required String workspaceId,
       required int amountCents,
-      required String currency,
       required String kind,
       required String paidBy,
       required String split,
@@ -5100,7 +5051,6 @@ typedef $$CachedCostsTableUpdateCompanionBuilder =
       Value<String> eventId,
       Value<String> workspaceId,
       Value<int> amountCents,
-      Value<String> currency,
       Value<String> kind,
       Value<String> paidBy,
       Value<String> split,
@@ -5139,11 +5089,6 @@ class $$CachedCostsTableFilterComposer
 
   ColumnFilters<int> get amountCents => $composableBuilder(
     column: $table.amountCents,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get currency => $composableBuilder(
-    column: $table.currency,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5222,11 +5167,6 @@ class $$CachedCostsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get currency => $composableBuilder(
-    column: $table.currency,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get kind => $composableBuilder(
     column: $table.kind,
     builder: (column) => ColumnOrderings(column),
@@ -5298,9 +5238,6 @@ class $$CachedCostsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<String> get currency =>
-      $composableBuilder(column: $table.currency, builder: (column) => column);
-
   GeneratedColumn<String> get kind =>
       $composableBuilder(column: $table.kind, builder: (column) => column);
 
@@ -5364,7 +5301,6 @@ class $$CachedCostsTableTableManager
                 Value<String> eventId = const Value.absent(),
                 Value<String> workspaceId = const Value.absent(),
                 Value<int> amountCents = const Value.absent(),
-                Value<String> currency = const Value.absent(),
                 Value<String> kind = const Value.absent(),
                 Value<String> paidBy = const Value.absent(),
                 Value<String> split = const Value.absent(),
@@ -5380,7 +5316,6 @@ class $$CachedCostsTableTableManager
                 eventId: eventId,
                 workspaceId: workspaceId,
                 amountCents: amountCents,
-                currency: currency,
                 kind: kind,
                 paidBy: paidBy,
                 split: split,
@@ -5398,7 +5333,6 @@ class $$CachedCostsTableTableManager
                 required String eventId,
                 required String workspaceId,
                 required int amountCents,
-                required String currency,
                 required String kind,
                 required String paidBy,
                 required String split,
@@ -5414,7 +5348,6 @@ class $$CachedCostsTableTableManager
                 eventId: eventId,
                 workspaceId: workspaceId,
                 amountCents: amountCents,
-                currency: currency,
                 kind: kind,
                 paidBy: paidBy,
                 split: split,

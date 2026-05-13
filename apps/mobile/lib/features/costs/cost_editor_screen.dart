@@ -11,9 +11,10 @@ import 'package:kp_mobile/data/api_client/kp_client.dart';
 // Add a cost to an event. Online-only (POST /v1/events/{id}/costs) — adding
 // a cost while offline is rare enough that we skip the outbox round-trip;
 // the change_log pull on the next sync will land it on every device.
+//
+// Amounts are CZK haléře. Multi-currency was dropped before v1.0.
 
 const List<String> _kinds = <String>['ticket', 'transport', 'food', 'other'];
-const List<String> _currencies = <String>['CZK', 'EUR', 'USD'];
 
 class CostEditorScreen extends ConsumerStatefulWidget {
   const CostEditorScreen({required this.eventId, super.key});
@@ -27,7 +28,6 @@ class CostEditorScreen extends ConsumerStatefulWidget {
 class _CostEditorScreenState extends ConsumerState<CostEditorScreen> {
   final TextEditingController _amount = TextEditingController(text: '0');
   final TextEditingController _note = TextEditingController();
-  String _currency = 'CZK';
   String _kind = 'ticket';
   DateTime _paidAt = DateTime.now();
   bool _submitting = false;
@@ -81,7 +81,6 @@ class _CostEditorScreenState extends ConsumerState<CostEditorScreen> {
         '/v1/events/${widget.eventId}/costs',
         data: <String, Object?>{
           'amount_cents': cents,
-          'currency': _currency,
           'kind': _kind,
           'paid_at':
               '${_paidAt.year.toString().padLeft(4, '0')}-'
@@ -118,37 +117,14 @@ class _CostEditorScreenState extends ConsumerState<CostEditorScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                flex: 2,
-                child: TextField(
-                  controller: _amount,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Částka',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _currency,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    labelText: 'Měna',
-                  ),
-                  items: <DropdownMenuItem<String>>[
-                    for (final String c in _currencies)
-                      DropdownMenuItem<String>(value: c, child: Text(c)),
-                  ],
-                  onChanged: (v) => setState(() => _currency = v ?? 'CZK'),
-                ),
-              ),
-            ],
+          TextField(
+            controller: _amount,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: 'Částka',
+              suffixText: 'Kč',
+            ),
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(

@@ -134,7 +134,6 @@ def serialize_cost(cost: Cost) -> dict[str, Any]:
         "event_id": str(cost.event_id),
         "workspace_id": str(cost.workspace_id),
         "amount_cents": cost.amount_cents,
-        "currency": cost.currency,
         "kind": cost.kind,
         "paid_by": str(cost.paid_by),
         "split": cost.split,

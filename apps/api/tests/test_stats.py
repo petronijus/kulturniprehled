@@ -1,49 +1,13 @@
-"""Stats endpoint — aggregation + multi-currency conversion."""
+"""Stats endpoint — CZK-only aggregation."""
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
-from decimal import Decimal
+from datetime import date, datetime, timezone
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from kp_api.adapters.fx import FxRateProvider
-from kp_api.api.v1 import costs as costs_module
-from kp_api.api.v1 import stats as stats_module
 from tests.conftest import auth_header, login_as
-
-
-class _StubFx:
-    def __init__(self, rates: dict[tuple[str, str], Decimal]) -> None:
-        self._rates = rates
-
-    async def rate(
-        self,
-        session: AsyncSession,
-        on: date,
-        base: str,
-        quote: str,
-    ) -> Decimal:
-        if base == quote:
-            return Decimal("1")
-        return self._rates[(base, quote)]
-
-
-@pytest.fixture(autouse=True)
-def _stub_fx() -> None:
-    stub: FxRateProvider = _StubFx(
-        {
-            ("EUR", "CZK"): Decimal("24"),
-            ("USD", "CZK"): Decimal("22"),
-        },
-    )
-    costs_module.set_fx_provider(stub)
-    stats_module.set_fx_provider(stub)
-    yield
-    costs_module.set_fx_provider(None)
-    stats_module.set_fx_provider(None)
 
 
 def _iso(dt: datetime) -> str:
@@ -76,29 +40,25 @@ async def test_stats_aggregates_events_and_costs(client: AsyncClient) -> None:
     await _event("concert", 2)
     theatre = await _event("theatre", 3)
 
-    # Mark one as attended.
     await client.patch(
         f"/v1/events/{concert['id']}",
         json={"version": 1, "status": "attended"},
         headers=headers,
     )
 
-    paid_at = date(year, 1, 15)
     await client.post(
         f"/v1/events/{concert['id']}/costs",
         json={
             "amount_cents": 1000,
-            "currency": "CZK",
             "kind": "ticket",
-            "paid_at": paid_at.isoformat(),
+            "paid_at": date(year, 1, 15).isoformat(),
         },
         headers=headers,
     )
     await client.post(
         f"/v1/events/{theatre['id']}/costs",
         json={
-            "amount_cents": 500,
-            "currency": "EUR",
+            "amount_cents": 12000,
             "kind": "ticket",
             "paid_at": date(year, 3, 5).isoformat(),
         },
@@ -119,12 +79,10 @@ async def test_stats_aggregates_events_and_costs(client: AsyncClient) -> None:
 
     months = {row["month"]: row for row in body["by_month"]}
     assert months[1]["events"] == 1
-    assert months[1]["total_cost_cents"] == 1000  # CZK direct
-    assert months[3]["total_cost_cents"] == 12000  # 500 EUR cents * 24
+    assert months[1]["total_cost_cents"] == 1000
+    assert months[3]["total_cost_cents"] == 12000
 
-    # 1000 CZK cents + 12000 CZK cents
     assert body["total_cost_cents"] == 13000
-    assert body["primary_currency"] == "CZK"
 
 
 @pytest.mark.asyncio

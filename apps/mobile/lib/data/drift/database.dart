@@ -102,11 +102,11 @@ class CachedTicketFiles extends Table {
 
 @DataClassName('CachedCostRow')
 class CachedCosts extends Table {
+  // All amounts are CZK haléře. Multi-currency was dropped before v1.0.
   TextColumn get id => text()();
   TextColumn get eventId => text()();
   TextColumn get workspaceId => text()();
   IntColumn get amountCents => integer()();
-  TextColumn get currency => text()();
   TextColumn get kind => text()();
   TextColumn get paidBy => text()();
   TextColumn get split => text()();
@@ -136,7 +136,7 @@ class KpDatabase extends _$KpDatabase {
   KpDatabase.test(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -148,6 +148,14 @@ class KpDatabase extends _$KpDatabase {
       }
       if (from < 3) {
         await m.createTable(cachedCosts);
+      }
+      if (from < 4) {
+        // Backend dropped multi-currency in 0006; align the local cache.
+        // ALTER TABLE DROP COLUMN works on SQLite 3.35+ (Drift bundles
+        // a newer build via sqlite3_flutter_libs).
+        await m.database.customStatement(
+          'ALTER TABLE cached_costs DROP COLUMN currency',
+        );
       }
     },
   );

@@ -129,7 +129,6 @@ async def _clean_db(engine: AsyncEngine) -> AsyncIterator[None]:
                   applied_ops,
                   refresh_tokens,
                   personal_access_tokens,
-                  fx_rates,
                   costs,
                   tickets,
                   change_log,

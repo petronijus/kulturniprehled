@@ -125,14 +125,10 @@ class TicketDownloadUrlResponse(BaseModel):
     expires_in_seconds: int
 
 
-_CURRENCY_PATTERN = r"^[A-Za-z]{3}$"
-
-
 class CostCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     amount_cents: int = Field(ge=0)
-    currency: str = Field(min_length=3, max_length=3, pattern=_CURRENCY_PATTERN)
     kind: CostKind = CostKind.TICKET
     split: CostSplit = CostSplit.SHARED
     note: str | None = None
@@ -145,9 +141,6 @@ class CostUpdate(BaseModel):
 
     version: int = Field(ge=1)
     amount_cents: int | None = Field(default=None, ge=0)
-    currency: str | None = Field(
-        default=None, min_length=3, max_length=3, pattern=_CURRENCY_PATTERN
-    )
     kind: CostKind | None = None
     split: CostSplit | None = None
     note: str | None = None
@@ -161,7 +154,6 @@ class CostResponse(BaseModel):
     event_id: UUID
     workspace_id: UUID
     amount_cents: int
-    currency: str
     kind: CostKind
     paid_by: UUID
     split: CostSplit
@@ -174,8 +166,7 @@ class CostResponse(BaseModel):
 
 class CostListResponse(BaseModel):
     items: list[CostResponse]
-    total_in_primary_currency: int
-    primary_currency: str = "CZK"
+    total_amount_cents: int
 
 
 class StatsByMonth(BaseModel):
@@ -203,4 +194,3 @@ class StatsResponse(BaseModel):
     by_month: list[StatsByMonth]
     top_venues: list[StatsTopVenue]
     total_cost_cents: int
-    primary_currency: str = "CZK"

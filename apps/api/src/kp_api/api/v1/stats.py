@@ -1,10 +1,7 @@
-"""Stats endpoint — aggregated counts and converted totals for a year.
+"""Stats endpoint — aggregated counts and CZK totals for a year.
 
-Two passes over the workspace's data:
-1. Pure SQL aggregates (events per month/category/status, venue tallies).
-2. Cost rows fetched and converted to the primary currency via the FX
-   provider so totals stay reproducible even after a frankfurter dataset
-   rotation.
+All money is in CZK haléře (`amount_cents`) — multi-currency was dropped
+in 0006. Aggregation is therefore a single SQL pass.
 """
 
 from __future__ import annotations
@@ -15,7 +12,6 @@ from fastapi import APIRouter, Query
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from kp_api.adapters.fx import FrankfurterProvider, FxRateProvider, convert
 from kp_api.api.deps import CurrentUser, SessionDep
 from kp_api.domain.enums import EventCategory, EventStatus
 from kp_api.domain.models import Cost, Event, User, Venue, Workspace, WorkspaceMember
@@ -27,17 +23,6 @@ from kp_api.domain.schemas import (
 )
 
 router = APIRouter(prefix="/v1/stats", tags=["stats"])
-
-_fx_provider: FxRateProvider | None = None
-
-
-def set_fx_provider(provider: FxRateProvider | None) -> None:
-    global _fx_provider
-    _fx_provider = provider
-
-
-def _provider() -> FxRateProvider:
-    return _fx_provider or FrankfurterProvider()
 
 
 async def _user_workspace(session: AsyncSession, user: User) -> Workspace:
@@ -56,11 +41,9 @@ async def stats(
     session: SessionDep,
     user: CurrentUser,
     year: Annotated[int, Query(ge=2000, le=2100)],
-    primary: Annotated[str, Query()] = "CZK",
 ) -> StatsResponse:
     workspace = await _user_workspace(session, user)
 
-    # ---- Events per category ----
     by_cat_rows = (
         await session.execute(
             select(Event.category, func.count())
@@ -72,14 +55,12 @@ async def stats(
             .group_by(Event.category)
         )
     ).all()
-
     by_category = [
         StatsByCategory(category=EventCategory(row[0]), count=int(row[1]))
         for row in by_cat_rows
     ]
     total_events = sum(c.count for c in by_category)
 
-    # ---- Events per month ----
     by_month_rows = (
         await session.execute(
             select(
@@ -97,33 +78,22 @@ async def stats(
     ).all()
     by_month_events = {int(row[0]): int(row[1]) for row in by_month_rows}
 
-    # ---- Cost rollups (per month and total) ----
-    costs = (
-        await session.scalars(
-            select(Cost).where(
+    by_month_cost_rows = (
+        await session.execute(
+            select(
+                func.extract("month", Cost.paid_at).label("month"),
+                func.coalesce(func.sum(Cost.amount_cents), 0).label("total"),
+            )
+            .where(
                 Cost.workspace_id == workspace.id,
                 Cost.deleted_at.is_(None),
                 func.extract("year", Cost.paid_at) == year,
             )
+            .group_by(func.extract("month", Cost.paid_at))
         )
     ).all()
-    primary = primary.upper()
-    provider = _provider()
-    by_month_cost: dict[int, int] = {}
-    total_cost = 0
-    for cost in costs:
-        converted = await convert(
-            session,
-            provider,
-            amount_cents=cost.amount_cents,
-            currency=cost.currency,
-            on=cost.paid_at,
-            target=primary,
-        )
-        by_month_cost[cost.paid_at.month] = (
-            by_month_cost.get(cost.paid_at.month, 0) + converted
-        )
-        total_cost += converted
+    by_month_cost = {int(row[0]): int(row[1]) for row in by_month_cost_rows}
+    total_cost = sum(by_month_cost.values())
 
     by_month = [
         StatsByMonth(
@@ -135,7 +105,6 @@ async def stats(
         if by_month_events.get(m, 0) > 0 or by_month_cost.get(m, 0) > 0
     ]
 
-    # ---- Top venues (by event count) ----
     venue_rows = (
         await session.execute(
             select(Venue.name, func.count())
@@ -154,7 +123,6 @@ async def stats(
         StatsTopVenue(name=str(row[0]), count=int(row[1])) for row in venue_rows
     ]
 
-    # ---- Attended / upcoming counters ----
     attended = await session.scalar(
         select(func.count(distinct(Event.id))).where(
             Event.workspace_id == workspace.id,
@@ -172,8 +140,6 @@ async def stats(
         )
     )
 
-    await session.commit()  # persist FX cache writes done during the loop
-
     return StatsResponse(
         year=year,
         total_events=total_events,
@@ -183,5 +149,4 @@ async def stats(
         by_month=by_month,
         top_venues=top_venues,
         total_cost_cents=total_cost,
-        primary_currency=primary,
     )

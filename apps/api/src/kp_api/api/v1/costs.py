@@ -4,19 +4,20 @@ Costs hang off events: every line is created via
 `POST /v1/events/{event_id}/costs`. Listings are workspace-wide via
 `GET /v1/events/{event_id}/costs`. Mutations follow the same optimistic-
 locking + change_log pattern used for events.
+
+Amounts are in CZK haléře (`amount_cents`). Multi-currency was dropped
+in 0006 — see the `Cost` model docstring for rationale.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from kp_api.adapters.fx import FrankfurterProvider, FxRateProvider, convert
 from kp_api.api.deps import CurrentUser, SessionDep
 from kp_api.domain.enums import ChangeOp
 from kp_api.domain.models import Cost, Event, User, Workspace, WorkspaceMember
@@ -30,18 +31,6 @@ from kp_api.sync.changelog import record_cost_change
 
 router = APIRouter(prefix="/v1/costs", tags=["costs"])
 events_router = APIRouter(prefix="/v1/events", tags=["costs"])
-
-# Dependency hook so tests can swap in a deterministic provider.
-_fx_provider: FxRateProvider | None = None
-
-
-def set_fx_provider(provider: FxRateProvider | None) -> None:
-    global _fx_provider
-    _fx_provider = provider
-
-
-def _provider() -> FxRateProvider:
-    return _fx_provider or FrankfurterProvider()
 
 
 def _utcnow() -> datetime:
@@ -107,7 +96,6 @@ async def create_cost(
         event_id=event.id,
         workspace_id=workspace.id,
         amount_cents=body.amount_cents,
-        currency=body.currency.upper(),
         kind=body.kind,
         paid_by=body.paid_by or user.id,
         split=body.split,
@@ -131,7 +119,6 @@ async def list_event_costs(
     event_id: UUID,
     session: SessionDep,
     user: CurrentUser,
-    primary: Annotated[str, "query"] = "CZK",
 ) -> CostListResponse:
     workspace = await _user_workspace(session, user)
     await _event_in_workspace(session, workspace, event_id)
@@ -146,24 +133,16 @@ async def list_event_costs(
             .order_by(Cost.paid_at.asc())
         )
     ).all()
-
-    primary = primary.upper()
-    provider = _provider()
-    total = 0
-    for cost in rows:
-        total += await convert(
-            session,
-            provider,
-            amount_cents=cost.amount_cents,
-            currency=cost.currency,
-            on=cost.paid_at,
-            target=primary,
+    total = await session.scalar(
+        select(func.coalesce(func.sum(Cost.amount_cents), 0)).where(
+            Cost.event_id == event_id,
+            Cost.workspace_id == workspace.id,
+            Cost.deleted_at.is_(None),
         )
-    await session.commit()  # persist any newly-cached FX rates
+    )
     return CostListResponse(
         items=[CostResponse.model_validate(c) for c in rows],
-        total_in_primary_currency=total,
-        primary_currency=primary,
+        total_amount_cents=int(total or 0),
     )
 
 
@@ -182,8 +161,6 @@ async def update_cost(
             {"code": "version_mismatch", "current_version": cost.version},
         )
     data = body.model_dump(exclude_unset=True, exclude={"version"})
-    if "currency" in data and isinstance(data["currency"], str):
-        data["currency"] = data["currency"].upper()
     for key, value in data.items():
         setattr(cost, key, value)
     cost.version += 1

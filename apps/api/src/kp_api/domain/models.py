@@ -17,7 +17,6 @@ Conventions:
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
-from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import (
@@ -28,7 +27,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
-    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -269,9 +267,11 @@ class Ticket(Base):
 class Cost(Base):
     """A money line attached to an event.
 
-    Stored in minor units (`amount_cents`) with explicit ISO-4217
-    `currency`. Conversion to a reporting currency happens at read time so
-    historic reports stay stable — see `kp_api.adapters.fx`.
+    Amounts are stored in minor units (haléře) as integers — implicit
+    currency is CZK, the only currency the household tracks. Multi-currency
+    support was removed in 0006 along with the frankfurter FX cache; if
+    the day ever comes that we need foreign currencies again, restore the
+    `currency` column and re-introduce a conversion table.
     """
 
     __tablename__ = "costs"
@@ -298,7 +298,6 @@ class Cost(Base):
         nullable=False,
     )
     amount_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    currency: Mapped[str] = mapped_column(String(3), nullable=False)
     kind: Mapped[CostKind] = mapped_column(String(20), nullable=False)
     paid_by: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -316,19 +315,6 @@ class Cost(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-
-
-class FxRate(Base):
-    """Daily mid-rate from frankfurter.app, cached so reports stay
-    reproducible after the upstream rotates its dataset."""
-
-    __tablename__ = "fx_rates"
-
-    date: Mapped[date] = mapped_column(Date, primary_key=True)  # noqa: F811
-    base: Mapped[str] = mapped_column(String(3), primary_key=True)
-    quote: Mapped[str] = mapped_column(String(3), primary_key=True)
-    rate: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
-    fetched_at: Mapped[datetime] = _created_at()
 
 
 class PersonalAccessToken(Base):

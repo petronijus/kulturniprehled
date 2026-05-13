@@ -27,11 +27,20 @@ class Settings(BaseSettings):
 
     # MinIO
     minio_endpoint: str = "localhost:9000"
+    # Public endpoint baked into presigned URLs. Defaults to `minio_endpoint`
+    # so dev / tests work with a single hostname. In production set this to
+    # the Cloudflare-tunnel-fronted host (e.g. `tickets.kp.example.com`) so
+    # mobile clients reach MinIO via the public URL; SigV4 signs the host
+    # header, so the URL must already point at the host that will receive
+    # the request.
+    minio_public_endpoint: str | None = None
+    minio_public_use_ssl: bool | None = None
     minio_access_key: str = "kp-minio"
     minio_secret_key: str = "changeme-changeme"
     minio_bucket_tickets: str = "tickets"
     minio_region: str = "eu-central-1"
     minio_use_ssl: bool = False
+    minio_presigned_url_ttl_seconds: int = 900
 
     # API
     api_host: str = "0.0.0.0"  # noqa: S104  (binding inside container)

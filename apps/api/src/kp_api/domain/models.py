@@ -207,6 +207,60 @@ class Event(Base):
     venue: Mapped[Venue | None] = relationship()
 
 
+class Ticket(Base):
+    """A purchased-ticket artefact attached to an event.
+
+    The blob (PDF / image / ICS file) lives in MinIO at `object_key`. The
+    domain row carries identity, integrity (`hash_sha256`) and provenance
+    (`uploaded_by`); the bytes themselves are fetched via a short-lived
+    presigned URL. `workspace_id` is denormalized from the parent event so
+    sync queries do not have to join."""
+
+    __tablename__ = "tickets"
+    __table_args__ = (
+        Index(
+            "ix_tickets_event_active",
+            "event_id",
+            "deleted_at",
+            postgresql_where="deleted_at IS NULL",
+        ),
+        Index(
+            "ix_tickets_workspace_active",
+            "workspace_id",
+            "deleted_at",
+            postgresql_where="deleted_at IS NULL",
+        ),
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    event_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("events.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    object_key: Mapped[str] = mapped_column(String(512), nullable=False, unique=True)
+    mime_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    original_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    hash_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    uploaded_by: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
 class RefreshToken(Base):
     """Issued refresh tokens. Reuse detection: when a token is presented after
     being rotated, the whole family is revoked. `family_id` ties all tokens

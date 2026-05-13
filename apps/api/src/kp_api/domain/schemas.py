@@ -66,3 +66,54 @@ class EventResponse(BaseModel):
 class EventListResponse(BaseModel):
     items: list[EventResponse]
     total: int
+
+
+class TicketUploadUrlRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: UUID
+    mime_type: str = Field(min_length=1, max_length=120)
+    original_filename: str | None = Field(default=None, max_length=255)
+    size_bytes: int | None = Field(default=None, ge=0)
+
+
+class TicketUploadUrlResponse(BaseModel):
+    object_key: str
+    upload_url: str
+    expires_in_seconds: int
+
+
+class TicketCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: UUID
+    object_key: str = Field(min_length=1, max_length=512)
+    mime_type: str = Field(min_length=1, max_length=120)
+    original_filename: str | None = Field(default=None, max_length=255)
+    size_bytes: int | None = Field(default=None, ge=0)
+    hash_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+
+class TicketResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    event_id: UUID
+    workspace_id: UUID
+    mime_type: str
+    original_filename: str | None
+    size_bytes: int | None
+    hash_sha256: str | None
+    uploaded_by: UUID
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class TicketListResponse(BaseModel):
+    items: list[TicketResponse]
+
+
+class TicketDownloadUrlResponse(BaseModel):
+    download_url: str
+    expires_in_seconds: int

@@ -1,9 +1,19 @@
 # Example tunnel configuration. The real `config.yml` is created on the
 # Proxmox VM and contains the tunnel UUID; it must not be committed.
 #
-# Two public hostnames are mapped to two internal services:
+# Two public hostnames front two internal services:
 #   - api.kp.example.com      → FastAPI on http://api:8000
 #   - tickets.kp.example.com  → MinIO on  http://minio:9000
+#
+# Why two hostnames?
+#   The MinIO presigned-URL flow (M3) signs the request host into the URL
+#   via SigV4. Mobile clients receive URLs pointing at `tickets.kp.*` and
+#   reach MinIO directly through the tunnel — the API never streams ticket
+#   bytes. To make signed URLs valid the API must generate them with the
+#   public hostname (set MINIO_PUBLIC_ENDPOINT=tickets.kp.example.com and
+#   MINIO_PUBLIC_USE_SSL=true in the prod `.env`), and the MinIO server
+#   must answer to that hostname — set MINIO_SERVER_URL on the MinIO
+#   container accordingly.
 
 tunnel: REPLACE_WITH_TUNNEL_UUID
 credentials-file: /etc/cloudflared/REPLACE_WITH_TUNNEL_UUID.json
@@ -14,5 +24,10 @@ ingress:
   - hostname: tickets.kp.example.com
     service: http://minio:9000
     originRequest:
+      # MinIO doesn't speak TLS internally; Cloudflare Tunnel terminates.
       noTLSVerify: true
+      # Streaming uploads from the desktop skill / Flutter clients can be
+      # large (PDF tickets, posters). 60s default is enough for now;
+      # bump if you start attaching long video recaps.
+      connectTimeout: 30s
   - service: http_status:404

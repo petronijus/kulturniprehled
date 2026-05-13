@@ -26,10 +26,12 @@ from alembic.config import Config as AlembicConfig
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from testcontainers.minio import MinioContainer
 from testcontainers.postgres import PostgresContainer
 
 from kp_api.adapters.db import set_engine_override
 from kp_api.adapters.oauth import GoogleIdentity, IdTokenVerifier
+from kp_api.adapters.storage import minio as storage
 from kp_api.api.v1.auth import get_verifier
 from kp_api.config import Settings, get_settings
 from kp_api.main import app
@@ -64,21 +66,38 @@ def postgres() -> Iterator[PostgresContainer]:
 
 
 @pytest.fixture(scope="session")
-def settings(postgres: PostgresContainer) -> Iterator[Settings]:
+def minio() -> Iterator[MinioContainer]:
+    with MinioContainer() as container:
+        yield container
+
+
+@pytest.fixture(scope="session")
+def settings(
+    postgres: PostgresContainer, minio: MinioContainer
+) -> Iterator[Settings]:
+    minio_config = minio.get_config()
     env: dict[str, str] = {
         "POSTGRES_HOST": str(postgres.get_container_host_ip()),
         "POSTGRES_PORT": str(postgres.get_exposed_port(5432)),
         "POSTGRES_DB": str(postgres.dbname),
         "POSTGRES_USER": str(postgres.username),
         "POSTGRES_PASSWORD": str(postgres.password),
+        "MINIO_ENDPOINT": str(minio_config["endpoint"]),
+        "MINIO_ACCESS_KEY": str(minio_config["access_key"]),
+        "MINIO_SECRET_KEY": str(minio_config["secret_key"]),
+        "MINIO_BUCKET_TICKETS": "tickets",
+        "MINIO_USE_SSL": "false",
         "API_JWT_SECRET": "test-secret-test-secret-test-secret",
         "GOOGLE_OAUTH_CLIENT_ID": "test-client-id",
         "ALLOWED_EMAILS": "petr@example.com,bela@example.com",
     }
     with patch.dict(os.environ, env, clear=False):
         get_settings.cache_clear()
+        storage.reset_cached_clients()
+        storage.ensure_bucket()
         yield get_settings()
     get_settings.cache_clear()
+    storage.reset_cached_clients()
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -109,6 +128,7 @@ async def _clean_db(engine: AsyncEngine) -> AsyncIterator[None]:
                 TRUNCATE TABLE
                   applied_ops,
                   refresh_tokens,
+                  tickets,
                   change_log,
                   events,
                   workspace_members,

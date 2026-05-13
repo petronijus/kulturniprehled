@@ -24,7 +24,7 @@ from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api.domain.enums import ChangeOp
-from kp_api.domain.models import ChangeLog, Event
+from kp_api.domain.models import ChangeLog, Event, Ticket
 
 
 def _isoformat(value: datetime | None) -> str | None:
@@ -74,6 +74,52 @@ async def record_event_change(
             entity_id=event.id,
             op=op,
             payload=serialize_event(event),
+            actor_id=actor_id,
+        )
+        .returning(ChangeLog.seq)
+    )
+    seq = result.scalar_one()
+    return int(seq)
+
+
+def serialize_ticket(ticket: Ticket) -> dict[str, Any]:
+    """Public ticket payload for sync.
+
+    `object_key` is deliberately omitted — mobile clients fetch the blob via
+    `GET /v1/tickets/{id}/url`. Exposing the MinIO path is not a security
+    problem (the secret is the signature), but it ties the public payload to
+    an internal storage layout we may change."""
+
+    return {
+        "id": str(ticket.id),
+        "event_id": str(ticket.event_id),
+        "workspace_id": str(ticket.workspace_id),
+        "mime_type": ticket.mime_type,
+        "original_filename": ticket.original_filename,
+        "size_bytes": ticket.size_bytes,
+        "hash_sha256": ticket.hash_sha256,
+        "uploaded_by": str(ticket.uploaded_by),
+        "version": ticket.version,
+        "created_at": _isoformat(ticket.created_at),
+        "updated_at": _isoformat(ticket.updated_at),
+        "deleted_at": _isoformat(ticket.deleted_at),
+    }
+
+
+async def record_ticket_change(
+    session: AsyncSession,
+    ticket: Ticket,
+    actor_id: UUID,
+    op: ChangeOp,
+) -> int:
+    result = await session.execute(
+        insert(ChangeLog)
+        .values(
+            workspace_id=ticket.workspace_id,
+            entity_type="ticket",
+            entity_id=ticket.id,
+            op=op,
+            payload=serialize_ticket(ticket),
             actor_id=actor_id,
         )
         .returning(ChangeLog.seq)

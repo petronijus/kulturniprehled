@@ -261,6 +261,35 @@ class Ticket(Base):
     )
 
 
+class PersonalAccessToken(Base):
+    """Long-lived bearer credential for headless clients (Claude Code skill,
+    desktop scripts).
+
+    Unlike refresh tokens, a PAT is presented directly on every request and
+    never rotates. We sign it as a JWT so verification is stateless; the row
+    here only exists for naming, revocation, and `last_used_at` book-keeping."""
+
+    __tablename__ = "personal_access_tokens"
+
+    jti: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = _created_at()
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
 class RefreshToken(Base):
     """Issued refresh tokens. Reuse detection: when a token is presented after
     being rotated, the whole family is revoked. `family_id` ties all tokens

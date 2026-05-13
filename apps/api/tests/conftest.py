@@ -128,6 +128,7 @@ async def _clean_db(engine: AsyncEngine) -> AsyncIterator[None]:
                 TRUNCATE TABLE
                   applied_ops,
                   refresh_tokens,
+                  personal_access_tokens,
                   tickets,
                   change_log,
                   events,

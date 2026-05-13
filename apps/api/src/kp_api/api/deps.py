@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from kp_api.adapters.auth import AuthError, decode_access
+from kp_api.adapters.auth import AuthError, decode_bearer, touch_pat
 from kp_api.adapters.db import get_session
 from kp_api.config import Settings, get_settings
 from kp_api.domain.models import User
@@ -25,9 +25,18 @@ async def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing bearer token")
     token = authorization.split(" ", 1)[1].strip()
     try:
-        claims = decode_access(token, settings)
+        claims = decode_bearer(token, settings)
     except AuthError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
+
+    if claims.is_pat:
+        # PATs are DB-tracked: revocation, expiry, and last_used_at all live
+        # there. Touch the row so we have a real "last seen" without paying
+        # for a separate audit table.
+        row = await touch_pat(session, claims.jti)
+        if row is None:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "pat revoked or unknown")
+
     user = await session.get(User, claims.sub)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "user not found")

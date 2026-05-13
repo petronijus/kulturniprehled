@@ -1,18 +1,67 @@
-# `ticket-parser` skill
+# `kulturni-prehled-ingest` Claude Code skill
 
-Placeholder. Milestone M4 imports the existing personal Claude Code skill
-(currently writing only to Google Calendar) and extends it to call the
-Kulturní Přehled API.
+End-to-end ingestion of downloaded cultural-event tickets:
 
-When the skill source is added here, it must include:
+1. Reads the PDFs from `~/Downloads`.
+2. Extracts the metadata (performer/title, date, venue, seats).
+3. Looks up MHD travel time from Svatovítská 16 to the venue.
+4. Creates the event in Kulturní Přehled (`POST /v1/events`).
+5. Uploads each ticket to KP via presigned MinIO URL.
+6. Mirrors to Google Drive.
+7. Creates the event in the shared Google Calendar.
+8. Emails Běla.
 
-- `SKILL.md` describing trigger conditions and capabilities (parse ticket,
-  create event in KP, upload ticket file, log to `llm_calls`).
-- A new capability `kp_create_event` that POSTs to `/v1/events`.
-- A new capability `kp_upload_ticket` that uses the presigned-URL flow.
-- A bearer token loaded from 1Password (`op-cache "kulturni-prehled api-token" credential`).
-- Idempotency: re-running the skill on the same ticket file must not create
-  duplicate events (use a stable hash of the ticket payload as a marker).
+The KP-side steps are the new bit; the Drive/Calendar/Gmail steps preserve
+the existing personal workflow that predates this project.
 
-The skill source lives in this directory and is versioned together with the
-backend so the API contract and the skill never drift.
+## Installation
+
+The canonical skill source lives here, inside the `kulturniprehled` repo so
+it is versioned together with the API contract it speaks to. To make it
+invokable from Claude Code, symlink it into the user's skills directory:
+
+```bash
+ln -sfn \
+    ~/Documents/Dev/kulturniprehled/skills/ticket-parser \
+    ~/.claude/skills/kulturni-prehled-ingest
+```
+
+(In this dev box the same symlink already exists under
+`~/Documents/Dev/ai-config/.claude/skills/kulturni-prehled-ingest`.)
+
+## Prerequisites
+
+- Docker + Docker Compose
+- The KP backend running locally (`docker compose --env-file .env -f infra/docker-compose.yml up -d`)
+- 1Password CLI signed in (`op-cache` helper available)
+- One-time setup: mint a Personal Access Token, store in 1Password
+  - `./scripts/mint-pat.sh petr@example.com 'desktop-skill'`
+  - The script prints the JWT to stdout. Pipe into 1Password:
+    ```bash
+    PAT=$(./scripts/mint-pat.sh petr@example.com 'desktop-skill')
+    op item edit 'Kulturni Prehled API Token' "credential=$PAT"
+    ```
+
+## How it authenticates
+
+The skill resolves the bearer token in this order:
+
+1. `op-cache 'Kulturni Prehled API Token' credential` (recommended)
+2. `KP_API_TOKEN` from the repo `.env`
+
+The token is a long-lived JWT (`type=pat`) signed by the API and tracked
+in the `personal_access_tokens` table for revocation. Revoke a leaked
+token via `docker compose exec api python -m kp_api.cli` (revoke command
+coming in M5).
+
+## API base URL
+
+The skill reads `KP_API_BASE`, defaulting to `http://localhost:18000`.
+In production set it to the Cloudflare-tunnel-fronted host
+(`https://api.kp.example.com`) in your shell profile or 1Password.
+
+## Why not let the skill call `/v1/sync/apply`?
+
+Creating tickets requires a presigned-URL round trip that is by nature
+online. There is no reason to wrap ticket-creation in the outbox; offline
+edits / deletes go through the outbox once the Flutter app lands (M5+).

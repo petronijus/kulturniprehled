@@ -21,11 +21,12 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api.config import Settings
-from kp_api.domain.models import RefreshToken, User
+from kp_api.domain.models import PersonalAccessToken, RefreshToken, User
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_TYPE = "access"
 REFRESH_TOKEN_TYPE = "refresh"
+PAT_TOKEN_TYPE = "pat"
 
 
 class AuthError(Exception):
@@ -38,6 +39,19 @@ class AccessClaims:
     email: str
     jti: UUID
     exp: datetime
+
+
+@dataclass(frozen=True)
+class BearerClaims:
+    """Either a short-lived access JWT or a long-lived PAT.
+
+    `is_pat` lets the auth dependency switch on whether to check the DB for
+    revocation. Access JWTs are stateless and rely on their short expiry."""
+
+    sub: UUID
+    email: str
+    jti: UUID
+    is_pat: bool
 
 
 @dataclass(frozen=True)
@@ -140,6 +154,96 @@ def decode_access(token: str, settings: Settings) -> AccessClaims:
         )
     except (KeyError, ValueError) as exc:
         raise AuthError("malformed token") from exc
+
+
+def decode_bearer(token: str, settings: Settings) -> BearerClaims:
+    """Decode either an access JWT or a PAT.
+
+    Both share the same signing key. PATs do not include `exp` and do not
+    rotate; the API caller must consult `personal_access_tokens` to ensure
+    the row exists and is not revoked."""
+
+    payload = _decode(token, settings.api_jwt_secret)
+    token_type = payload.get("type")
+    if token_type not in (ACCESS_TOKEN_TYPE, PAT_TOKEN_TYPE):
+        raise AuthError("wrong token type")
+    try:
+        return BearerClaims(
+            sub=UUID(str(payload["sub"])),
+            email=str(payload["email"]),
+            jti=UUID(str(payload["jti"])),
+            is_pat=token_type == PAT_TOKEN_TYPE,
+        )
+    except (KeyError, ValueError) as exc:
+        raise AuthError("malformed token") from exc
+
+
+async def mint_pat(
+    session: AsyncSession,
+    user: User,
+    name: str,
+    settings: Settings,
+    expires_at: datetime | None = None,
+) -> str:
+    """Issue a long-lived bearer JWT and record the row for revocation.
+
+    Returns the encoded JWT — callers must show it to the user **once** and
+    never store the plaintext server-side. The DB row holds the `jti` and a
+    human-readable `name` for audit, never the token itself."""
+
+    now = _utcnow()
+    jti = uuid4()
+    payload: dict[str, object] = {
+        "sub": str(user.id),
+        "email": user.email,
+        "type": PAT_TOKEN_TYPE,
+        "iat": int(now.timestamp()),
+        "jti": str(jti),
+    }
+    if expires_at is not None:
+        payload["exp"] = int(expires_at.timestamp())
+    token = _encode(payload, settings.api_jwt_secret)
+    session.add(
+        PersonalAccessToken(
+            jti=jti,
+            user_id=user.id,
+            name=name,
+            expires_at=expires_at,
+        )
+    )
+    await session.flush()
+    return token
+
+
+async def touch_pat(session: AsyncSession, jti: UUID) -> PersonalAccessToken | None:
+    """Look up a PAT and persist `last_used_at`.
+
+    Returns None when the token is unknown, revoked or expired so the caller
+    can answer 401 in one place. The update is committed here so the audit
+    record sticks even for read-only requests (those endpoints never commit
+    themselves)."""
+
+    row = await session.get(PersonalAccessToken, jti)
+    if row is None or row.revoked_at is not None:
+        return None
+    now = _utcnow()
+    if row.expires_at is not None and row.expires_at < now:
+        return None
+    await session.execute(
+        update(PersonalAccessToken)
+        .where(PersonalAccessToken.jti == jti)
+        .values(last_used_at=now)
+    )
+    await session.commit()
+    row.last_used_at = now
+    return row
+
+
+async def revoke_pat(session: AsyncSession, jti: UUID) -> None:
+    row = await session.get(PersonalAccessToken, jti)
+    if row is not None and row.revoked_at is None:
+        row.revoked_at = _utcnow()
+        await session.flush()
 
 
 async def rotate_refresh(

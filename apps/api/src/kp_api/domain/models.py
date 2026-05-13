@@ -1,0 +1,248 @@
+"""SQLAlchemy 2.0 ORM models for the Kulturní Přehled domain.
+
+This file defines the core entities introduced in milestone M1
+(users, workspaces, events, venues, change_log). Sync write-side hooks for
+`change_log` arrive in M2; the table is created here so migrations stay
+linear and so the `seq` column already exists when M2 ships.
+
+Conventions:
+- Primary keys are UUIDv7 generated in Python (`domain.ids.uuid7`) — they
+  sort chronologically, which gives Postgres better index locality.
+- Timestamps are `TIMESTAMPTZ` and default to `now()` at the database.
+- Soft deletes use `deleted_at`; queries must filter it out.
+- `version` is an optimistic-locking counter — server increments on every
+  upsert, clients must echo the value they last saw.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from uuid import UUID
+
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from kp_api.domain.enums import (
+    ChangeOp,
+    EventCategory,
+    EventSource,
+    EventStatus,
+    UserRole,
+)
+from kp_api.domain.ids import uuid7
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+def _uuid_pk() -> Mapped[UUID]:
+    return mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid7,
+    )
+
+
+def _created_at() -> Mapped[datetime]:
+    return mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+def _updated_at() -> Mapped[datetime]:
+    return mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[UUID] = _uuid_pk()
+    email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        String(20), nullable=False, default=UserRole.MEMBER
+    )
+    google_refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+
+    memberships: Mapped[list[WorkspaceMember]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    id: Mapped[UUID] = _uuid_pk()
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    google_calendar_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+
+    members: Mapped[list[WorkspaceMember]] = relationship(
+        back_populates="workspace", cascade="all, delete-orphan"
+    )
+    events: Mapped[list[Event]] = relationship(back_populates="workspace")
+
+
+class WorkspaceMember(Base):
+    __tablename__ = "workspace_members"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "user_id", name="uq_workspace_members"),
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[UserRole] = mapped_column(
+        String(20), nullable=False, default=UserRole.MEMBER
+    )
+    created_at: Mapped[datetime] = _created_at()
+
+    workspace: Mapped[Workspace] = relationship(back_populates="members")
+    user: Mapped[User] = relationship(back_populates="memberships")
+
+
+class Venue(Base):
+    __tablename__ = "venues"
+
+    id: Mapped[UUID] = _uuid_pk()
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    lat: Mapped[float | None] = mapped_column(nullable=True)
+    lng: Mapped[float | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = _created_at()
+
+
+class Event(Base):
+    __tablename__ = "events"
+    __table_args__ = (
+        Index("ix_events_workspace_starts_at", "workspace_id", "starts_at"),
+        Index(
+            "ix_events_workspace_active",
+            "workspace_id",
+            "deleted_at",
+            postgresql_where="deleted_at IS NULL",
+        ),
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[EventCategory] = mapped_column(String(20), nullable=False)
+    venue_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("venues.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    venue_timezone: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    status: Mapped[EventStatus] = mapped_column(
+        String(20), nullable=False, default=EventStatus.PLANNED
+    )
+    source: Mapped[EventSource] = mapped_column(
+        String(20), nullable=False, default=EventSource.MANUAL
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    workspace: Mapped[Workspace] = relationship(back_populates="events")
+    venue: Mapped[Venue | None] = relationship()
+
+
+class RefreshToken(Base):
+    """Issued refresh tokens. Reuse detection: when a token is presented after
+    being rotated, the whole family is revoked. `family_id` ties all tokens
+    that descend from one login together; `parent_jti` links to the token this
+    one replaced (NULL for the root token of a family)."""
+
+    __tablename__ = "refresh_tokens"
+
+    jti: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    family_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    parent_jti: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    rotated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = _created_at()
+
+
+class ChangeLog(Base):
+    """Append-only monotonic log used by the sync protocol (M2 wires writes).
+
+    Mobile clients pull with `GET /v1/sync?since=<seq>`. `seq` is the only
+    cursor that matters; timestamps are recorded for observability."""
+
+    __tablename__ = "change_log"
+    __table_args__ = (CheckConstraint("seq > 0", name="ck_change_log_seq_positive"),)
+
+    seq: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    entity_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    entity_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    op: Mapped[ChangeOp] = mapped_column(String(10), nullable=False)
+    payload: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    actor_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = _created_at()

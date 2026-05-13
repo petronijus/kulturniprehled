@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from kp_api import __version__
-from kp_api.api.v1 import healthz
+from kp_api.api.v1 import auth, events, healthz
 
 
 @asynccontextmanager
@@ -21,6 +21,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(healthz.router)
+    app.include_router(auth.router)
+    app.include_router(events.router)
     return app
 
 

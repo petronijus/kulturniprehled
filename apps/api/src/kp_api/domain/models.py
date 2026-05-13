@@ -16,7 +16,7 @@ Conventions:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import (
@@ -64,12 +64,21 @@ def _created_at() -> Mapped[datetime]:
     )
 
 
+def _python_utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 def _updated_at() -> Mapped[datetime]:
+    # onupdate runs Python-side: SQLAlchemy materializes the value and
+    # includes it in the UPDATE statement, so the in-memory attribute stays
+    # fresh. Using `func.now()` here would mark the attribute expired and
+    # force a reload — which then explodes in async sessions because the
+    # lazy fetch happens outside SQLAlchemy's `greenlet_spawn` context.
     return mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
-        onupdate=func.now(),
+        onupdate=_python_utcnow,
     )
 
 
@@ -229,15 +238,22 @@ class RefreshToken(Base):
 
 
 class ChangeLog(Base):
-    """Append-only monotonic log used by the sync protocol (M2 wires writes).
+    """Append-only monotonic log used by the sync protocol.
 
     Mobile clients pull with `GET /v1/sync?since=<seq>`. `seq` is the only
-    cursor that matters; timestamps are recorded for observability."""
+    cursor that matters; timestamps are recorded for observability. The
+    `workspace_id` column scopes the cursor — a member only sees changes for
+    workspaces they belong to."""
 
     __tablename__ = "change_log"
     __table_args__ = (CheckConstraint("seq > 0", name="ck_change_log_seq_positive"),)
 
     seq: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     entity_type: Mapped[str] = mapped_column(String(40), nullable=False)
     entity_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     op: Mapped[ChangeOp] = mapped_column(String(10), nullable=False)
@@ -245,4 +261,28 @@ class ChangeLog(Base):
     actor_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True
     )
+    created_at: Mapped[datetime] = _created_at()
+
+
+class AppliedOp(Base):
+    """Idempotency cache for `POST /v1/sync/apply`.
+
+    Clients generate an `op_id` UUID for each mutation in their outbox; the
+    server stores the response on first apply and replays it on retry so a
+    flaky network never produces a duplicate event."""
+
+    __tablename__ = "applied_ops"
+
+    op_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
+    actor_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    response: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = _created_at()

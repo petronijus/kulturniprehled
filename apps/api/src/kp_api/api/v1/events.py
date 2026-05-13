@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api.api.deps import CurrentUser, SessionDep
-from kp_api.domain.enums import EventCategory, EventSource, EventStatus
+from kp_api.domain.enums import ChangeOp, EventCategory, EventSource, EventStatus
 from kp_api.domain.models import Event, User, Workspace, WorkspaceMember
 from kp_api.domain.schemas import (
     EventCreate,
@@ -25,6 +25,7 @@ from kp_api.domain.schemas import (
     EventResponse,
     EventUpdate,
 )
+from kp_api.sync.changelog import record_event_change
 
 router = APIRouter(prefix="/v1/events", tags=["events"])
 
@@ -101,6 +102,8 @@ async def create_event(
         version=1,
     )
     session.add(event)
+    await session.flush()
+    await record_event_change(session, event, user.id, ChangeOp.UPSERT)
     await session.commit()
     await session.refresh(event)
     return EventResponse.model_validate(event)
@@ -150,6 +153,8 @@ async def update_event(
     for key, value in data.items():
         setattr(event, key, value)
     event.version += 1
+    await session.flush()
+    await record_event_change(session, event, user.id, ChangeOp.UPSERT)
     await session.commit()
     await session.refresh(event)
     return EventResponse.model_validate(event)
@@ -165,6 +170,8 @@ async def delete_event(
     event = await _get_active_event(session, workspace, event_id)
     event.deleted_at = _utcnow()
     event.version += 1
+    await session.flush()
+    await record_event_change(session, event, user.id, ChangeOp.DELETE)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

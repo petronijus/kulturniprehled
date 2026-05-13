@@ -107,6 +107,7 @@ async def _clean_db(engine: AsyncEngine) -> AsyncIterator[None]:
             text(
                 """
                 TRUNCATE TABLE
+                  applied_ops,
                   refresh_tokens,
                   change_log,
                   events,

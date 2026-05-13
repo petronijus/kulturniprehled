@@ -1,0 +1,17 @@
+# Drop this snippet into /etc/cron.d/kp on the production VM. The user it
+# runs as needs to be in the `docker` group (typically the deploy user).
+#
+# Adjust paths/user to match your install.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Nightly logical backup at 03:17 UTC. Random minute reduces collision with
+# other cron jobs on multi-tenant hosts.
+17 3 * * *  deploy  /opt/kp/infra/backup/pg_dump.sh   >> /var/log/kp-backup.log 2>&1
+
+# Off-site mirror right after.
+47 3 * * *  deploy  /opt/kp/infra/backup/mc_mirror.sh >> /var/log/kp-backup.log 2>&1
+
+# Quarterly restore drill — every 1st of Jan, Apr, Jul, Oct at 05:00 UTC.
+0 5 1 1,4,7,10 *  deploy  /opt/kp/infra/backup/restore-test.sh >> /var/log/kp-restore.log 2>&1

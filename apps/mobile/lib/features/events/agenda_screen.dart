@@ -7,6 +7,7 @@ import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/auth/auth_controller.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
 import 'package:kp_mobile/features/sync/sync_controller.dart';
+import 'package:kp_mobile/features/system/server_status.dart';
 
 class AgendaScreen extends ConsumerStatefulWidget {
   const AgendaScreen({super.key});
@@ -35,10 +36,19 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
     final AsyncValue<List<CachedEventRow>> agendaAsync = ref.watch(
       agendaProvider,
     );
+    final ServerHealth health = ref.watch(serverStatusProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kulturní přehled'),
         actions: <Widget>[
+          if (health == ServerHealth.unreachable)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Tooltip(
+                message: 'Server nedostupný — pracuju z cache.',
+                child: Icon(Icons.cloud_off, size: 20),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Odhlásit',
@@ -71,10 +81,25 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
                 ],
               );
             }
+            final DateTime now = DateTime.now();
+            final DateTime cutoff = now.add(const Duration(hours: 24));
+            final List<CachedEventRow> imminent = rows
+                .where(
+                  (e) =>
+                      e.startsAt.toLocal().isAfter(now) &&
+                      e.startsAt.toLocal().isBefore(cutoff),
+                )
+                .toList();
             return ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: rows.length,
-              itemBuilder: (context, index) => _AgendaTile(event: rows[index]),
+              itemCount: rows.length + (imminent.isEmpty ? 0 : 1),
+              itemBuilder: (context, index) {
+                if (imminent.isNotEmpty && index == 0) {
+                  return _ImminentBanner(events: imminent);
+                }
+                final int rowIndex = imminent.isEmpty ? index : index - 1;
+                return _AgendaTile(event: rows[rowIndex]);
+              },
             );
           },
         ),
@@ -116,6 +141,55 @@ class _AgendaTile extends StatelessWidget {
         subtitle: Text(fmt.format(event.startsAt.toLocal())),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => context.go('/agenda/events/${event.id}'),
+      ),
+    );
+  }
+}
+
+class _ImminentBanner extends StatelessWidget {
+  const _ImminentBanner({required this.events});
+
+  final List<CachedEventRow> events;
+
+  @override
+  Widget build(BuildContext context) {
+    final DateFormat fmt = DateFormat('HH:mm', 'cs');
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(
+                Icons.notifications_active_outlined,
+                color: scheme.onSecondaryContainer,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'V nejbližších 24 h',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: scheme.onSecondaryContainer,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final CachedEventRow e in events)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text(
+                '${fmt.format(e.startsAt.toLocal())} · ${e.title}',
+                style: TextStyle(color: scheme.onSecondaryContainer),
+              ),
+            ),
+        ],
       ),
     );
   }

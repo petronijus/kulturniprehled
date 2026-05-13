@@ -8,6 +8,7 @@ import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/agenda_screen.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
 import 'package:kp_mobile/features/sync/sync_controller.dart';
+import 'package:kp_mobile/features/system/server_status.dart';
 
 import 'helpers/in_memory_db.dart';
 
@@ -19,6 +20,11 @@ class _StubSyncController extends SyncController {
   Future<void> pullChanges({int batchSize = 500}) async {
     state = SyncState(lastSyncedAt: DateTime.now());
   }
+}
+
+class _StubServerStatusController extends ServerStatusController {
+  @override
+  ServerHealth build() => ServerHealth.ok;
 }
 
 CachedEventRow _row({
@@ -48,30 +54,38 @@ Widget _wrap(ProviderContainer container) {
   );
 }
 
+List<Override> _overrides({
+  required Stream<List<CachedEventRow>> agendaStream,
+}) {
+  return <Override>[
+    agendaProvider.overrideWith((ref) => agendaStream),
+    syncControllerProvider.overrideWith(_StubSyncController.new),
+    serverStatusProvider.overrideWith(_StubServerStatusController.new),
+  ];
+}
+
 void main() {
   setUpAll(() async => initializeDateFormatting('cs'));
 
   testWidgets('renders cached events ordered by start time', (tester) async {
-    final DateTime now = DateTime.now().toUtc();
+    // Far-future dates so neither event lands in the 24-h "imminent" banner.
+    final DateTime base = DateTime.utc(2099);
     final List<CachedEventRow> rows = <CachedEventRow>[
       _row(
         id: 'evt-1',
         title: 'PJ Harvey',
-        startsAt: now.add(const Duration(days: 7)),
+        startsAt: base.add(const Duration(days: 7)),
       ),
       _row(
         id: 'evt-2',
         title: 'Sokolov',
-        startsAt: now.add(const Duration(days: 14)),
+        startsAt: base.add(const Duration(days: 14)),
       ),
     ];
     final ProviderContainer container = ProviderContainer(
-      overrides: <Override>[
-        agendaProvider.overrideWith(
-          (ref) => Stream<List<CachedEventRow>>.value(rows),
-        ),
-        syncControllerProvider.overrideWith(_StubSyncController.new),
-      ],
+      overrides: _overrides(
+        agendaStream: Stream<List<CachedEventRow>>.value(rows),
+      ),
     );
     addTearDown(container.dispose);
 
@@ -88,12 +102,11 @@ void main() {
 
   testWidgets('shows empty-state message when cache is empty', (tester) async {
     final ProviderContainer container = ProviderContainer(
-      overrides: <Override>[
-        agendaProvider.overrideWith(
-          (ref) => Stream<List<CachedEventRow>>.value(const <CachedEventRow>[]),
+      overrides: _overrides(
+        agendaStream: Stream<List<CachedEventRow>>.value(
+          const <CachedEventRow>[],
         ),
-        syncControllerProvider.overrideWith(_StubSyncController.new),
-      ],
+      ),
     );
     addTearDown(container.dispose);
 

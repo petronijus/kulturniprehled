@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-6"
 
+    # Error reporting (Sentry / GlitchTip). When empty the SDK is not
+    # initialised at all — dev runs stay silent.
+    sentry_dsn: str = ""
+    sentry_environment: str = "dev"
+    sentry_traces_sample_rate: float = 0.0
+
     log_level: str = "INFO"
 
     # Derived

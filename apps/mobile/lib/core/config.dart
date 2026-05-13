@@ -28,4 +28,11 @@ class AppConfig {
   static const String googleOauthServerClientId = String.fromEnvironment(
     'KP_GOOGLE_OAUTH_SERVER_CLIENT_ID',
   );
+
+  // Sentry / GlitchTip DSN. Leave empty in dev; the SDK skips init.
+  static const String sentryDsn = String.fromEnvironment('KP_SENTRY_DSN');
+  static const String sentryEnvironment = String.fromEnvironment(
+    'KP_SENTRY_ENVIRONMENT',
+    defaultValue: 'dev',
+  );
 }

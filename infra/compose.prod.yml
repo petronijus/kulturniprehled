@@ -1,0 +1,30 @@
+# Production overlay. Run alongside docker-compose.yml on the Proxmox VM:
+#
+#   docker compose \
+#     -f infra/docker-compose.yml \
+#     -f infra/compose.prod.yml \
+#     up -d
+#
+# Adds the Cloudflare Tunnel daemon and removes published ports — only the
+# tunnel and an internal Docker network expose the services.
+
+services:
+  postgres:
+    ports: !reset []
+
+  minio:
+    ports: !reset []
+
+  api:
+    ports: !reset []
+    restart: always
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: always
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      api:
+        condition: service_healthy

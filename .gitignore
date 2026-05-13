@@ -17,7 +17,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -60,17 +59,17 @@ build/
 **/android/app/profile
 **/android/app/release
 **/android/key.properties
-**/android/**/gradle-wrapper.jar
+# gradle-wrapper.jar IS committed — CI needs it to bootstrap Gradle without
+# requiring a pre-installed Gradle on the runner.
 **/macos/Flutter/ephemeral/
 **/windows/flutter/ephemeral/
 **/linux/flutter/ephemeral/
 *.iml
 
-# Generated code
-**/generated/
-**/*.g.dart
-**/*.freezed.dart
-**/*.mocks.dart
+# Generated code from build_runner is committed for Flutter — keeps CI
+# fast and lets the API contract live next to the consumer code.
+# Only fully-generated OpenAPI clients live under a dedicated directory.
+**/api_client/generated/
 
 # IDE
 .idea/
@@ -83,8 +82,8 @@ build/
 # Docker
 docker-compose.override.yml
 
-# Local data
-data/
+# Local data (root-level only — Flutter has lib/data/ which must be tracked)
+/data/
 *.db
 *.sqlite
 *.sqlite3

@@ -5,12 +5,13 @@ import 'package:go_router/go_router.dart';
 import 'package:kp_mobile/features/auth/auth_controller.dart';
 import 'package:kp_mobile/features/auth/auth_state.dart';
 import 'package:kp_mobile/features/auth/login_screen.dart';
+import 'package:kp_mobile/features/calendar/calendar_screen.dart';
 import 'package:kp_mobile/features/events/agenda_screen.dart';
+import 'package:kp_mobile/features/events/edit_event_screen.dart';
 import 'package:kp_mobile/features/events/event_detail_screen.dart';
+import 'package:kp_mobile/features/tickets/ticket_viewer_screen.dart';
 
 final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
-  // Rebuild the router whenever auth state flips between signed-in and
-  // signed-out so the redirect callback fires.
   final Listenable refresh = ValueNotifier<AuthSession?>(
     ref.read(authControllerProvider).session,
   );
@@ -34,17 +35,86 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
     },
     routes: <RouteBase>[
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(
-        path: '/agenda',
-        builder: (context, state) => const AgendaScreen(),
-        routes: <RouteBase>[
-          GoRoute(
-            path: 'events/:eventId',
-            builder: (context, state) =>
-                EventDetailScreen(eventId: state.pathParameters['eventId']!),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            _HomeShell(navigationShell: navigationShell),
+        branches: <StatefulShellBranch>[
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/agenda',
+                builder: (context, state) => const AgendaScreen(),
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'events/:eventId',
+                    builder: (context, state) => EventDetailScreen(
+                      eventId: state.pathParameters['eventId']!,
+                    ),
+                    routes: <RouteBase>[
+                      GoRoute(
+                        path: 'edit',
+                        builder: (context, state) => EditEventScreen(
+                          eventId: state.pathParameters['eventId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'tickets/:ticketId',
+                        builder: (context, state) => TicketViewerScreen(
+                          ticketId: state.pathParameters['ticketId']!,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/month',
+                builder: (context, state) => const CalendarScreen(),
+              ),
+            ],
           ),
         ],
       ),
     ],
   );
 });
+
+class _HomeShell extends StatelessWidget {
+  const _HomeShell({required this.navigationShell});
+
+  final StatefulNavigationShell navigationShell;
+
+  void _goBranch(int index) {
+    navigationShell.goBranch(
+      index,
+      initialLocation: index == navigationShell.currentIndex,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: navigationShell,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: navigationShell.currentIndex,
+        onDestinationSelected: _goBranch,
+        destinations: const <NavigationDestination>[
+          NavigationDestination(
+            icon: Icon(Icons.list_alt_outlined),
+            selectedIcon: Icon(Icons.list_alt),
+            label: 'Agenda',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: 'Měsíc',
+          ),
+        ],
+      ),
+    );
+  }
+}

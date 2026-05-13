@@ -65,13 +65,67 @@ class SyncCursors extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{id};
 }
 
-@DriftDatabase(tables: <Type>[CachedEvents, CachedTickets, SyncCursors])
+@DataClassName('PendingOpRow')
+class PendingOps extends Table {
+  // Client-generated UUID — the server uses it as the idempotency key for
+  // POST /v1/sync/apply. Retrying the same op_id is byte-equal idempotent.
+  TextColumn get opId => text()();
+  TextColumn get entityType => text()();
+  TextColumn get op => text()(); // "create" | "update" | "delete"
+  TextColumn get entityId => text().nullable()();
+  IntColumn get baseVersion => integer().nullable()();
+  TextColumn get payloadJson => text()();
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+  TextColumn get lastError => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get lastAttemptAt => dateTime().nullable()();
+  // After server applies, mark briefly so the UI can show a checkmark before
+  // we delete the row. NULL while still pending.
+  DateTimeColumn get appliedAt => dateTime().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{opId};
+}
+
+@DataClassName('CachedTicketFileRow')
+class CachedTicketFiles extends Table {
+  TextColumn get ticketId => text()();
+  TextColumn get localPath => text()();
+  TextColumn get mimeType => text()();
+  IntColumn get sizeBytes => integer().nullable()();
+  TextColumn get hashSha256 => text().nullable()();
+  DateTimeColumn get downloadedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{ticketId};
+}
+
+@DriftDatabase(
+  tables: <Type>[
+    CachedEvents,
+    CachedTickets,
+    SyncCursors,
+    PendingOps,
+    CachedTicketFiles,
+  ],
+)
 class KpDatabase extends _$KpDatabase {
   KpDatabase() : super(_openConnection());
   KpDatabase.test(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (Migrator m) => m.createAll(),
+    onUpgrade: (Migrator m, int from, int to) async {
+      if (from < 2) {
+        await m.createTable(pendingOps);
+        await m.createTable(cachedTicketFiles);
+      }
+    },
+  );
 
   Future<List<CachedEventRow>> watchUpcomingEvents() {
     final DateTime now = DateTime.now();
@@ -110,6 +164,12 @@ class KpDatabase extends _$KpDatabase {
         .get();
   }
 
+  Future<CachedTicketRow?> findTicket(String id) async {
+    return (select(
+      cachedTickets,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+  }
+
   Future<void> upsertEvent(CachedEventsCompanion row) =>
       into(cachedEvents).insertOnConflictUpdate(row);
 
@@ -132,6 +192,77 @@ class KpDatabase extends _$KpDatabase {
       ),
     );
   }
+
+  // ===== Outbox / pending ops =====
+
+  Future<void> insertPendingOp(PendingOpsCompanion row) =>
+      into(pendingOps).insert(row);
+
+  Future<List<PendingOpRow>> readPendingBatch({int limit = 50}) {
+    return (select(pendingOps)
+          ..where((tbl) => tbl.appliedAt.isNull())
+          ..orderBy(<OrderClauseGenerator<PendingOps>>[
+            (tbl) => OrderingTerm(expression: tbl.createdAt),
+          ])
+          ..limit(limit))
+        .get();
+  }
+
+  Future<int> countPending() async {
+    final Expression<int> total = pendingOps.opId.count();
+    final TypedResult row =
+        await (selectOnly(pendingOps)
+              ..where(pendingOps.appliedAt.isNull())
+              ..addColumns(<Expression<Object>>[total]))
+            .getSingle();
+    return row.read(total) ?? 0;
+  }
+
+  Stream<int> watchPendingCount() {
+    final Expression<int> total = pendingOps.opId.count();
+    return (selectOnly(pendingOps)
+          ..where(pendingOps.appliedAt.isNull())
+          ..addColumns(<Expression<Object>>[total]))
+        .watchSingle()
+        .map((row) => row.read(total) ?? 0);
+  }
+
+  Future<void> markPendingApplied(String opId) async {
+    await (update(pendingOps)..where((tbl) => tbl.opId.equals(opId))).write(
+      PendingOpsCompanion(appliedAt: Value<DateTime>(DateTime.now())),
+    );
+  }
+
+  Future<void> markPendingError(String opId, String error) async {
+    final PendingOpRow? row = await (select(
+      pendingOps,
+    )..where((tbl) => tbl.opId.equals(opId))).getSingleOrNull();
+    if (row == null) {
+      return;
+    }
+    await (update(pendingOps)..where((tbl) => tbl.opId.equals(opId))).write(
+      PendingOpsCompanion(
+        attempts: Value<int>(row.attempts + 1),
+        lastError: Value<String?>(error),
+        lastAttemptAt: Value<DateTime>(DateTime.now()),
+      ),
+    );
+  }
+
+  Future<void> deletePending(String opId) async {
+    await (delete(pendingOps)..where((tbl) => tbl.opId.equals(opId))).go();
+  }
+
+  // ===== Ticket file cache =====
+
+  Future<CachedTicketFileRow?> findTicketFile(String ticketId) {
+    return (select(
+      cachedTicketFiles,
+    )..where((tbl) => tbl.ticketId.equals(ticketId))).getSingleOrNull();
+  }
+
+  Future<void> upsertTicketFile(CachedTicketFilesCompanion row) =>
+      into(cachedTicketFiles).insertOnConflictUpdate(row);
 }
 
 LazyDatabase _openConnection() {

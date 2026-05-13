@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -36,6 +38,24 @@ class KpClient {
   final TokenStore _tokenStore;
 
   Dio get dio => _dio;
+
+  /// Typed wrapper around POST /v1/sync/apply. Encapsulates the JSON
+  /// envelope so the outbox controller never has to touch `Response`
+  /// shapes — and tests can override this method without standing up a
+  /// full Dio adapter.
+  Future<Map<String, dynamic>> applyOperations(
+    List<Map<String, Object?>> operations,
+  ) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '/v1/sync/apply',
+      data: <String, Object?>{'operations': operations},
+    );
+    final dynamic raw = response.data;
+    if (raw is String) {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    }
+    return raw as Map<String, dynamic>;
+  }
 
   Future<TokenPair?> _refresh() async {
     final TokenPair? current = await _tokenStore.read();

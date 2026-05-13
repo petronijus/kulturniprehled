@@ -16,16 +16,19 @@ Conventions:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -36,6 +39,8 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from kp_api.domain.enums import (
     ChangeOp,
+    CostKind,
+    CostSplit,
     EventCategory,
     EventSource,
     EventStatus,
@@ -259,6 +264,71 @@ class Ticket(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class Cost(Base):
+    """A money line attached to an event.
+
+    Stored in minor units (`amount_cents`) with explicit ISO-4217
+    `currency`. Conversion to a reporting currency happens at read time so
+    historic reports stay stable — see `kp_api.adapters.fx`.
+    """
+
+    __tablename__ = "costs"
+    __table_args__ = (
+        CheckConstraint("amount_cents >= 0", name="ck_costs_amount_nonnegative"),
+        Index("ix_costs_workspace_paid_at", "workspace_id", "paid_at"),
+        Index(
+            "ix_costs_event_active",
+            "event_id",
+            "deleted_at",
+            postgresql_where="deleted_at IS NULL",
+        ),
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    event_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("events.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    amount_cents: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    kind: Mapped[CostKind] = mapped_column(String(20), nullable=False)
+    paid_by: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    split: Mapped[CostSplit] = mapped_column(
+        String(20), nullable=False, default=CostSplit.SHARED
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    paid_at: Mapped[date] = mapped_column(Date, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class FxRate(Base):
+    """Daily mid-rate from frankfurter.app, cached so reports stay
+    reproducible after the upstream rotates its dataset."""
+
+    __tablename__ = "fx_rates"
+
+    date: Mapped[date] = mapped_column(Date, primary_key=True)  # noqa: F811
+    base: Mapped[str] = mapped_column(String(3), primary_key=True)
+    quote: Mapped[str] = mapped_column(String(3), primary_key=True)
+    rate: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
+    fetched_at: Mapped[datetime] = _created_at()
 
 
 class PersonalAccessToken(Base):

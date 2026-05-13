@@ -33,3 +33,15 @@ class UserRole(StrEnum):
 class ChangeOp(StrEnum):
     UPSERT = "upsert"
     DELETE = "delete"
+
+
+class CostKind(StrEnum):
+    TICKET = "ticket"
+    TRANSPORT = "transport"
+    FOOD = "food"
+    OTHER = "other"
+
+
+class CostSplit(StrEnum):
+    SHARED = "shared"
+    INDIVIDUAL = "individual"

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kp_mobile/data/api_client/kp_client.dart';
 import 'package:kp_mobile/data/drift/database.dart';
+import 'package:kp_mobile/features/costs/cost_dto.dart';
 import 'package:kp_mobile/features/events/event_dto.dart';
 
 // Pulls /v1/sync since the last cursor and feeds change_log entries into
@@ -88,6 +89,9 @@ class SyncController extends Notifier<SyncState> {
     } else if (entityType == 'ticket') {
       final TicketDto ticket = TicketDto.fromMap(payload);
       await db.upsertTicket(ticket.toCompanion());
+    } else if (entityType == 'cost') {
+      final CostDto cost = CostDto.fromMap(payload);
+      await db.upsertCost(cost.toCompanion());
     }
     // Unknown entity types are dropped silently — they will land on the
     // next schema bump that adds support for them.

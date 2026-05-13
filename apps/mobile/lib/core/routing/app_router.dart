@@ -6,9 +6,11 @@ import 'package:kp_mobile/features/auth/auth_controller.dart';
 import 'package:kp_mobile/features/auth/auth_state.dart';
 import 'package:kp_mobile/features/auth/login_screen.dart';
 import 'package:kp_mobile/features/calendar/calendar_screen.dart';
+import 'package:kp_mobile/features/costs/cost_editor_screen.dart';
 import 'package:kp_mobile/features/events/agenda_screen.dart';
 import 'package:kp_mobile/features/events/edit_event_screen.dart';
 import 'package:kp_mobile/features/events/event_detail_screen.dart';
+import 'package:kp_mobile/features/stats/stats_screen.dart';
 import 'package:kp_mobile/features/tickets/ticket_viewer_screen.dart';
 
 final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
@@ -63,6 +65,12 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
                           ticketId: state.pathParameters['ticketId']!,
                         ),
                       ),
+                      GoRoute(
+                        path: 'costs/new',
+                        builder: (context, state) => CostEditorScreen(
+                          eventId: state.pathParameters['eventId']!,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -74,6 +82,14 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/month',
                 builder: (context, state) => const CalendarScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: '/stats',
+                builder: (context, state) => const StatsScreen(),
               ),
             ],
           ),
@@ -112,6 +128,11 @@ class _HomeShell extends StatelessWidget {
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'Měsíc',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bar_chart_outlined),
+            selectedIcon: Icon(Icons.bar_chart),
+            label: 'Statistiky',
           ),
         ],
       ),

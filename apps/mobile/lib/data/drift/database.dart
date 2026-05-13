@@ -100,6 +100,27 @@ class CachedTicketFiles extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{ticketId};
 }
 
+@DataClassName('CachedCostRow')
+class CachedCosts extends Table {
+  TextColumn get id => text()();
+  TextColumn get eventId => text()();
+  TextColumn get workspaceId => text()();
+  IntColumn get amountCents => integer()();
+  TextColumn get currency => text()();
+  TextColumn get kind => text()();
+  TextColumn get paidBy => text()();
+  TextColumn get split => text()();
+  TextColumn get note => text().nullable()();
+  DateTimeColumn get paidAt => dateTime()();
+  IntColumn get version => integer()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{id};
+}
+
 @DriftDatabase(
   tables: <Type>[
     CachedEvents,
@@ -107,6 +128,7 @@ class CachedTicketFiles extends Table {
     SyncCursors,
     PendingOps,
     CachedTicketFiles,
+    CachedCosts,
   ],
 )
 class KpDatabase extends _$KpDatabase {
@@ -114,7 +136,7 @@ class KpDatabase extends _$KpDatabase {
   KpDatabase.test(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -123,6 +145,9 @@ class KpDatabase extends _$KpDatabase {
       if (from < 2) {
         await m.createTable(pendingOps);
         await m.createTable(cachedTicketFiles);
+      }
+      if (from < 3) {
+        await m.createTable(cachedCosts);
       }
     },
   );
@@ -263,6 +288,26 @@ class KpDatabase extends _$KpDatabase {
 
   Future<void> upsertTicketFile(CachedTicketFilesCompanion row) =>
       into(cachedTicketFiles).insertOnConflictUpdate(row);
+
+  // ===== Costs =====
+
+  Future<List<CachedCostRow>> costsForEvent(String eventId) {
+    return (select(cachedCosts)
+          ..where((tbl) => tbl.deletedAt.isNull() & tbl.eventId.equals(eventId))
+          ..orderBy(<OrderClauseGenerator<CachedCosts>>[
+            (tbl) => OrderingTerm(expression: tbl.paidAt),
+          ]))
+        .get();
+  }
+
+  Future<CachedCostRow?> findCost(String id) async {
+    return (select(
+      cachedCosts,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+  }
+
+  Future<void> upsertCost(CachedCostsCompanion row) =>
+      into(cachedCosts).insertOnConflictUpdate(row);
 }
 
 LazyDatabase _openConnection() {

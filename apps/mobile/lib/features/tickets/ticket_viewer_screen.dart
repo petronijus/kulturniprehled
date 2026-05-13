@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:pdfrx/pdfrx.dart';
 
 import 'package:kp_mobile/data/api_client/kp_client.dart';
 import 'package:kp_mobile/data/drift/database.dart';
@@ -17,8 +18,8 @@ import 'package:kp_mobile/data/drift/database.dart';
 // CachedTicketFiles so subsequent opens (and offline use at the venue!)
 // hit local disk only.
 //
-// Image MIMEs render inline. PDFs are stored but not rendered yet — adding
-// a PDF view widget needs an extra native plugin and is on the M7 backlog.
+// Image MIMEs render inline via InteractiveViewer; PDFs go through pdfrx's
+// PdfViewer.file with pinch-zoom and proper paging.
 
 class TicketViewerScreen extends ConsumerStatefulWidget {
   const TicketViewerScreen({required this.ticketId, super.key});
@@ -148,17 +149,19 @@ class _TicketViewerScreenState extends ConsumerState<TicketViewerScreen> {
     if (_mime?.startsWith('image/') ?? false) {
       return InteractiveViewer(child: Center(child: Image.file(file)));
     }
+    if (_mime == 'application/pdf') {
+      return PdfViewer.file(file.path);
+    }
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
-          const Icon(Icons.picture_as_pdf_outlined, size: 80),
+          const Icon(Icons.attachment, size: 80),
           const SizedBox(height: 16),
           Text(
-            'PDF lístek je stažený v zařízení '
-            '(${(_file?.lengthSync() ?? 0) ~/ 1024} kB), '
-            'ale prohlížeč PDF přijde v M7.',
+            'Lístek je stažený (${(_file?.lengthSync() ?? 0) ~/ 1024} kB), '
+            'ale tenhle MIME ($_mime) zatím nemáme jak zobrazit.',
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),

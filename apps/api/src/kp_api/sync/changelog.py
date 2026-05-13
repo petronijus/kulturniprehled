@@ -24,7 +24,7 @@ from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api.domain.enums import ChangeOp
-from kp_api.domain.models import ChangeLog, Event, Ticket
+from kp_api.domain.models import ChangeLog, Cost, Event, Ticket
 
 
 def _isoformat(value: datetime | None) -> str | None:
@@ -120,6 +120,47 @@ async def record_ticket_change(
             entity_id=ticket.id,
             op=op,
             payload=serialize_ticket(ticket),
+            actor_id=actor_id,
+        )
+        .returning(ChangeLog.seq)
+    )
+    seq = result.scalar_one()
+    return int(seq)
+
+
+def serialize_cost(cost: Cost) -> dict[str, Any]:
+    return {
+        "id": str(cost.id),
+        "event_id": str(cost.event_id),
+        "workspace_id": str(cost.workspace_id),
+        "amount_cents": cost.amount_cents,
+        "currency": cost.currency,
+        "kind": cost.kind,
+        "paid_by": str(cost.paid_by),
+        "split": cost.split,
+        "note": cost.note,
+        "paid_at": cost.paid_at.isoformat(),
+        "version": cost.version,
+        "created_at": _isoformat(cost.created_at),
+        "updated_at": _isoformat(cost.updated_at),
+        "deleted_at": _isoformat(cost.deleted_at),
+    }
+
+
+async def record_cost_change(
+    session: AsyncSession,
+    cost: Cost,
+    actor_id: UUID,
+    op: ChangeOp,
+) -> int:
+    result = await session.execute(
+        insert(ChangeLog)
+        .values(
+            workspace_id=cost.workspace_id,
+            entity_type="cost",
+            entity_id=cost.id,
+            op=op,
+            payload=serialize_cost(cost),
             actor_id=actor_id,
         )
         .returning(ChangeLog.seq)

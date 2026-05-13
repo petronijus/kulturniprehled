@@ -2841,6 +2841,806 @@ class CachedTicketFilesCompanion extends UpdateCompanion<CachedTicketFileRow> {
   }
 }
 
+class $CachedCostsTable extends CachedCosts
+    with TableInfo<$CachedCostsTable, CachedCostRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedCostsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _eventIdMeta = const VerificationMeta(
+    'eventId',
+  );
+  @override
+  late final GeneratedColumn<String> eventId = GeneratedColumn<String>(
+    'event_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _workspaceIdMeta = const VerificationMeta(
+    'workspaceId',
+  );
+  @override
+  late final GeneratedColumn<String> workspaceId = GeneratedColumn<String>(
+    'workspace_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _amountCentsMeta = const VerificationMeta(
+    'amountCents',
+  );
+  @override
+  late final GeneratedColumn<int> amountCents = GeneratedColumn<int>(
+    'amount_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _currencyMeta = const VerificationMeta(
+    'currency',
+  );
+  @override
+  late final GeneratedColumn<String> currency = GeneratedColumn<String>(
+    'currency',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _paidByMeta = const VerificationMeta('paidBy');
+  @override
+  late final GeneratedColumn<String> paidBy = GeneratedColumn<String>(
+    'paid_by',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _splitMeta = const VerificationMeta('split');
+  @override
+  late final GeneratedColumn<String> split = GeneratedColumn<String>(
+    'split',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _paidAtMeta = const VerificationMeta('paidAt');
+  @override
+  late final GeneratedColumn<DateTime> paidAt = GeneratedColumn<DateTime>(
+    'paid_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    eventId,
+    workspaceId,
+    amountCents,
+    currency,
+    kind,
+    paidBy,
+    split,
+    note,
+    paidAt,
+    version,
+    updatedAt,
+    deletedAt,
+    cachedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_costs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedCostRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('event_id')) {
+      context.handle(
+        _eventIdMeta,
+        eventId.isAcceptableOrUnknown(data['event_id']!, _eventIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_eventIdMeta);
+    }
+    if (data.containsKey('workspace_id')) {
+      context.handle(
+        _workspaceIdMeta,
+        workspaceId.isAcceptableOrUnknown(
+          data['workspace_id']!,
+          _workspaceIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_workspaceIdMeta);
+    }
+    if (data.containsKey('amount_cents')) {
+      context.handle(
+        _amountCentsMeta,
+        amountCents.isAcceptableOrUnknown(
+          data['amount_cents']!,
+          _amountCentsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_amountCentsMeta);
+    }
+    if (data.containsKey('currency')) {
+      context.handle(
+        _currencyMeta,
+        currency.isAcceptableOrUnknown(data['currency']!, _currencyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_currencyMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('paid_by')) {
+      context.handle(
+        _paidByMeta,
+        paidBy.isAcceptableOrUnknown(data['paid_by']!, _paidByMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_paidByMeta);
+    }
+    if (data.containsKey('split')) {
+      context.handle(
+        _splitMeta,
+        split.isAcceptableOrUnknown(data['split']!, _splitMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_splitMeta);
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('paid_at')) {
+      context.handle(
+        _paidAtMeta,
+        paidAt.isAcceptableOrUnknown(data['paid_at']!, _paidAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_paidAtMeta);
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_versionMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedCostRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedCostRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      eventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}event_id'],
+      )!,
+      workspaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}workspace_id'],
+      )!,
+      amountCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}amount_cents'],
+      )!,
+      currency: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}currency'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      paidBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}paid_by'],
+      )!,
+      split: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}split'],
+      )!,
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      paidAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}paid_at'],
+      )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedCostsTable createAlias(String alias) {
+    return $CachedCostsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedCostRow extends DataClass implements Insertable<CachedCostRow> {
+  final String id;
+  final String eventId;
+  final String workspaceId;
+  final int amountCents;
+  final String currency;
+  final String kind;
+  final String paidBy;
+  final String split;
+  final String? note;
+  final DateTime paidAt;
+  final int version;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final DateTime cachedAt;
+  const CachedCostRow({
+    required this.id,
+    required this.eventId,
+    required this.workspaceId,
+    required this.amountCents,
+    required this.currency,
+    required this.kind,
+    required this.paidBy,
+    required this.split,
+    this.note,
+    required this.paidAt,
+    required this.version,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['event_id'] = Variable<String>(eventId);
+    map['workspace_id'] = Variable<String>(workspaceId);
+    map['amount_cents'] = Variable<int>(amountCents);
+    map['currency'] = Variable<String>(currency);
+    map['kind'] = Variable<String>(kind);
+    map['paid_by'] = Variable<String>(paidBy);
+    map['split'] = Variable<String>(split);
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['paid_at'] = Variable<DateTime>(paidAt);
+    map['version'] = Variable<int>(version);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedCostsCompanion toCompanion(bool nullToAbsent) {
+    return CachedCostsCompanion(
+      id: Value(id),
+      eventId: Value(eventId),
+      workspaceId: Value(workspaceId),
+      amountCents: Value(amountCents),
+      currency: Value(currency),
+      kind: Value(kind),
+      paidBy: Value(paidBy),
+      split: Value(split),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      paidAt: Value(paidAt),
+      version: Value(version),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedCostRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedCostRow(
+      id: serializer.fromJson<String>(json['id']),
+      eventId: serializer.fromJson<String>(json['eventId']),
+      workspaceId: serializer.fromJson<String>(json['workspaceId']),
+      amountCents: serializer.fromJson<int>(json['amountCents']),
+      currency: serializer.fromJson<String>(json['currency']),
+      kind: serializer.fromJson<String>(json['kind']),
+      paidBy: serializer.fromJson<String>(json['paidBy']),
+      split: serializer.fromJson<String>(json['split']),
+      note: serializer.fromJson<String?>(json['note']),
+      paidAt: serializer.fromJson<DateTime>(json['paidAt']),
+      version: serializer.fromJson<int>(json['version']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'eventId': serializer.toJson<String>(eventId),
+      'workspaceId': serializer.toJson<String>(workspaceId),
+      'amountCents': serializer.toJson<int>(amountCents),
+      'currency': serializer.toJson<String>(currency),
+      'kind': serializer.toJson<String>(kind),
+      'paidBy': serializer.toJson<String>(paidBy),
+      'split': serializer.toJson<String>(split),
+      'note': serializer.toJson<String?>(note),
+      'paidAt': serializer.toJson<DateTime>(paidAt),
+      'version': serializer.toJson<int>(version),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedCostRow copyWith({
+    String? id,
+    String? eventId,
+    String? workspaceId,
+    int? amountCents,
+    String? currency,
+    String? kind,
+    String? paidBy,
+    String? split,
+    Value<String?> note = const Value.absent(),
+    DateTime? paidAt,
+    int? version,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    DateTime? cachedAt,
+  }) => CachedCostRow(
+    id: id ?? this.id,
+    eventId: eventId ?? this.eventId,
+    workspaceId: workspaceId ?? this.workspaceId,
+    amountCents: amountCents ?? this.amountCents,
+    currency: currency ?? this.currency,
+    kind: kind ?? this.kind,
+    paidBy: paidBy ?? this.paidBy,
+    split: split ?? this.split,
+    note: note.present ? note.value : this.note,
+    paidAt: paidAt ?? this.paidAt,
+    version: version ?? this.version,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  CachedCostRow copyWithCompanion(CachedCostsCompanion data) {
+    return CachedCostRow(
+      id: data.id.present ? data.id.value : this.id,
+      eventId: data.eventId.present ? data.eventId.value : this.eventId,
+      workspaceId: data.workspaceId.present
+          ? data.workspaceId.value
+          : this.workspaceId,
+      amountCents: data.amountCents.present
+          ? data.amountCents.value
+          : this.amountCents,
+      currency: data.currency.present ? data.currency.value : this.currency,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      paidBy: data.paidBy.present ? data.paidBy.value : this.paidBy,
+      split: data.split.present ? data.split.value : this.split,
+      note: data.note.present ? data.note.value : this.note,
+      paidAt: data.paidAt.present ? data.paidAt.value : this.paidAt,
+      version: data.version.present ? data.version.value : this.version,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedCostRow(')
+          ..write('id: $id, ')
+          ..write('eventId: $eventId, ')
+          ..write('workspaceId: $workspaceId, ')
+          ..write('amountCents: $amountCents, ')
+          ..write('currency: $currency, ')
+          ..write('kind: $kind, ')
+          ..write('paidBy: $paidBy, ')
+          ..write('split: $split, ')
+          ..write('note: $note, ')
+          ..write('paidAt: $paidAt, ')
+          ..write('version: $version, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    eventId,
+    workspaceId,
+    amountCents,
+    currency,
+    kind,
+    paidBy,
+    split,
+    note,
+    paidAt,
+    version,
+    updatedAt,
+    deletedAt,
+    cachedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedCostRow &&
+          other.id == this.id &&
+          other.eventId == this.eventId &&
+          other.workspaceId == this.workspaceId &&
+          other.amountCents == this.amountCents &&
+          other.currency == this.currency &&
+          other.kind == this.kind &&
+          other.paidBy == this.paidBy &&
+          other.split == this.split &&
+          other.note == this.note &&
+          other.paidAt == this.paidAt &&
+          other.version == this.version &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedCostsCompanion extends UpdateCompanion<CachedCostRow> {
+  final Value<String> id;
+  final Value<String> eventId;
+  final Value<String> workspaceId;
+  final Value<int> amountCents;
+  final Value<String> currency;
+  final Value<String> kind;
+  final Value<String> paidBy;
+  final Value<String> split;
+  final Value<String?> note;
+  final Value<DateTime> paidAt;
+  final Value<int> version;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedCostsCompanion({
+    this.id = const Value.absent(),
+    this.eventId = const Value.absent(),
+    this.workspaceId = const Value.absent(),
+    this.amountCents = const Value.absent(),
+    this.currency = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.paidBy = const Value.absent(),
+    this.split = const Value.absent(),
+    this.note = const Value.absent(),
+    this.paidAt = const Value.absent(),
+    this.version = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedCostsCompanion.insert({
+    required String id,
+    required String eventId,
+    required String workspaceId,
+    required int amountCents,
+    required String currency,
+    required String kind,
+    required String paidBy,
+    required String split,
+    this.note = const Value.absent(),
+    required DateTime paidAt,
+    required int version,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       eventId = Value(eventId),
+       workspaceId = Value(workspaceId),
+       amountCents = Value(amountCents),
+       currency = Value(currency),
+       kind = Value(kind),
+       paidBy = Value(paidBy),
+       split = Value(split),
+       paidAt = Value(paidAt),
+       version = Value(version),
+       updatedAt = Value(updatedAt),
+       cachedAt = Value(cachedAt);
+  static Insertable<CachedCostRow> custom({
+    Expression<String>? id,
+    Expression<String>? eventId,
+    Expression<String>? workspaceId,
+    Expression<int>? amountCents,
+    Expression<String>? currency,
+    Expression<String>? kind,
+    Expression<String>? paidBy,
+    Expression<String>? split,
+    Expression<String>? note,
+    Expression<DateTime>? paidAt,
+    Expression<int>? version,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (eventId != null) 'event_id': eventId,
+      if (workspaceId != null) 'workspace_id': workspaceId,
+      if (amountCents != null) 'amount_cents': amountCents,
+      if (currency != null) 'currency': currency,
+      if (kind != null) 'kind': kind,
+      if (paidBy != null) 'paid_by': paidBy,
+      if (split != null) 'split': split,
+      if (note != null) 'note': note,
+      if (paidAt != null) 'paid_at': paidAt,
+      if (version != null) 'version': version,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedCostsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? eventId,
+    Value<String>? workspaceId,
+    Value<int>? amountCents,
+    Value<String>? currency,
+    Value<String>? kind,
+    Value<String>? paidBy,
+    Value<String>? split,
+    Value<String?>? note,
+    Value<DateTime>? paidAt,
+    Value<int>? version,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedCostsCompanion(
+      id: id ?? this.id,
+      eventId: eventId ?? this.eventId,
+      workspaceId: workspaceId ?? this.workspaceId,
+      amountCents: amountCents ?? this.amountCents,
+      currency: currency ?? this.currency,
+      kind: kind ?? this.kind,
+      paidBy: paidBy ?? this.paidBy,
+      split: split ?? this.split,
+      note: note ?? this.note,
+      paidAt: paidAt ?? this.paidAt,
+      version: version ?? this.version,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (eventId.present) {
+      map['event_id'] = Variable<String>(eventId.value);
+    }
+    if (workspaceId.present) {
+      map['workspace_id'] = Variable<String>(workspaceId.value);
+    }
+    if (amountCents.present) {
+      map['amount_cents'] = Variable<int>(amountCents.value);
+    }
+    if (currency.present) {
+      map['currency'] = Variable<String>(currency.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (paidBy.present) {
+      map['paid_by'] = Variable<String>(paidBy.value);
+    }
+    if (split.present) {
+      map['split'] = Variable<String>(split.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (paidAt.present) {
+      map['paid_at'] = Variable<DateTime>(paidAt.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedCostsCompanion(')
+          ..write('id: $id, ')
+          ..write('eventId: $eventId, ')
+          ..write('workspaceId: $workspaceId, ')
+          ..write('amountCents: $amountCents, ')
+          ..write('currency: $currency, ')
+          ..write('kind: $kind, ')
+          ..write('paidBy: $paidBy, ')
+          ..write('split: $split, ')
+          ..write('note: $note, ')
+          ..write('paidAt: $paidAt, ')
+          ..write('version: $version, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$KpDatabase extends GeneratedDatabase {
   _$KpDatabase(QueryExecutor e) : super(e);
   $KpDatabaseManager get managers => $KpDatabaseManager(this);
@@ -2850,6 +3650,7 @@ abstract class _$KpDatabase extends GeneratedDatabase {
   late final $PendingOpsTable pendingOps = $PendingOpsTable(this);
   late final $CachedTicketFilesTable cachedTicketFiles =
       $CachedTicketFilesTable(this);
+  late final $CachedCostsTable cachedCosts = $CachedCostsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2860,6 +3661,7 @@ abstract class _$KpDatabase extends GeneratedDatabase {
     syncCursors,
     pendingOps,
     cachedTicketFiles,
+    cachedCosts,
   ];
 }
 
@@ -4274,6 +5076,381 @@ typedef $$CachedTicketFilesTableProcessedTableManager =
       CachedTicketFileRow,
       PrefetchHooks Function()
     >;
+typedef $$CachedCostsTableCreateCompanionBuilder =
+    CachedCostsCompanion Function({
+      required String id,
+      required String eventId,
+      required String workspaceId,
+      required int amountCents,
+      required String currency,
+      required String kind,
+      required String paidBy,
+      required String split,
+      Value<String?> note,
+      required DateTime paidAt,
+      required int version,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedCostsTableUpdateCompanionBuilder =
+    CachedCostsCompanion Function({
+      Value<String> id,
+      Value<String> eventId,
+      Value<String> workspaceId,
+      Value<int> amountCents,
+      Value<String> currency,
+      Value<String> kind,
+      Value<String> paidBy,
+      Value<String> split,
+      Value<String?> note,
+      Value<DateTime> paidAt,
+      Value<int> version,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedCostsTableFilterComposer
+    extends Composer<_$KpDatabase, $CachedCostsTable> {
+  $$CachedCostsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get currency => $composableBuilder(
+    column: $table.currency,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get paidBy => $composableBuilder(
+    column: $table.paidBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get split => $composableBuilder(
+    column: $table.split,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get paidAt => $composableBuilder(
+    column: $table.paidAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedCostsTableOrderingComposer
+    extends Composer<_$KpDatabase, $CachedCostsTable> {
+  $$CachedCostsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get currency => $composableBuilder(
+    column: $table.currency,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get paidBy => $composableBuilder(
+    column: $table.paidBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get split => $composableBuilder(
+    column: $table.split,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get paidAt => $composableBuilder(
+    column: $table.paidAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedCostsTableAnnotationComposer
+    extends Composer<_$KpDatabase, $CachedCostsTable> {
+  $$CachedCostsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get eventId =>
+      $composableBuilder(column: $table.eventId, builder: (column) => column);
+
+  GeneratedColumn<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get currency =>
+      $composableBuilder(column: $table.currency, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get paidBy =>
+      $composableBuilder(column: $table.paidBy, builder: (column) => column);
+
+  GeneratedColumn<String> get split =>
+      $composableBuilder(column: $table.split, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get paidAt =>
+      $composableBuilder(column: $table.paidAt, builder: (column) => column);
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedCostsTableTableManager
+    extends
+        RootTableManager<
+          _$KpDatabase,
+          $CachedCostsTable,
+          CachedCostRow,
+          $$CachedCostsTableFilterComposer,
+          $$CachedCostsTableOrderingComposer,
+          $$CachedCostsTableAnnotationComposer,
+          $$CachedCostsTableCreateCompanionBuilder,
+          $$CachedCostsTableUpdateCompanionBuilder,
+          (
+            CachedCostRow,
+            BaseReferences<_$KpDatabase, $CachedCostsTable, CachedCostRow>,
+          ),
+          CachedCostRow,
+          PrefetchHooks Function()
+        > {
+  $$CachedCostsTableTableManager(_$KpDatabase db, $CachedCostsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedCostsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedCostsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CachedCostsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> eventId = const Value.absent(),
+                Value<String> workspaceId = const Value.absent(),
+                Value<int> amountCents = const Value.absent(),
+                Value<String> currency = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> paidBy = const Value.absent(),
+                Value<String> split = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<DateTime> paidAt = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedCostsCompanion(
+                id: id,
+                eventId: eventId,
+                workspaceId: workspaceId,
+                amountCents: amountCents,
+                currency: currency,
+                kind: kind,
+                paidBy: paidBy,
+                split: split,
+                note: note,
+                paidAt: paidAt,
+                version: version,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String eventId,
+                required String workspaceId,
+                required int amountCents,
+                required String currency,
+                required String kind,
+                required String paidBy,
+                required String split,
+                Value<String?> note = const Value.absent(),
+                required DateTime paidAt,
+                required int version,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedCostsCompanion.insert(
+                id: id,
+                eventId: eventId,
+                workspaceId: workspaceId,
+                amountCents: amountCents,
+                currency: currency,
+                kind: kind,
+                paidBy: paidBy,
+                split: split,
+                note: note,
+                paidAt: paidAt,
+                version: version,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedCostsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$KpDatabase,
+      $CachedCostsTable,
+      CachedCostRow,
+      $$CachedCostsTableFilterComposer,
+      $$CachedCostsTableOrderingComposer,
+      $$CachedCostsTableAnnotationComposer,
+      $$CachedCostsTableCreateCompanionBuilder,
+      $$CachedCostsTableUpdateCompanionBuilder,
+      (
+        CachedCostRow,
+        BaseReferences<_$KpDatabase, $CachedCostsTable, CachedCostRow>,
+      ),
+      CachedCostRow,
+      PrefetchHooks Function()
+    >;
 
 class $KpDatabaseManager {
   final _$KpDatabase _db;
@@ -4288,4 +5465,6 @@ class $KpDatabaseManager {
       $$PendingOpsTableTableManager(_db, _db.pendingOps);
   $$CachedTicketFilesTableTableManager get cachedTicketFiles =>
       $$CachedTicketFilesTableTableManager(_db, _db.cachedTicketFiles);
+  $$CachedCostsTableTableManager get cachedCosts =>
+      $$CachedCostsTableTableManager(_db, _db.cachedCosts);
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
@@ -159,6 +160,14 @@ class _EventDetailBody extends StatelessWidget {
         const SizedBox(height: 8),
         Chip(label: Text(_statusLabel(event.status))),
         const SizedBox(height: 16),
+        if (event.venueAddress != null &&
+            event.venueAddress!.isNotEmpty) ...<Widget>[
+          _VenueSection(
+            address: event.venueAddress!,
+            imageUrl: event.venueImageUrl,
+          ),
+          const SizedBox(height: 16),
+        ],
         if (event.notes != null && event.notes!.isNotEmpty) ...<Widget>[
           Card(
             child: Padding(
@@ -197,5 +206,81 @@ class _EventDetailBody extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+class _VenueSection extends StatelessWidget {
+  const _VenueSection({required this.address, this.imageUrl});
+
+  final String address;
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          if (imageUrl != null && imageUrl!.isNotEmpty)
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Image.network(
+                imageUrl!,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) => progress == null
+                    ? child
+                    : Container(
+                        color: scheme.surfaceContainerHighest,
+                        alignment: Alignment.center,
+                        child: const CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                errorBuilder: (context, _, _) => Container(
+                  color: scheme.surfaceContainerHighest,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.broken_image_outlined,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: <Widget>[
+                Icon(Icons.place_outlined, color: scheme.onSurfaceVariant),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    address,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                FilledButton.tonalIcon(
+                  onPressed: () => _openMaps(address),
+                  icon: const Icon(Icons.map_outlined),
+                  label: const Text('Mapa'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openMaps(String address) async {
+    // Universal Maps search URL — opens Google Maps on Android, Apple Maps
+    // on iOS via the universal link, and the web fallback in a browser if
+    // neither is installed.
+    final Uri uri = Uri.https(
+      'www.google.com',
+      '/maps/search/',
+      <String, String>{'api': '1', 'query': address},
+    );
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }

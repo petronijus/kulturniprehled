@@ -97,3 +97,6 @@ Thumbs.db
 
 # Plans (kept local, never pushed)
 .claude/plans/
+
+# Per-machine Claude Code overrides (permissions/autoMode tied to local LAN/keys)
+.claude/settings.local.json

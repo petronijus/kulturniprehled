@@ -189,6 +189,8 @@ class Event(Base):
     )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     cover_image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    venue_image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    venue_address: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),

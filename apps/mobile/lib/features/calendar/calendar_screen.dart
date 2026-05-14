@@ -32,6 +32,38 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     return map;
   }
 
+  Widget? _eventDayCell(
+    BuildContext context,
+    DateTime day,
+    Map<DateTime, List<CachedEventRow>> buckets, {
+    required bool isToday,
+  }) {
+    final List<CachedEventRow> events =
+        buckets[_dayKey(day)] ?? <CachedEventRow>[];
+    if (events.isEmpty) {
+      // Returning null lets table_calendar fall back to its default builder.
+      return null;
+    }
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final Color bg = isToday
+        ? scheme.primary.withValues(alpha: 0.25)
+        : scheme.primaryContainer.withValues(alpha: 0.6);
+    final Color fg = isToday ? scheme.onPrimary : scheme.onPrimaryContainer;
+    return Container(
+      margin: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: bg,
+        shape: BoxShape.circle,
+        border: isToday ? Border.all(color: scheme.primary, width: 1.5) : null,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        '${day.day}',
+        style: TextStyle(color: fg, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
   Color _markerColor(BuildContext context, String category) {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     switch (category) {
@@ -92,6 +124,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 },
                 onPageChanged: (focused) => _focused = focused,
                 calendarBuilders: CalendarBuilders<CachedEventRow>(
+                  // Days with events get a tinted background pill — far more
+                  // visible than the 6 px dots at the bottom alone. Selected
+                  // and today builders are left to defaults so we don't fight
+                  // table_calendar's own highlight chain.
+                  defaultBuilder: (context, day, focusedDay) =>
+                      _eventDayCell(context, day, buckets, isToday: false),
+                  todayBuilder: (context, day, focusedDay) =>
+                      _eventDayCell(context, day, buckets, isToday: true),
                   markerBuilder: (context, day, events) {
                     if (events.isEmpty) {
                       return const SizedBox.shrink();

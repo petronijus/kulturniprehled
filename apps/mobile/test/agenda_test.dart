@@ -94,10 +94,11 @@ void main() {
 
     expect(find.text('PJ Harvey'), findsOneWidget);
     expect(find.text('Sokolov'), findsOneWidget);
-    final Iterable<ListTile> tiles = tester.widgetList<ListTile>(
-      find.byType(ListTile),
-    );
-    expect((tiles.first.title! as Text).data, equals('PJ Harvey'));
+    // Ordering check is vertical-position based now that the tile is a
+    // Card > InkWell > Column (no ListTile wrapping the title).
+    final double pjHarveyDy = tester.getCenter(find.text('PJ Harvey')).dy;
+    final double sokolovDy = tester.getCenter(find.text('Sokolov')).dy;
+    expect(pjHarveyDy, lessThan(sokolovDy));
   });
 
   testWidgets('shows empty-state message when cache is empty', (tester) async {

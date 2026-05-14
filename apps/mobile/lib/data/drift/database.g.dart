@@ -118,6 +118,28 @@ class $CachedEventsTable extends CachedEvents
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _venueImageUrlMeta = const VerificationMeta(
+    'venueImageUrl',
+  );
+  @override
+  late final GeneratedColumn<String> venueImageUrl = GeneratedColumn<String>(
+    'venue_image_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _venueAddressMeta = const VerificationMeta(
+    'venueAddress',
+  );
+  @override
+  late final GeneratedColumn<String> venueAddress = GeneratedColumn<String>(
+    'venue_address',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _versionMeta = const VerificationMeta(
     'version',
   );
@@ -175,6 +197,8 @@ class $CachedEventsTable extends CachedEvents
     source,
     notes,
     coverImageUrl,
+    venueImageUrl,
+    venueAddress,
     version,
     updatedAt,
     deletedAt,
@@ -278,6 +302,24 @@ class $CachedEventsTable extends CachedEvents
         ),
       );
     }
+    if (data.containsKey('venue_image_url')) {
+      context.handle(
+        _venueImageUrlMeta,
+        venueImageUrl.isAcceptableOrUnknown(
+          data['venue_image_url']!,
+          _venueImageUrlMeta,
+        ),
+      );
+    }
+    if (data.containsKey('venue_address')) {
+      context.handle(
+        _venueAddressMeta,
+        venueAddress.isAcceptableOrUnknown(
+          data['venue_address']!,
+          _venueAddressMeta,
+        ),
+      );
+    }
     if (data.containsKey('version')) {
       context.handle(
         _versionMeta,
@@ -361,6 +403,14 @@ class $CachedEventsTable extends CachedEvents
         DriftSqlType.string,
         data['${effectivePrefix}cover_image_url'],
       ),
+      venueImageUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}venue_image_url'],
+      ),
+      venueAddress: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}venue_address'],
+      ),
       version: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}version'],
@@ -398,6 +448,8 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
   final String source;
   final String? notes;
   final String? coverImageUrl;
+  final String? venueImageUrl;
+  final String? venueAddress;
   final int version;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -414,6 +466,8 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     required this.source,
     this.notes,
     this.coverImageUrl,
+    this.venueImageUrl,
+    this.venueAddress,
     required this.version,
     required this.updatedAt,
     this.deletedAt,
@@ -440,6 +494,12 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     }
     if (!nullToAbsent || coverImageUrl != null) {
       map['cover_image_url'] = Variable<String>(coverImageUrl);
+    }
+    if (!nullToAbsent || venueImageUrl != null) {
+      map['venue_image_url'] = Variable<String>(venueImageUrl);
+    }
+    if (!nullToAbsent || venueAddress != null) {
+      map['venue_address'] = Variable<String>(venueAddress);
     }
     map['version'] = Variable<int>(version);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -471,6 +531,12 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
       coverImageUrl: coverImageUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(coverImageUrl),
+      venueImageUrl: venueImageUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(venueImageUrl),
+      venueAddress: venueAddress == null && nullToAbsent
+          ? const Value.absent()
+          : Value(venueAddress),
       version: Value(version),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -497,6 +563,8 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
       source: serializer.fromJson<String>(json['source']),
       notes: serializer.fromJson<String?>(json['notes']),
       coverImageUrl: serializer.fromJson<String?>(json['coverImageUrl']),
+      venueImageUrl: serializer.fromJson<String?>(json['venueImageUrl']),
+      venueAddress: serializer.fromJson<String?>(json['venueAddress']),
       version: serializer.fromJson<int>(json['version']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -518,6 +586,8 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
       'source': serializer.toJson<String>(source),
       'notes': serializer.toJson<String?>(notes),
       'coverImageUrl': serializer.toJson<String?>(coverImageUrl),
+      'venueImageUrl': serializer.toJson<String?>(venueImageUrl),
+      'venueAddress': serializer.toJson<String?>(venueAddress),
       'version': serializer.toJson<int>(version),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -537,6 +607,8 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     String? source,
     Value<String?> notes = const Value.absent(),
     Value<String?> coverImageUrl = const Value.absent(),
+    Value<String?> venueImageUrl = const Value.absent(),
+    Value<String?> venueAddress = const Value.absent(),
     int? version,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -557,6 +629,10 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     coverImageUrl: coverImageUrl.present
         ? coverImageUrl.value
         : this.coverImageUrl,
+    venueImageUrl: venueImageUrl.present
+        ? venueImageUrl.value
+        : this.venueImageUrl,
+    venueAddress: venueAddress.present ? venueAddress.value : this.venueAddress,
     version: version ?? this.version,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -581,6 +657,12 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
       coverImageUrl: data.coverImageUrl.present
           ? data.coverImageUrl.value
           : this.coverImageUrl,
+      venueImageUrl: data.venueImageUrl.present
+          ? data.venueImageUrl.value
+          : this.venueImageUrl,
+      venueAddress: data.venueAddress.present
+          ? data.venueAddress.value
+          : this.venueAddress,
       version: data.version.present ? data.version.value : this.version,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -602,6 +684,8 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
           ..write('source: $source, ')
           ..write('notes: $notes, ')
           ..write('coverImageUrl: $coverImageUrl, ')
+          ..write('venueImageUrl: $venueImageUrl, ')
+          ..write('venueAddress: $venueAddress, ')
           ..write('version: $version, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -623,6 +707,8 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     source,
     notes,
     coverImageUrl,
+    venueImageUrl,
+    venueAddress,
     version,
     updatedAt,
     deletedAt,
@@ -643,6 +729,8 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
           other.source == this.source &&
           other.notes == this.notes &&
           other.coverImageUrl == this.coverImageUrl &&
+          other.venueImageUrl == this.venueImageUrl &&
+          other.venueAddress == this.venueAddress &&
           other.version == this.version &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -661,6 +749,8 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
   final Value<String> source;
   final Value<String?> notes;
   final Value<String?> coverImageUrl;
+  final Value<String?> venueImageUrl;
+  final Value<String?> venueAddress;
   final Value<int> version;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -678,6 +768,8 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     this.source = const Value.absent(),
     this.notes = const Value.absent(),
     this.coverImageUrl = const Value.absent(),
+    this.venueImageUrl = const Value.absent(),
+    this.venueAddress = const Value.absent(),
     this.version = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -696,6 +788,8 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     required String source,
     this.notes = const Value.absent(),
     this.coverImageUrl = const Value.absent(),
+    this.venueImageUrl = const Value.absent(),
+    this.venueAddress = const Value.absent(),
     required int version,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -723,6 +817,8 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     Expression<String>? source,
     Expression<String>? notes,
     Expression<String>? coverImageUrl,
+    Expression<String>? venueImageUrl,
+    Expression<String>? venueAddress,
     Expression<int>? version,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -741,6 +837,8 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
       if (source != null) 'source': source,
       if (notes != null) 'notes': notes,
       if (coverImageUrl != null) 'cover_image_url': coverImageUrl,
+      if (venueImageUrl != null) 'venue_image_url': venueImageUrl,
+      if (venueAddress != null) 'venue_address': venueAddress,
       if (version != null) 'version': version,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -761,6 +859,8 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     Value<String>? source,
     Value<String?>? notes,
     Value<String?>? coverImageUrl,
+    Value<String?>? venueImageUrl,
+    Value<String?>? venueAddress,
     Value<int>? version,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -779,6 +879,8 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
       source: source ?? this.source,
       notes: notes ?? this.notes,
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,
+      venueImageUrl: venueImageUrl ?? this.venueImageUrl,
+      venueAddress: venueAddress ?? this.venueAddress,
       version: version ?? this.version,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -823,6 +925,12 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     if (coverImageUrl.present) {
       map['cover_image_url'] = Variable<String>(coverImageUrl.value);
     }
+    if (venueImageUrl.present) {
+      map['venue_image_url'] = Variable<String>(venueImageUrl.value);
+    }
+    if (venueAddress.present) {
+      map['venue_address'] = Variable<String>(venueAddress.value);
+    }
     if (version.present) {
       map['version'] = Variable<int>(version.value);
     }
@@ -855,6 +963,8 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
           ..write('source: $source, ')
           ..write('notes: $notes, ')
           ..write('coverImageUrl: $coverImageUrl, ')
+          ..write('venueImageUrl: $venueImageUrl, ')
+          ..write('venueAddress: $venueAddress, ')
           ..write('version: $version, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -4538,6 +4648,8 @@ typedef $$CachedEventsTableCreateCompanionBuilder =
       required String source,
       Value<String?> notes,
       Value<String?> coverImageUrl,
+      Value<String?> venueImageUrl,
+      Value<String?> venueAddress,
       required int version,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -4557,6 +4669,8 @@ typedef $$CachedEventsTableUpdateCompanionBuilder =
       Value<String> source,
       Value<String?> notes,
       Value<String?> coverImageUrl,
+      Value<String?> venueImageUrl,
+      Value<String?> venueAddress,
       Value<int> version,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -4625,6 +4739,16 @@ class $$CachedEventsTableFilterComposer
 
   ColumnFilters<String> get coverImageUrl => $composableBuilder(
     column: $table.coverImageUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get venueImageUrl => $composableBuilder(
+    column: $table.venueImageUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get venueAddress => $composableBuilder(
+    column: $table.venueAddress,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4713,6 +4837,16 @@ class $$CachedEventsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get venueImageUrl => $composableBuilder(
+    column: $table.venueImageUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get venueAddress => $composableBuilder(
+    column: $table.venueAddress,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get version => $composableBuilder(
     column: $table.version,
     builder: (column) => ColumnOrderings(column),
@@ -4782,6 +4916,16 @@ class $$CachedEventsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get venueImageUrl => $composableBuilder(
+    column: $table.venueImageUrl,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get venueAddress => $composableBuilder(
+    column: $table.venueAddress,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get version =>
       $composableBuilder(column: $table.version, builder: (column) => column);
 
@@ -4837,6 +4981,8 @@ class $$CachedEventsTableTableManager
                 Value<String> source = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<String?> coverImageUrl = const Value.absent(),
+                Value<String?> venueImageUrl = const Value.absent(),
+                Value<String?> venueAddress = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -4854,6 +5000,8 @@ class $$CachedEventsTableTableManager
                 source: source,
                 notes: notes,
                 coverImageUrl: coverImageUrl,
+                venueImageUrl: venueImageUrl,
+                venueAddress: venueAddress,
                 version: version,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -4873,6 +5021,8 @@ class $$CachedEventsTableTableManager
                 required String source,
                 Value<String?> notes = const Value.absent(),
                 Value<String?> coverImageUrl = const Value.absent(),
+                Value<String?> venueImageUrl = const Value.absent(),
+                Value<String?> venueAddress = const Value.absent(),
                 required int version,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -4890,6 +5040,8 @@ class $$CachedEventsTableTableManager
                 source: source,
                 notes: notes,
                 coverImageUrl: coverImageUrl,
+                venueImageUrl: venueImageUrl,
+                venueAddress: venueAddress,
                 version: version,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,

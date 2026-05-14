@@ -19,6 +19,8 @@ class EventDto {
     required this.source,
     required this.notes,
     required this.coverImageUrl,
+    required this.venueImageUrl,
+    required this.venueAddress,
     required this.version,
     required this.updatedAt,
     required this.deletedAt,
@@ -45,6 +47,8 @@ class EventDto {
       source: map['source'] as String,
       notes: map['notes'] as String?,
       coverImageUrl: map['cover_image_url'] as String?,
+      venueImageUrl: map['venue_image_url'] as String?,
+      venueAddress: map['venue_address'] as String?,
       version: map['version'] as int,
       updatedAt: DateTime.parse(map['updated_at'] as String),
       deletedAt: maybeDate('deleted_at'),
@@ -62,6 +66,8 @@ class EventDto {
   final String source;
   final String? notes;
   final String? coverImageUrl;
+  final String? venueImageUrl;
+  final String? venueAddress;
   final int version;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -79,6 +85,8 @@ class EventDto {
       source: source,
       notes: Value<String?>(notes),
       coverImageUrl: Value<String?>(coverImageUrl),
+      venueImageUrl: Value<String?>(venueImageUrl),
+      venueAddress: Value<String?>(venueAddress),
       version: version,
       updatedAt: updatedAt,
       deletedAt: Value<DateTime?>(deletedAt),

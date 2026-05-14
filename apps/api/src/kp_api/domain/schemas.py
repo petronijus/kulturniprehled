@@ -35,6 +35,8 @@ class EventCreate(BaseModel):
     source: EventSource = EventSource.MANUAL
     notes: str | None = None
     cover_image_url: str | None = Field(default=None, max_length=1024)
+    venue_image_url: str | None = Field(default=None, max_length=1024)
+    venue_address: str | None = None
 
 
 class EventUpdate(BaseModel):
@@ -50,6 +52,8 @@ class EventUpdate(BaseModel):
     status: EventStatus | None = None
     notes: str | None = None
     cover_image_url: str | None = Field(default=None, max_length=1024)
+    venue_image_url: str | None = Field(default=None, max_length=1024)
+    venue_address: str | None = None
 
 
 class EventResponse(BaseModel):
@@ -67,6 +71,8 @@ class EventResponse(BaseModel):
     source: EventSource
     notes: str | None
     cover_image_url: str | None
+    venue_image_url: str | None
+    venue_address: str | None
     created_by: UUID
     version: int
     created_at: datetime

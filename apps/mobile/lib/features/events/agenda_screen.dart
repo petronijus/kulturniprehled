@@ -126,21 +126,116 @@ class _AgendaTile extends StatelessWidget {
     }
   }
 
+  /// Pulls a short program/teaser line out of `notes`. The skill writes a
+  /// stable format starting with the program/season blurb on line one; we
+  /// strip empty lines and seat-info / transit-info lines so the tile shows
+  /// the headline, not logistics.
+  String? _previewFromNotes(String? notes) {
+    if (notes == null) {
+      return null;
+    }
+    for (final String raw in notes.split('\n')) {
+      final String line = raw.trim();
+      if (line.isEmpty) continue;
+      if (line.startsWith('Místa:')) continue;
+      if (line.startsWith('Místo:')) continue;
+      if (line.startsWith('🚌')) continue;
+      if (line.startsWith('Vstupenky')) continue;
+      if (line.startsWith('•')) continue;
+      return line;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final DateFormat fmt = DateFormat('EEE d. M. yyyy · HH:mm', 'cs');
     final ColorScheme scheme = Theme.of(context).colorScheme;
+    final String? preview = _previewFromNotes(event.notes);
+    final bool hasCover =
+        event.coverImageUrl != null && event.coverImageUrl!.isNotEmpty;
+
     return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: scheme.primaryContainer,
-          foregroundColor: scheme.onPrimaryContainer,
-          child: Icon(_iconFor(event.category)),
-        ),
-        title: Text(event.title),
-        subtitle: Text(fmt.format(event.startsAt.toLocal())),
-        trailing: const Icon(Icons.chevron_right),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: () => context.go('/agenda/events/${event.id}'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            if (hasCover)
+              AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Image.network(
+                  event.coverImageUrl!,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, progress) => progress == null
+                      ? child
+                      : Container(color: scheme.surfaceContainerHighest),
+                  errorBuilder: (context, _, _) => Container(
+                    color: scheme.surfaceContainerHighest,
+                    alignment: Alignment.center,
+                    child: Icon(
+                      _iconFor(event.category),
+                      size: 32,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  if (!hasCover)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12, top: 4),
+                      child: CircleAvatar(
+                        backgroundColor: scheme.primaryContainer,
+                        foregroundColor: scheme.onPrimaryContainer,
+                        child: Icon(_iconFor(event.category)),
+                      ),
+                    ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          event.title,
+                          style: Theme.of(context).textTheme.titleMedium,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          fmt.format(event.startsAt.toLocal()),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant),
+                        ),
+                        if (preview != null) ...<Widget>[
+                          const SizedBox(height: 6),
+                          Text(
+                            preview,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Icon(
+                      Icons.chevron_right,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

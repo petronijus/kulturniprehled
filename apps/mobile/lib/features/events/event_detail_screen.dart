@@ -118,6 +118,36 @@ class _EventDetailBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
+        if (event.coverImageUrl != null &&
+            event.coverImageUrl!.isNotEmpty) ...<Widget>[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Image.network(
+                event.coverImageUrl!,
+                fit: BoxFit.cover,
+                // Skeleton + error states so a flaky CDN never breaks the screen.
+                loadingBuilder: (context, child, progress) => progress == null
+                    ? child
+                    : Container(
+                        color: scheme.surfaceContainerHighest,
+                        alignment: Alignment.center,
+                        child: const CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                errorBuilder: (context, _, _) => Container(
+                  color: scheme.surfaceContainerHighest,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.image_not_supported_outlined,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         Text(event.title, style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
         Text(

@@ -18,6 +18,7 @@ class EventDto {
     required this.status,
     required this.source,
     required this.notes,
+    required this.coverImageUrl,
     required this.version,
     required this.updatedAt,
     required this.deletedAt,
@@ -43,6 +44,7 @@ class EventDto {
       status: map['status'] as String,
       source: map['source'] as String,
       notes: map['notes'] as String?,
+      coverImageUrl: map['cover_image_url'] as String?,
       version: map['version'] as int,
       updatedAt: DateTime.parse(map['updated_at'] as String),
       deletedAt: maybeDate('deleted_at'),
@@ -59,6 +61,7 @@ class EventDto {
   final String status;
   final String source;
   final String? notes;
+  final String? coverImageUrl;
   final int version;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -75,6 +78,7 @@ class EventDto {
       status: status,
       source: source,
       notes: Value<String?>(notes),
+      coverImageUrl: Value<String?>(coverImageUrl),
       version: version,
       updatedAt: updatedAt,
       deletedAt: Value<DateTime?>(deletedAt),

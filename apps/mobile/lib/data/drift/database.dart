@@ -26,6 +26,7 @@ class CachedEvents extends Table {
   TextColumn get status => text()();
   TextColumn get source => text()();
   TextColumn get notes => text().nullable()();
+  TextColumn get coverImageUrl => text().nullable()();
   IntColumn get version => integer()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();
@@ -161,7 +162,7 @@ class KpDatabase extends _$KpDatabase {
   KpDatabase.test(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -184,6 +185,9 @@ class KpDatabase extends _$KpDatabase {
       }
       if (from < 5) {
         await m.createTable(cachedWatchlistItems);
+      }
+      if (from < 6) {
+        await m.addColumn(cachedEvents, cachedEvents.coverImageUrl);
       }
     },
   );

@@ -107,6 +107,17 @@ class $CachedEventsTable extends CachedEvents
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _coverImageUrlMeta = const VerificationMeta(
+    'coverImageUrl',
+  );
+  @override
+  late final GeneratedColumn<String> coverImageUrl = GeneratedColumn<String>(
+    'cover_image_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _versionMeta = const VerificationMeta(
     'version',
   );
@@ -163,6 +174,7 @@ class $CachedEventsTable extends CachedEvents
     status,
     source,
     notes,
+    coverImageUrl,
     version,
     updatedAt,
     deletedAt,
@@ -257,6 +269,15 @@ class $CachedEventsTable extends CachedEvents
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('cover_image_url')) {
+      context.handle(
+        _coverImageUrlMeta,
+        coverImageUrl.isAcceptableOrUnknown(
+          data['cover_image_url']!,
+          _coverImageUrlMeta,
+        ),
+      );
+    }
     if (data.containsKey('version')) {
       context.handle(
         _versionMeta,
@@ -336,6 +357,10 @@ class $CachedEventsTable extends CachedEvents
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       ),
+      coverImageUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cover_image_url'],
+      ),
       version: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}version'],
@@ -372,6 +397,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
   final String status;
   final String source;
   final String? notes;
+  final String? coverImageUrl;
   final int version;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -387,6 +413,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     required this.status,
     required this.source,
     this.notes,
+    this.coverImageUrl,
     required this.version,
     required this.updatedAt,
     this.deletedAt,
@@ -410,6 +437,9 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     map['source'] = Variable<String>(source);
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || coverImageUrl != null) {
+      map['cover_image_url'] = Variable<String>(coverImageUrl);
     }
     map['version'] = Variable<int>(version);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -438,6 +468,9 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      coverImageUrl: coverImageUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coverImageUrl),
       version: Value(version),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -463,6 +496,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
       status: serializer.fromJson<String>(json['status']),
       source: serializer.fromJson<String>(json['source']),
       notes: serializer.fromJson<String?>(json['notes']),
+      coverImageUrl: serializer.fromJson<String?>(json['coverImageUrl']),
       version: serializer.fromJson<int>(json['version']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -483,6 +517,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
       'status': serializer.toJson<String>(status),
       'source': serializer.toJson<String>(source),
       'notes': serializer.toJson<String?>(notes),
+      'coverImageUrl': serializer.toJson<String?>(coverImageUrl),
       'version': serializer.toJson<int>(version),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -501,6 +536,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     String? status,
     String? source,
     Value<String?> notes = const Value.absent(),
+    Value<String?> coverImageUrl = const Value.absent(),
     int? version,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -518,6 +554,9 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     status: status ?? this.status,
     source: source ?? this.source,
     notes: notes.present ? notes.value : this.notes,
+    coverImageUrl: coverImageUrl.present
+        ? coverImageUrl.value
+        : this.coverImageUrl,
     version: version ?? this.version,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -539,6 +578,9 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
       status: data.status.present ? data.status.value : this.status,
       source: data.source.present ? data.source.value : this.source,
       notes: data.notes.present ? data.notes.value : this.notes,
+      coverImageUrl: data.coverImageUrl.present
+          ? data.coverImageUrl.value
+          : this.coverImageUrl,
       version: data.version.present ? data.version.value : this.version,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -559,6 +601,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
           ..write('status: $status, ')
           ..write('source: $source, ')
           ..write('notes: $notes, ')
+          ..write('coverImageUrl: $coverImageUrl, ')
           ..write('version: $version, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -579,6 +622,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     status,
     source,
     notes,
+    coverImageUrl,
     version,
     updatedAt,
     deletedAt,
@@ -598,6 +642,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
           other.status == this.status &&
           other.source == this.source &&
           other.notes == this.notes &&
+          other.coverImageUrl == this.coverImageUrl &&
           other.version == this.version &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -615,6 +660,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
   final Value<String> status;
   final Value<String> source;
   final Value<String?> notes;
+  final Value<String?> coverImageUrl;
   final Value<int> version;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -631,6 +677,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     this.status = const Value.absent(),
     this.source = const Value.absent(),
     this.notes = const Value.absent(),
+    this.coverImageUrl = const Value.absent(),
     this.version = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -648,6 +695,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     required String status,
     required String source,
     this.notes = const Value.absent(),
+    this.coverImageUrl = const Value.absent(),
     required int version,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -674,6 +722,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     Expression<String>? status,
     Expression<String>? source,
     Expression<String>? notes,
+    Expression<String>? coverImageUrl,
     Expression<int>? version,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -691,6 +740,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
       if (status != null) 'status': status,
       if (source != null) 'source': source,
       if (notes != null) 'notes': notes,
+      if (coverImageUrl != null) 'cover_image_url': coverImageUrl,
       if (version != null) 'version': version,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -710,6 +760,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     Value<String>? status,
     Value<String>? source,
     Value<String?>? notes,
+    Value<String?>? coverImageUrl,
     Value<int>? version,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -727,6 +778,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
       status: status ?? this.status,
       source: source ?? this.source,
       notes: notes ?? this.notes,
+      coverImageUrl: coverImageUrl ?? this.coverImageUrl,
       version: version ?? this.version,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -768,6 +820,9 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (coverImageUrl.present) {
+      map['cover_image_url'] = Variable<String>(coverImageUrl.value);
+    }
     if (version.present) {
       map['version'] = Variable<int>(version.value);
     }
@@ -799,6 +854,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
           ..write('status: $status, ')
           ..write('source: $source, ')
           ..write('notes: $notes, ')
+          ..write('coverImageUrl: $coverImageUrl, ')
           ..write('version: $version, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -4481,6 +4537,7 @@ typedef $$CachedEventsTableCreateCompanionBuilder =
       required String status,
       required String source,
       Value<String?> notes,
+      Value<String?> coverImageUrl,
       required int version,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -4499,6 +4556,7 @@ typedef $$CachedEventsTableUpdateCompanionBuilder =
       Value<String> status,
       Value<String> source,
       Value<String?> notes,
+      Value<String?> coverImageUrl,
       Value<int> version,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -4562,6 +4620,11 @@ class $$CachedEventsTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get coverImageUrl => $composableBuilder(
+    column: $table.coverImageUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4645,6 +4708,11 @@ class $$CachedEventsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get coverImageUrl => $composableBuilder(
+    column: $table.coverImageUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get version => $composableBuilder(
     column: $table.version,
     builder: (column) => ColumnOrderings(column),
@@ -4709,6 +4777,11 @@ class $$CachedEventsTableAnnotationComposer
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
 
+  GeneratedColumn<String> get coverImageUrl => $composableBuilder(
+    column: $table.coverImageUrl,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get version =>
       $composableBuilder(column: $table.version, builder: (column) => column);
 
@@ -4763,6 +4836,7 @@ class $$CachedEventsTableTableManager
                 Value<String> status = const Value.absent(),
                 Value<String> source = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<String?> coverImageUrl = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -4779,6 +4853,7 @@ class $$CachedEventsTableTableManager
                 status: status,
                 source: source,
                 notes: notes,
+                coverImageUrl: coverImageUrl,
                 version: version,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -4797,6 +4872,7 @@ class $$CachedEventsTableTableManager
                 required String status,
                 required String source,
                 Value<String?> notes = const Value.absent(),
+                Value<String?> coverImageUrl = const Value.absent(),
                 required int version,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -4813,6 +4889,7 @@ class $$CachedEventsTableTableManager
                 status: status,
                 source: source,
                 notes: notes,
+                coverImageUrl: coverImageUrl,
                 version: version,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,

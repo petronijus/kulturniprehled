@@ -34,6 +34,7 @@ class EventCreate(BaseModel):
     status: EventStatus = EventStatus.PLANNED
     source: EventSource = EventSource.MANUAL
     notes: str | None = None
+    cover_image_url: str | None = Field(default=None, max_length=1024)
 
 
 class EventUpdate(BaseModel):
@@ -48,6 +49,7 @@ class EventUpdate(BaseModel):
     venue_timezone: str | None = Field(default=None, max_length=60)
     status: EventStatus | None = None
     notes: str | None = None
+    cover_image_url: str | None = Field(default=None, max_length=1024)
 
 
 class EventResponse(BaseModel):
@@ -64,6 +66,7 @@ class EventResponse(BaseModel):
     status: EventStatus
     source: EventSource
     notes: str | None
+    cover_image_url: str | None
     created_by: UUID
     version: int
     created_at: datetime

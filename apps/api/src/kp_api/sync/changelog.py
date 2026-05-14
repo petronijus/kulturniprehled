@@ -50,6 +50,7 @@ def serialize_event(event: Event) -> dict[str, Any]:
         "status": event.status,
         "source": event.source,
         "notes": event.notes,
+        "cover_image_url": event.cover_image_url,
         "created_by": str(event.created_by),
         "version": event.version,
         "created_at": _isoformat(event.created_at),

@@ -11,6 +11,7 @@ import 'package:kp_mobile/features/events/agenda_screen.dart';
 import 'package:kp_mobile/features/events/edit_event_screen.dart';
 import 'package:kp_mobile/features/events/event_detail_screen.dart';
 import 'package:kp_mobile/features/stats/stats_screen.dart';
+import 'package:kp_mobile/features/sync/sync_controller.dart';
 import 'package:kp_mobile/features/tickets/ticket_viewer_screen.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_screen.dart';
 
@@ -108,24 +109,55 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class _HomeShell extends StatelessWidget {
+class _HomeShell extends ConsumerStatefulWidget {
   const _HomeShell({required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
+  @override
+  ConsumerState<_HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends ConsumerState<_HomeShell>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Pull on every foregrounding so a switch to the other device picks
+    // up its writes the moment the user returns. Mutations are sparse in
+    // this app — a single pull per resume costs effectively nothing.
+    if (state == AppLifecycleState.resumed) {
+      ref.read(syncControllerProvider.notifier).pullChanges();
+    }
+  }
+
   void _goBranch(int index) {
-    navigationShell.goBranch(
+    widget.navigationShell.goBranch(
       index,
-      initialLocation: index == navigationShell.currentIndex,
+      initialLocation: index == widget.navigationShell.currentIndex,
     );
+    // Pulling on every tab switch keeps each feature's cache fresh
+    // without each screen having to know to sync in initState.
+    ref.read(syncControllerProvider.notifier).pullChanges();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: navigationShell,
+      body: widget.navigationShell,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
+        selectedIndex: widget.navigationShell.currentIndex,
         onDestinationSelected: _goBranch,
         destinations: const <NavigationDestination>[
           NavigationDestination(

@@ -12,6 +12,7 @@ import 'package:kp_mobile/features/events/edit_event_screen.dart';
 import 'package:kp_mobile/features/events/event_detail_screen.dart';
 import 'package:kp_mobile/features/stats/stats_screen.dart';
 import 'package:kp_mobile/features/tickets/ticket_viewer_screen.dart';
+import 'package:kp_mobile/features/watchlist/watchlist_screen.dart';
 
 final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
   final Listenable refresh = ValueNotifier<AuthSession?>(
@@ -88,6 +89,14 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
+                path: '/watchlist',
+                builder: (context, state) => const WatchlistScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
                 path: '/stats',
                 builder: (context, state) => const StatsScreen(),
               ),
@@ -128,6 +137,11 @@ class _HomeShell extends StatelessWidget {
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'Měsíc',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.checklist_outlined),
+            selectedIcon: Icon(Icons.checklist),
+            label: 'Watchlist',
           ),
           NavigationDestination(
             icon: Icon(Icons.bar_chart_outlined),

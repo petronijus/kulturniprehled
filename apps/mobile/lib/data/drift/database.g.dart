@@ -3593,6 +3593,855 @@ class CachedCostsCompanion extends UpdateCompanion<CachedCostRow> {
   }
 }
 
+class $CachedWatchlistItemsTable extends CachedWatchlistItems
+    with TableInfo<$CachedWatchlistItemsTable, CachedWatchlistItemRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedWatchlistItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _workspaceIdMeta = const VerificationMeta(
+    'workspaceId',
+  );
+  @override
+  late final GeneratedColumn<String> workspaceId = GeneratedColumn<String>(
+    'workspace_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _parentIdMeta = const VerificationMeta(
+    'parentId',
+  );
+  @override
+  late final GeneratedColumn<String> parentId = GeneratedColumn<String>(
+    'parent_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<double> position = GeneratedColumn<double>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _doneMeta = const VerificationMeta('done');
+  @override
+  late final GeneratedColumn<bool> done = GeneratedColumn<bool>(
+    'done',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("done" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _doneAtMeta = const VerificationMeta('doneAt');
+  @override
+  late final GeneratedColumn<DateTime> doneAt = GeneratedColumn<DateTime>(
+    'done_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _doneByMeta = const VerificationMeta('doneBy');
+  @override
+  late final GeneratedColumn<String> doneBy = GeneratedColumn<String>(
+    'done_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdByMeta = const VerificationMeta(
+    'createdBy',
+  );
+  @override
+  late final GeneratedColumn<String> createdBy = GeneratedColumn<String>(
+    'created_by',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    workspaceId,
+    parentId,
+    title,
+    kind,
+    note,
+    position,
+    done,
+    doneAt,
+    doneBy,
+    createdBy,
+    version,
+    updatedAt,
+    deletedAt,
+    cachedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_watchlist_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedWatchlistItemRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('workspace_id')) {
+      context.handle(
+        _workspaceIdMeta,
+        workspaceId.isAcceptableOrUnknown(
+          data['workspace_id']!,
+          _workspaceIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_workspaceIdMeta);
+    }
+    if (data.containsKey('parent_id')) {
+      context.handle(
+        _parentIdMeta,
+        parentId.isAcceptableOrUnknown(data['parent_id']!, _parentIdMeta),
+      );
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_positionMeta);
+    }
+    if (data.containsKey('done')) {
+      context.handle(
+        _doneMeta,
+        done.isAcceptableOrUnknown(data['done']!, _doneMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_doneMeta);
+    }
+    if (data.containsKey('done_at')) {
+      context.handle(
+        _doneAtMeta,
+        doneAt.isAcceptableOrUnknown(data['done_at']!, _doneAtMeta),
+      );
+    }
+    if (data.containsKey('done_by')) {
+      context.handle(
+        _doneByMeta,
+        doneBy.isAcceptableOrUnknown(data['done_by']!, _doneByMeta),
+      );
+    }
+    if (data.containsKey('created_by')) {
+      context.handle(
+        _createdByMeta,
+        createdBy.isAcceptableOrUnknown(data['created_by']!, _createdByMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdByMeta);
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_versionMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedWatchlistItemRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedWatchlistItemRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      workspaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}workspace_id'],
+      )!,
+      parentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_id'],
+      ),
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}position'],
+      )!,
+      done: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}done'],
+      )!,
+      doneAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}done_at'],
+      ),
+      doneBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}done_by'],
+      ),
+      createdBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_by'],
+      )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CachedWatchlistItemsTable createAlias(String alias) {
+    return $CachedWatchlistItemsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedWatchlistItemRow extends DataClass
+    implements Insertable<CachedWatchlistItemRow> {
+  final String id;
+  final String workspaceId;
+  final String? parentId;
+  final String title;
+  final String kind;
+  final String? note;
+  final double position;
+  final bool done;
+  final DateTime? doneAt;
+  final String? doneBy;
+  final String createdBy;
+  final int version;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final DateTime cachedAt;
+  const CachedWatchlistItemRow({
+    required this.id,
+    required this.workspaceId,
+    this.parentId,
+    required this.title,
+    required this.kind,
+    this.note,
+    required this.position,
+    required this.done,
+    this.doneAt,
+    this.doneBy,
+    required this.createdBy,
+    required this.version,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.cachedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['workspace_id'] = Variable<String>(workspaceId);
+    if (!nullToAbsent || parentId != null) {
+      map['parent_id'] = Variable<String>(parentId);
+    }
+    map['title'] = Variable<String>(title);
+    map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['position'] = Variable<double>(position);
+    map['done'] = Variable<bool>(done);
+    if (!nullToAbsent || doneAt != null) {
+      map['done_at'] = Variable<DateTime>(doneAt);
+    }
+    if (!nullToAbsent || doneBy != null) {
+      map['done_by'] = Variable<String>(doneBy);
+    }
+    map['created_by'] = Variable<String>(createdBy);
+    map['version'] = Variable<int>(version);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    return map;
+  }
+
+  CachedWatchlistItemsCompanion toCompanion(bool nullToAbsent) {
+    return CachedWatchlistItemsCompanion(
+      id: Value(id),
+      workspaceId: Value(workspaceId),
+      parentId: parentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentId),
+      title: Value(title),
+      kind: Value(kind),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      position: Value(position),
+      done: Value(done),
+      doneAt: doneAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(doneAt),
+      doneBy: doneBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(doneBy),
+      createdBy: Value(createdBy),
+      version: Value(version),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      cachedAt: Value(cachedAt),
+    );
+  }
+
+  factory CachedWatchlistItemRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedWatchlistItemRow(
+      id: serializer.fromJson<String>(json['id']),
+      workspaceId: serializer.fromJson<String>(json['workspaceId']),
+      parentId: serializer.fromJson<String?>(json['parentId']),
+      title: serializer.fromJson<String>(json['title']),
+      kind: serializer.fromJson<String>(json['kind']),
+      note: serializer.fromJson<String?>(json['note']),
+      position: serializer.fromJson<double>(json['position']),
+      done: serializer.fromJson<bool>(json['done']),
+      doneAt: serializer.fromJson<DateTime?>(json['doneAt']),
+      doneBy: serializer.fromJson<String?>(json['doneBy']),
+      createdBy: serializer.fromJson<String>(json['createdBy']),
+      version: serializer.fromJson<int>(json['version']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'workspaceId': serializer.toJson<String>(workspaceId),
+      'parentId': serializer.toJson<String?>(parentId),
+      'title': serializer.toJson<String>(title),
+      'kind': serializer.toJson<String>(kind),
+      'note': serializer.toJson<String?>(note),
+      'position': serializer.toJson<double>(position),
+      'done': serializer.toJson<bool>(done),
+      'doneAt': serializer.toJson<DateTime?>(doneAt),
+      'doneBy': serializer.toJson<String?>(doneBy),
+      'createdBy': serializer.toJson<String>(createdBy),
+      'version': serializer.toJson<int>(version),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+    };
+  }
+
+  CachedWatchlistItemRow copyWith({
+    String? id,
+    String? workspaceId,
+    Value<String?> parentId = const Value.absent(),
+    String? title,
+    String? kind,
+    Value<String?> note = const Value.absent(),
+    double? position,
+    bool? done,
+    Value<DateTime?> doneAt = const Value.absent(),
+    Value<String?> doneBy = const Value.absent(),
+    String? createdBy,
+    int? version,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    DateTime? cachedAt,
+  }) => CachedWatchlistItemRow(
+    id: id ?? this.id,
+    workspaceId: workspaceId ?? this.workspaceId,
+    parentId: parentId.present ? parentId.value : this.parentId,
+    title: title ?? this.title,
+    kind: kind ?? this.kind,
+    note: note.present ? note.value : this.note,
+    position: position ?? this.position,
+    done: done ?? this.done,
+    doneAt: doneAt.present ? doneAt.value : this.doneAt,
+    doneBy: doneBy.present ? doneBy.value : this.doneBy,
+    createdBy: createdBy ?? this.createdBy,
+    version: version ?? this.version,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    cachedAt: cachedAt ?? this.cachedAt,
+  );
+  CachedWatchlistItemRow copyWithCompanion(CachedWatchlistItemsCompanion data) {
+    return CachedWatchlistItemRow(
+      id: data.id.present ? data.id.value : this.id,
+      workspaceId: data.workspaceId.present
+          ? data.workspaceId.value
+          : this.workspaceId,
+      parentId: data.parentId.present ? data.parentId.value : this.parentId,
+      title: data.title.present ? data.title.value : this.title,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      note: data.note.present ? data.note.value : this.note,
+      position: data.position.present ? data.position.value : this.position,
+      done: data.done.present ? data.done.value : this.done,
+      doneAt: data.doneAt.present ? data.doneAt.value : this.doneAt,
+      doneBy: data.doneBy.present ? data.doneBy.value : this.doneBy,
+      createdBy: data.createdBy.present ? data.createdBy.value : this.createdBy,
+      version: data.version.present ? data.version.value : this.version,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedWatchlistItemRow(')
+          ..write('id: $id, ')
+          ..write('workspaceId: $workspaceId, ')
+          ..write('parentId: $parentId, ')
+          ..write('title: $title, ')
+          ..write('kind: $kind, ')
+          ..write('note: $note, ')
+          ..write('position: $position, ')
+          ..write('done: $done, ')
+          ..write('doneAt: $doneAt, ')
+          ..write('doneBy: $doneBy, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('version: $version, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('cachedAt: $cachedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    workspaceId,
+    parentId,
+    title,
+    kind,
+    note,
+    position,
+    done,
+    doneAt,
+    doneBy,
+    createdBy,
+    version,
+    updatedAt,
+    deletedAt,
+    cachedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedWatchlistItemRow &&
+          other.id == this.id &&
+          other.workspaceId == this.workspaceId &&
+          other.parentId == this.parentId &&
+          other.title == this.title &&
+          other.kind == this.kind &&
+          other.note == this.note &&
+          other.position == this.position &&
+          other.done == this.done &&
+          other.doneAt == this.doneAt &&
+          other.doneBy == this.doneBy &&
+          other.createdBy == this.createdBy &&
+          other.version == this.version &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.cachedAt == this.cachedAt);
+}
+
+class CachedWatchlistItemsCompanion
+    extends UpdateCompanion<CachedWatchlistItemRow> {
+  final Value<String> id;
+  final Value<String> workspaceId;
+  final Value<String?> parentId;
+  final Value<String> title;
+  final Value<String> kind;
+  final Value<String?> note;
+  final Value<double> position;
+  final Value<bool> done;
+  final Value<DateTime?> doneAt;
+  final Value<String?> doneBy;
+  final Value<String> createdBy;
+  final Value<int> version;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<DateTime> cachedAt;
+  final Value<int> rowid;
+  const CachedWatchlistItemsCompanion({
+    this.id = const Value.absent(),
+    this.workspaceId = const Value.absent(),
+    this.parentId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.note = const Value.absent(),
+    this.position = const Value.absent(),
+    this.done = const Value.absent(),
+    this.doneAt = const Value.absent(),
+    this.doneBy = const Value.absent(),
+    this.createdBy = const Value.absent(),
+    this.version = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedWatchlistItemsCompanion.insert({
+    required String id,
+    required String workspaceId,
+    this.parentId = const Value.absent(),
+    required String title,
+    required String kind,
+    this.note = const Value.absent(),
+    required double position,
+    required bool done,
+    this.doneAt = const Value.absent(),
+    this.doneBy = const Value.absent(),
+    required String createdBy,
+    required int version,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    required DateTime cachedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       workspaceId = Value(workspaceId),
+       title = Value(title),
+       kind = Value(kind),
+       position = Value(position),
+       done = Value(done),
+       createdBy = Value(createdBy),
+       version = Value(version),
+       updatedAt = Value(updatedAt),
+       cachedAt = Value(cachedAt);
+  static Insertable<CachedWatchlistItemRow> custom({
+    Expression<String>? id,
+    Expression<String>? workspaceId,
+    Expression<String>? parentId,
+    Expression<String>? title,
+    Expression<String>? kind,
+    Expression<String>? note,
+    Expression<double>? position,
+    Expression<bool>? done,
+    Expression<DateTime>? doneAt,
+    Expression<String>? doneBy,
+    Expression<String>? createdBy,
+    Expression<int>? version,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (workspaceId != null) 'workspace_id': workspaceId,
+      if (parentId != null) 'parent_id': parentId,
+      if (title != null) 'title': title,
+      if (kind != null) 'kind': kind,
+      if (note != null) 'note': note,
+      if (position != null) 'position': position,
+      if (done != null) 'done': done,
+      if (doneAt != null) 'done_at': doneAt,
+      if (doneBy != null) 'done_by': doneBy,
+      if (createdBy != null) 'created_by': createdBy,
+      if (version != null) 'version': version,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedWatchlistItemsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? workspaceId,
+    Value<String?>? parentId,
+    Value<String>? title,
+    Value<String>? kind,
+    Value<String?>? note,
+    Value<double>? position,
+    Value<bool>? done,
+    Value<DateTime?>? doneAt,
+    Value<String?>? doneBy,
+    Value<String>? createdBy,
+    Value<int>? version,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<DateTime>? cachedAt,
+    Value<int>? rowid,
+  }) {
+    return CachedWatchlistItemsCompanion(
+      id: id ?? this.id,
+      workspaceId: workspaceId ?? this.workspaceId,
+      parentId: parentId ?? this.parentId,
+      title: title ?? this.title,
+      kind: kind ?? this.kind,
+      note: note ?? this.note,
+      position: position ?? this.position,
+      done: done ?? this.done,
+      doneAt: doneAt ?? this.doneAt,
+      doneBy: doneBy ?? this.doneBy,
+      createdBy: createdBy ?? this.createdBy,
+      version: version ?? this.version,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      cachedAt: cachedAt ?? this.cachedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (workspaceId.present) {
+      map['workspace_id'] = Variable<String>(workspaceId.value);
+    }
+    if (parentId.present) {
+      map['parent_id'] = Variable<String>(parentId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<double>(position.value);
+    }
+    if (done.present) {
+      map['done'] = Variable<bool>(done.value);
+    }
+    if (doneAt.present) {
+      map['done_at'] = Variable<DateTime>(doneAt.value);
+    }
+    if (doneBy.present) {
+      map['done_by'] = Variable<String>(doneBy.value);
+    }
+    if (createdBy.present) {
+      map['created_by'] = Variable<String>(createdBy.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedWatchlistItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('workspaceId: $workspaceId, ')
+          ..write('parentId: $parentId, ')
+          ..write('title: $title, ')
+          ..write('kind: $kind, ')
+          ..write('note: $note, ')
+          ..write('position: $position, ')
+          ..write('done: $done, ')
+          ..write('doneAt: $doneAt, ')
+          ..write('doneBy: $doneBy, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('version: $version, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$KpDatabase extends GeneratedDatabase {
   _$KpDatabase(QueryExecutor e) : super(e);
   $KpDatabaseManager get managers => $KpDatabaseManager(this);
@@ -3603,6 +4452,8 @@ abstract class _$KpDatabase extends GeneratedDatabase {
   late final $CachedTicketFilesTable cachedTicketFiles =
       $CachedTicketFilesTable(this);
   late final $CachedCostsTable cachedCosts = $CachedCostsTable(this);
+  late final $CachedWatchlistItemsTable cachedWatchlistItems =
+      $CachedWatchlistItemsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3614,6 +4465,7 @@ abstract class _$KpDatabase extends GeneratedDatabase {
     pendingOps,
     cachedTicketFiles,
     cachedCosts,
+    cachedWatchlistItems,
   ];
 }
 
@@ -5384,6 +6236,414 @@ typedef $$CachedCostsTableProcessedTableManager =
       CachedCostRow,
       PrefetchHooks Function()
     >;
+typedef $$CachedWatchlistItemsTableCreateCompanionBuilder =
+    CachedWatchlistItemsCompanion Function({
+      required String id,
+      required String workspaceId,
+      Value<String?> parentId,
+      required String title,
+      required String kind,
+      Value<String?> note,
+      required double position,
+      required bool done,
+      Value<DateTime?> doneAt,
+      Value<String?> doneBy,
+      required String createdBy,
+      required int version,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      required DateTime cachedAt,
+      Value<int> rowid,
+    });
+typedef $$CachedWatchlistItemsTableUpdateCompanionBuilder =
+    CachedWatchlistItemsCompanion Function({
+      Value<String> id,
+      Value<String> workspaceId,
+      Value<String?> parentId,
+      Value<String> title,
+      Value<String> kind,
+      Value<String?> note,
+      Value<double> position,
+      Value<bool> done,
+      Value<DateTime?> doneAt,
+      Value<String?> doneBy,
+      Value<String> createdBy,
+      Value<int> version,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<DateTime> cachedAt,
+      Value<int> rowid,
+    });
+
+class $$CachedWatchlistItemsTableFilterComposer
+    extends Composer<_$KpDatabase, $CachedWatchlistItemsTable> {
+  $$CachedWatchlistItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parentId => $composableBuilder(
+    column: $table.parentId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get done => $composableBuilder(
+    column: $table.done,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get doneAt => $composableBuilder(
+    column: $table.doneAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get doneBy => $composableBuilder(
+    column: $table.doneBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedWatchlistItemsTableOrderingComposer
+    extends Composer<_$KpDatabase, $CachedWatchlistItemsTable> {
+  $$CachedWatchlistItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get parentId => $composableBuilder(
+    column: $table.parentId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get done => $composableBuilder(
+    column: $table.done,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get doneAt => $composableBuilder(
+    column: $table.doneAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get doneBy => $composableBuilder(
+    column: $table.doneBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedWatchlistItemsTableAnnotationComposer
+    extends Composer<_$KpDatabase, $CachedWatchlistItemsTable> {
+  $$CachedWatchlistItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get parentId =>
+      $composableBuilder(column: $table.parentId, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<double> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<bool> get done =>
+      $composableBuilder(column: $table.done, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get doneAt =>
+      $composableBuilder(column: $table.doneAt, builder: (column) => column);
+
+  GeneratedColumn<String> get doneBy =>
+      $composableBuilder(column: $table.doneBy, builder: (column) => column);
+
+  GeneratedColumn<String> get createdBy =>
+      $composableBuilder(column: $table.createdBy, builder: (column) => column);
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+}
+
+class $$CachedWatchlistItemsTableTableManager
+    extends
+        RootTableManager<
+          _$KpDatabase,
+          $CachedWatchlistItemsTable,
+          CachedWatchlistItemRow,
+          $$CachedWatchlistItemsTableFilterComposer,
+          $$CachedWatchlistItemsTableOrderingComposer,
+          $$CachedWatchlistItemsTableAnnotationComposer,
+          $$CachedWatchlistItemsTableCreateCompanionBuilder,
+          $$CachedWatchlistItemsTableUpdateCompanionBuilder,
+          (
+            CachedWatchlistItemRow,
+            BaseReferences<
+              _$KpDatabase,
+              $CachedWatchlistItemsTable,
+              CachedWatchlistItemRow
+            >,
+          ),
+          CachedWatchlistItemRow,
+          PrefetchHooks Function()
+        > {
+  $$CachedWatchlistItemsTableTableManager(
+    _$KpDatabase db,
+    $CachedWatchlistItemsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedWatchlistItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedWatchlistItemsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedWatchlistItemsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> workspaceId = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<double> position = const Value.absent(),
+                Value<bool> done = const Value.absent(),
+                Value<DateTime?> doneAt = const Value.absent(),
+                Value<String?> doneBy = const Value.absent(),
+                Value<String> createdBy = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedWatchlistItemsCompanion(
+                id: id,
+                workspaceId: workspaceId,
+                parentId: parentId,
+                title: title,
+                kind: kind,
+                note: note,
+                position: position,
+                done: done,
+                doneAt: doneAt,
+                doneBy: doneBy,
+                createdBy: createdBy,
+                version: version,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String workspaceId,
+                Value<String?> parentId = const Value.absent(),
+                required String title,
+                required String kind,
+                Value<String?> note = const Value.absent(),
+                required double position,
+                required bool done,
+                Value<DateTime?> doneAt = const Value.absent(),
+                Value<String?> doneBy = const Value.absent(),
+                required String createdBy,
+                required int version,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                required DateTime cachedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CachedWatchlistItemsCompanion.insert(
+                id: id,
+                workspaceId: workspaceId,
+                parentId: parentId,
+                title: title,
+                kind: kind,
+                note: note,
+                position: position,
+                done: done,
+                doneAt: doneAt,
+                doneBy: doneBy,
+                createdBy: createdBy,
+                version: version,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                cachedAt: cachedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedWatchlistItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$KpDatabase,
+      $CachedWatchlistItemsTable,
+      CachedWatchlistItemRow,
+      $$CachedWatchlistItemsTableFilterComposer,
+      $$CachedWatchlistItemsTableOrderingComposer,
+      $$CachedWatchlistItemsTableAnnotationComposer,
+      $$CachedWatchlistItemsTableCreateCompanionBuilder,
+      $$CachedWatchlistItemsTableUpdateCompanionBuilder,
+      (
+        CachedWatchlistItemRow,
+        BaseReferences<
+          _$KpDatabase,
+          $CachedWatchlistItemsTable,
+          CachedWatchlistItemRow
+        >,
+      ),
+      CachedWatchlistItemRow,
+      PrefetchHooks Function()
+    >;
 
 class $KpDatabaseManager {
   final _$KpDatabase _db;
@@ -5400,4 +6660,6 @@ class $KpDatabaseManager {
       $$CachedTicketFilesTableTableManager(_db, _db.cachedTicketFiles);
   $$CachedCostsTableTableManager get cachedCosts =>
       $$CachedCostsTableTableManager(_db, _db.cachedCosts);
+  $$CachedWatchlistItemsTableTableManager get cachedWatchlistItems =>
+      $$CachedWatchlistItemsTableTableManager(_db, _db.cachedWatchlistItems);
 }

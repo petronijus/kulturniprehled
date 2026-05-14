@@ -5,6 +5,7 @@ import 'package:kp_mobile/data/api_client/kp_client.dart';
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/costs/cost_dto.dart';
 import 'package:kp_mobile/features/events/event_dto.dart';
+import 'package:kp_mobile/features/watchlist/watchlist_dto.dart';
 
 // Pulls /v1/sync since the last cursor and feeds change_log entries into
 // the drift cache. Designed to be idempotent and quick — long, full-page
@@ -92,6 +93,9 @@ class SyncController extends Notifier<SyncState> {
     } else if (entityType == 'cost') {
       final CostDto cost = CostDto.fromMap(payload);
       await db.upsertCost(cost.toCompanion());
+    } else if (entityType == 'watchlist_item') {
+      final WatchlistItemDto item = WatchlistItemDto.fromMap(payload);
+      await db.upsertWatchlistItem(item.toCompanion());
     }
     // Unknown entity types are dropped silently — they will land on the
     // next schema bump that adds support for them.

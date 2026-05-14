@@ -100,6 +100,30 @@ class CachedTicketFiles extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{ticketId};
 }
 
+@DataClassName('CachedWatchlistItemRow')
+class CachedWatchlistItems extends Table {
+  // Mirror of the server-side `watchlist_items` row. Position is the server
+  // float — UI orders rows on it directly. parent_id NULL = root item.
+  TextColumn get id => text()();
+  TextColumn get workspaceId => text()();
+  TextColumn get parentId => text().nullable()();
+  TextColumn get title => text()();
+  TextColumn get kind => text()(); // "film" | "divadlo" | "koncert"
+  TextColumn get note => text().nullable()();
+  RealColumn get position => real()();
+  BoolColumn get done => boolean()();
+  DateTimeColumn get doneAt => dateTime().nullable()();
+  TextColumn get doneBy => text().nullable()();
+  TextColumn get createdBy => text()();
+  IntColumn get version => integer()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  DateTimeColumn get cachedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{id};
+}
+
 @DataClassName('CachedCostRow')
 class CachedCosts extends Table {
   // All amounts are CZK haléře. Multi-currency was dropped before v1.0.
@@ -129,6 +153,7 @@ class CachedCosts extends Table {
     PendingOps,
     CachedTicketFiles,
     CachedCosts,
+    CachedWatchlistItems,
   ],
 )
 class KpDatabase extends _$KpDatabase {
@@ -136,7 +161,7 @@ class KpDatabase extends _$KpDatabase {
   KpDatabase.test(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -156,6 +181,9 @@ class KpDatabase extends _$KpDatabase {
         await m.database.customStatement(
           'ALTER TABLE cached_costs DROP COLUMN currency',
         );
+      }
+      if (from < 5) {
+        await m.createTable(cachedWatchlistItems);
       }
     },
   );
@@ -316,6 +344,29 @@ class KpDatabase extends _$KpDatabase {
 
   Future<void> upsertCost(CachedCostsCompanion row) =>
       into(cachedCosts).insertOnConflictUpdate(row);
+
+  // ===== Watchlist =====
+
+  Stream<List<CachedWatchlistItemRow>> watchWatchlist() {
+    // Roots first (parentId IS NULL → NULL sorts first in SQLite asc), then
+    // children of each parent. Order within scope is by `position`.
+    return (select(cachedWatchlistItems)
+          ..where((tbl) => tbl.deletedAt.isNull())
+          ..orderBy(<OrderClauseGenerator<CachedWatchlistItems>>[
+            (tbl) => OrderingTerm(expression: tbl.parentId),
+            (tbl) => OrderingTerm(expression: tbl.position),
+          ]))
+        .watch();
+  }
+
+  Future<CachedWatchlistItemRow?> findWatchlistItem(String id) {
+    return (select(
+      cachedWatchlistItems,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+  }
+
+  Future<void> upsertWatchlistItem(CachedWatchlistItemsCompanion row) =>
+      into(cachedWatchlistItems).insertOnConflictUpdate(row);
 }
 
 LazyDatabase _openConnection() {

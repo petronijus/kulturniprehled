@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kp_mobile/data/drift/database.dart';
+import 'package:kp_mobile/features/sync/sync_controller.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_repository.dart';
 
 // Shared watchlist screen.
@@ -14,26 +15,51 @@ import 'package:kp_mobile/features/watchlist/watchlist_repository.dart';
 // All writes go through `WatchlistRepository` which optimistically updates
 // the local drift cache; the next /v1/sync pull reconciles.
 
-class WatchlistScreen extends ConsumerWidget {
+class WatchlistScreen extends ConsumerStatefulWidget {
   const WatchlistScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WatchlistScreen> createState() => _WatchlistScreenState();
+}
+
+class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Non-blocking sync on mount — same pattern as AgendaScreen. The list
+    // renders from the local cache immediately; the pull tops it up with
+    // anything the other device wrote since.
+    Future<void>.microtask(
+      () => ref.read(syncControllerProvider.notifier).pullChanges(),
+    );
+  }
+
+  Future<void> _refresh() =>
+      ref.read(syncControllerProvider.notifier).pullChanges();
+
+  @override
+  Widget build(BuildContext context) {
     final AsyncValue<List<CachedWatchlistItemRow>> rows = ref.watch(
       watchlistProvider,
     );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Watchlist')),
-      body: rows.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('Chyba: $error', textAlign: TextAlign.center),
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: rows.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => ListView(
+            children: <Widget>[
+              const SizedBox(height: 120),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text('Chyba: $error', textAlign: TextAlign.center),
+              ),
+            ],
           ),
+          data: (items) => _WatchlistBody(items: items),
         ),
-        data: (items) => _WatchlistBody(items: items),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddDialog(context, ref, parentId: null),
@@ -95,14 +121,20 @@ class _WatchlistBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (items.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'Watchlist je prázdný — přidej první film, divadlo nebo koncert.',
-            textAlign: TextAlign.center,
+      // Use a scrollable ListView so the parent RefreshIndicator works
+      // even when the list is empty (pull-down from the empty state).
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const <Widget>[
+          SizedBox(height: 120),
+          Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Watchlist je prázdný — přidej první film, divadlo nebo koncert.',
+              textAlign: TextAlign.center,
+            ),
           ),
-        ),
+        ],
       );
     }
 

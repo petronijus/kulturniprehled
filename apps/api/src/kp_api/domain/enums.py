@@ -45,3 +45,11 @@ class CostKind(StrEnum):
 class CostSplit(StrEnum):
     SHARED = "shared"
     INDIVIDUAL = "individual"
+
+
+class WatchlistKind(StrEnum):
+    # Czech category values — stored verbatim; mobile UI presents the same
+    # token capitalised. Strict set: no "other" bucket by design.
+    FILM = "film"
+    DIVADLO = "divadlo"
+    KONCERT = "koncert"

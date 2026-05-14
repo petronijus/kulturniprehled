@@ -24,7 +24,7 @@ from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api.domain.enums import ChangeOp
-from kp_api.domain.models import ChangeLog, Cost, Event, Ticket
+from kp_api.domain.models import ChangeLog, Cost, Event, Ticket, WatchlistItem
 
 
 def _isoformat(value: datetime | None) -> str | None:
@@ -160,6 +160,48 @@ async def record_cost_change(
             entity_id=cost.id,
             op=op,
             payload=serialize_cost(cost),
+            actor_id=actor_id,
+        )
+        .returning(ChangeLog.seq)
+    )
+    seq = result.scalar_one()
+    return int(seq)
+
+
+def serialize_watchlist_item(item: WatchlistItem) -> dict[str, Any]:
+    return {
+        "id": str(item.id),
+        "workspace_id": str(item.workspace_id),
+        "parent_id": str(item.parent_id) if item.parent_id else None,
+        "title": item.title,
+        "kind": item.kind,
+        "note": item.note,
+        "position": item.position,
+        "done": item.done,
+        "done_at": _isoformat(item.done_at),
+        "done_by": str(item.done_by) if item.done_by else None,
+        "created_by": str(item.created_by),
+        "version": item.version,
+        "created_at": _isoformat(item.created_at),
+        "updated_at": _isoformat(item.updated_at),
+        "deleted_at": _isoformat(item.deleted_at),
+    }
+
+
+async def record_watchlist_change(
+    session: AsyncSession,
+    item: WatchlistItem,
+    actor_id: UUID,
+    op: ChangeOp,
+) -> int:
+    result = await session.execute(
+        insert(ChangeLog)
+        .values(
+            workspace_id=item.workspace_id,
+            entity_type="watchlist_item",
+            entity_id=item.id,
+            op=op,
+            payload=serialize_watchlist_item(item),
             actor_id=actor_id,
         )
         .returning(ChangeLog.seq)

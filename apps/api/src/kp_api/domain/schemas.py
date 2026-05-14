@@ -18,6 +18,7 @@ from kp_api.domain.enums import (
     EventCategory,
     EventSource,
     EventStatus,
+    WatchlistKind,
 )
 
 
@@ -167,6 +168,82 @@ class CostResponse(BaseModel):
 class CostListResponse(BaseModel):
     items: list[CostResponse]
     total_amount_cents: int
+
+
+class WatchlistItemCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=255)
+    kind: WatchlistKind
+    parent_id: UUID | None = None
+    note: str | None = None
+    # Optional anchor positions; if both are None the server appends.
+    after_id: UUID | None = None
+    before_id: UUID | None = None
+
+
+class WatchlistItemUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: int = Field(ge=1, description="Last seen version; server rejects on mismatch.")
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    kind: WatchlistKind | None = None
+    note: str | None = None
+
+
+class WatchlistCheckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: int = Field(ge=1)
+    done: bool
+
+
+class WatchlistMoveRequest(BaseModel):
+    """Reorder within a parent or move into a different parent.
+
+    Exactly one of the three positioning fields should be set:
+    `before_id`, `after_id`, or `to_end=true`. `parent_id` is honoured
+    when present (use `None` to move to the root); when omitted the
+    item's current parent is kept.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: int = Field(ge=1)
+    parent_id: UUID | None = None
+    set_parent: bool = Field(
+        default=False,
+        description=(
+            "Set to true to apply parent_id verbatim (including None for root). "
+            "When false, the item's current parent is kept."
+        ),
+    )
+    before_id: UUID | None = None
+    after_id: UUID | None = None
+    to_end: bool = False
+
+
+class WatchlistItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    workspace_id: UUID
+    parent_id: UUID | None
+    title: str
+    kind: WatchlistKind
+    note: str | None
+    position: float
+    done: bool
+    done_at: datetime | None
+    done_by: UUID | None
+    created_by: UUID
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class WatchlistListResponse(BaseModel):
+    items: list[WatchlistItemResponse]
 
 
 class StatsByMonth(BaseModel):

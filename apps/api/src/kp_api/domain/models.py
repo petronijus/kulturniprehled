@@ -43,6 +43,7 @@ from kp_api.domain.enums import (
     EventSource,
     EventStatus,
     UserRole,
+    WatchlistKind,
 )
 from kp_api.domain.ids import uuid7
 
@@ -309,6 +310,73 @@ class Cost(Base):
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     paid_at: Mapped[date] = mapped_column(Date, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class WatchlistItem(Base):
+    """An item in the shared watchlist: a film / concert / play we want to
+    catch later. Items can nest one level under a parent item ("Godard" with
+    four films beneath it). Order within a parent (or at the root) is
+    controlled by `position`, a float interpolated between neighbours on
+    insert/move — only the moved row changes, which keeps sync chatter low.
+
+    Cascade rules: parents and their children are independent rows. Deleting
+    a parent soft-deletes its non-deleted children in the same transaction
+    (handled in the repository / outbox path, not via DB ON DELETE — we never
+    hard-delete).
+    """
+
+    __tablename__ = "watchlist_items"
+    __table_args__ = (
+        Index(
+            "ix_watchlist_workspace_parent_pos",
+            "workspace_id",
+            "parent_id",
+            "position",
+            postgresql_where="deleted_at IS NULL",
+        ),
+        Index(
+            "ix_watchlist_workspace_active",
+            "workspace_id",
+            "deleted_at",
+            postgresql_where="deleted_at IS NULL",
+        ),
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    parent_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("watchlist_items.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    kind: Mapped[WatchlistKind] = mapped_column(String(20), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    position: Mapped[float] = mapped_column(nullable=False)
+    done: Mapped[bool] = mapped_column(nullable=False, default=False)
+    done_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    done_by: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_by: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()

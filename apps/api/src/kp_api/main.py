@@ -7,7 +7,7 @@ from fastapi import FastAPI
 
 from kp_api import __version__
 from kp_api.adapters.storage import minio as storage
-from kp_api.api.v1 import auth, costs, events, healthz, stats, sync, tickets
+from kp_api.api.v1 import auth, costs, events, healthz, stats, sync, tickets, watchlist
 
 
 @asynccontextmanager
@@ -38,6 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(costs.router)
     app.include_router(costs.events_router)
     app.include_router(stats.router)
+    app.include_router(watchlist.router)
     return app
 
 

@@ -14,7 +14,7 @@ the scope in a single UPDATE.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Response, status
@@ -38,7 +38,7 @@ router = APIRouter(prefix="/v1/watchlist", tags=["watchlist"])
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 async def _user_workspace(session: AsyncSession, user: User) -> Workspace:
@@ -53,9 +53,7 @@ async def _user_workspace(session: AsyncSession, user: User) -> Workspace:
     return workspace
 
 
-async def _get_active(
-    session: AsyncSession, workspace: Workspace, item_id: UUID
-) -> WatchlistItem:
+async def _get_active(session: AsyncSession, workspace: Workspace, item_id: UUID) -> WatchlistItem:
     item = await session.scalar(
         select(WatchlistItem).where(
             WatchlistItem.id == item_id,
@@ -92,7 +90,8 @@ async def _scope_max_position(
     else:
         stmt = stmt.where(WatchlistItem.parent_id == parent_id)
     stmt = stmt.order_by(WatchlistItem.position.desc()).limit(1)
-    return await session.scalar(stmt)
+    result: float | None = await session.scalar(stmt)
+    return result
 
 
 async def _scope_min_position(
@@ -107,7 +106,8 @@ async def _scope_min_position(
     else:
         stmt = stmt.where(WatchlistItem.parent_id == parent_id)
     stmt = stmt.order_by(WatchlistItem.position.asc()).limit(1)
-    return await session.scalar(stmt)
+    result: float | None = await session.scalar(stmt)
+    return result
 
 
 async def _neighbour_position(
@@ -141,7 +141,8 @@ async def _neighbour_position(
         stmt = stmt.where(WatchlistItem.position > relative_to).order_by(
             WatchlistItem.position.asc()
         )
-    return await session.scalar(stmt.limit(1))
+    result: float | None = await session.scalar(stmt.limit(1))
+    return result
 
 
 async def _compute_position(
@@ -217,8 +218,7 @@ async def list_items(
 ) -> WatchlistListResponse:
     workspace = await _user_workspace(session, user)
     rows = await session.scalars(
-        select(WatchlistItem)
-        .where(
+        select(WatchlistItem).where(
             WatchlistItem.workspace_id == workspace.id,
             WatchlistItem.deleted_at.is_(None),
         )

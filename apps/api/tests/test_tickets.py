@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -12,9 +12,7 @@ from tests.conftest import auth_header, login_as
 
 
 def _future(days: int = 14) -> str:
-    return (datetime.now(timezone.utc) + timedelta(days=days)).isoformat().replace(
-        "+00:00", "Z"
-    )
+    return (datetime.now(UTC) + timedelta(days=days)).isoformat().replace("+00:00", "Z")
 
 
 async def _create_event(client: AsyncClient, headers: dict[str, str]) -> dict[str, str]:
@@ -170,15 +168,11 @@ async def test_list_tickets_for_event_filters_soft_deleted(
     first = await _register()
     second = await _register()
 
-    listing = (
-        await client.get(f"/v1/events/{event['id']}/tickets", headers=headers)
-    ).json()
+    listing = (await client.get(f"/v1/events/{event['id']}/tickets", headers=headers)).json()
     assert {t["id"] for t in listing["items"]} == {first["id"], second["id"]}
 
     await client.delete(f"/v1/tickets/{first['id']}", headers=headers)
-    after_delete = (
-        await client.get(f"/v1/events/{event['id']}/tickets", headers=headers)
-    ).json()
+    after_delete = (await client.get(f"/v1/events/{event['id']}/tickets", headers=headers)).json()
     assert [t["id"] for t in after_delete["items"]] == [second["id"]]
 
 
@@ -245,7 +239,5 @@ async def test_other_member_sees_ticket_via_sync(client: AsyncClient) -> None:
         c["entity_id"] == ticket["id"] for c in page["changes"] if c["entity_type"] == "ticket"
     )
 
-    download = await client.get(
-        f"/v1/tickets/{ticket['id']}/url", headers=bela_headers
-    )
+    download = await client.get(f"/v1/tickets/{ticket['id']}/url", headers=bela_headers)
     assert download.status_code == 200

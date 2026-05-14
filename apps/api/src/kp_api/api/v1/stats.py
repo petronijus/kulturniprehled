@@ -32,7 +32,7 @@ async def _user_workspace(session: AsyncSession, user: User) -> Workspace:
         .where(WorkspaceMember.user_id == user.id)
         .limit(1)
     )
-    assert workspace is not None  # noqa: S101 — CurrentUser guarantees this
+    assert workspace is not None
     return workspace
 
 
@@ -56,8 +56,7 @@ async def stats(
         )
     ).all()
     by_category = [
-        StatsByCategory(category=EventCategory(row[0]), count=int(row[1]))
-        for row in by_cat_rows
+        StatsByCategory(category=EventCategory(row[0]), count=int(row[1])) for row in by_cat_rows
     ]
     total_events = sum(c.count for c in by_category)
 
@@ -119,9 +118,7 @@ async def stats(
             .limit(5)
         )
     ).all()
-    top_venues = [
-        StatsTopVenue(name=str(row[0]), count=int(row[1])) for row in venue_rows
-    ]
+    top_venues = [StatsTopVenue(name=str(row[0]), count=int(row[1])) for row in venue_rows]
 
     attended = await session.scalar(
         select(func.count(distinct(Event.id))).where(

@@ -11,7 +11,7 @@ in 0006 — see the `Cost` model docstring for rationale.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Response, status
@@ -34,7 +34,7 @@ events_router = APIRouter(prefix="/v1/events", tags=["costs"])
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 async def _user_workspace(session: AsyncSession, user: User) -> Workspace:
@@ -49,9 +49,7 @@ async def _user_workspace(session: AsyncSession, user: User) -> Workspace:
     return workspace
 
 
-async def _event_in_workspace(
-    session: AsyncSession, workspace: Workspace, event_id: UUID
-) -> Event:
+async def _event_in_workspace(session: AsyncSession, workspace: Workspace, event_id: UUID) -> Event:
     event = await session.scalar(
         select(Event).where(
             Event.id == event_id,
@@ -64,9 +62,7 @@ async def _event_in_workspace(
     return event
 
 
-async def _cost_in_workspace(
-    session: AsyncSession, workspace: Workspace, cost_id: UUID
-) -> Cost:
+async def _cost_in_workspace(session: AsyncSession, workspace: Workspace, cost_id: UUID) -> Cost:
     cost = await session.scalar(
         select(Cost).where(
             Cost.id == cost_id,

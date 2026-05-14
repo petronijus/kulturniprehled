@@ -23,7 +23,7 @@ async def _user_workspace(session: AsyncSession, user: User) -> Workspace:
         .where(WorkspaceMember.user_id == user.id)
         .limit(1)
     )
-    assert workspace is not None  # noqa: S101 — endpoint requires CurrentUser
+    assert workspace is not None
     return workspace
 
 

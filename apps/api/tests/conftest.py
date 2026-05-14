@@ -30,7 +30,7 @@ from testcontainers.minio import MinioContainer
 from testcontainers.postgres import PostgresContainer
 
 from kp_api.adapters.db import set_engine_override
-from kp_api.adapters.oauth import GoogleIdentity, IdTokenVerifier
+from kp_api.adapters.oauth import GoogleIdentity
 from kp_api.adapters.storage import minio as storage
 from kp_api.api.v1.auth import get_verifier
 from kp_api.config import Settings, get_settings
@@ -72,9 +72,7 @@ def minio() -> Iterator[MinioContainer]:
 
 
 @pytest.fixture(scope="session")
-def settings(
-    postgres: PostgresContainer, minio: MinioContainer
-) -> Iterator[Settings]:
+def settings(postgres: PostgresContainer, minio: MinioContainer) -> Iterator[Settings]:
     minio_config = minio.get_config()
     env: dict[str, str] = {
         "POSTGRES_HOST": str(postgres.get_container_host_ip()),
@@ -122,15 +120,14 @@ async def engine(settings: Settings) -> AsyncIterator[AsyncEngine]:
 @pytest_asyncio.fixture(autouse=True)
 async def _clean_db(engine: AsyncEngine) -> AsyncIterator[None]:
     async with engine.begin() as conn:
-        await conn.execute(
-            text(
-                """
+        await conn.execute(text("""
                 TRUNCATE TABLE
                   applied_ops,
                   refresh_tokens,
                   personal_access_tokens,
                   costs,
                   tickets,
+                  watchlist_items,
                   change_log,
                   events,
                   workspace_members,
@@ -138,9 +135,7 @@ async def _clean_db(engine: AsyncEngine) -> AsyncIterator[None]:
                   venues,
                   users
                 RESTART IDENTITY CASCADE
-                """
-            )
-        )
+                """))
     yield
 
 
@@ -156,8 +151,8 @@ async def db_session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
 @pytest_asyncio.fixture
 async def client(settings: Settings, engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
     _ = settings, engine  # ensures the DB is up before requests run
-    app.dependency_overrides[get_verifier] = (
-        lambda: StubVerifier({"petr@example.com", "bela@example.com"})
+    app.dependency_overrides[get_verifier] = lambda: StubVerifier(
+        {"petr@example.com", "bela@example.com"}
     )
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as async_client:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 from httpx import AsyncClient
@@ -29,7 +29,7 @@ async def test_stats_aggregates_events_and_costs(client: AsyncClient) -> None:
                     "title": f"{category} {month}",
                     "category": category,
                     "starts_at": _iso(
-                        datetime(year, month, 15, 20, 0, tzinfo=timezone.utc),
+                        datetime(year, month, 15, 20, 0, tzinfo=UTC),
                     ),
                 },
                 headers=headers,

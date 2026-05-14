@@ -46,7 +46,7 @@ class LogoutRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
-    token_type: str = "Bearer"
+    token_type: str = "Bearer"  # noqa: S105 (auth scheme literal, not a secret)
     access_expires_at: str
     refresh_expires_at: str
 
@@ -64,9 +64,7 @@ def get_verifier(settings: Annotated[Settings, Depends(get_settings)]) -> IdToke
     return GoogleIdTokenVerifier(settings)
 
 
-async def _ensure_user(
-    session: AsyncSession, settings: Settings, email: str, name: str
-) -> User:
+async def _ensure_user(session: AsyncSession, settings: Settings, email: str, name: str) -> User:
     user = await session.scalar(select(User).where(User.email == email))
     if user is None:
         # First sign-in for this email — create the user and add it to the
@@ -85,11 +83,7 @@ async def _ensure_user(
         )
         session.add(user)
         await session.flush()
-        session.add(
-            WorkspaceMember(
-                workspace_id=workspace.id, user_id=user.id, role=user.role
-            )
-        )
+        session.add(WorkspaceMember(workspace_id=workspace.id, user_id=user.id, role=user.role))
         await session.flush()
     elif user.name != name:
         user.name = name

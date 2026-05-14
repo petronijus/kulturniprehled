@@ -18,7 +18,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # until the bucket exists.
     try:
         storage.ensure_bucket()
-    except Exception:  # noqa: BLE001 — bootstrap is best-effort
+    except Exception:  # noqa: S110 (bootstrap is best-effort; healthz still serves)
         pass
     yield
 

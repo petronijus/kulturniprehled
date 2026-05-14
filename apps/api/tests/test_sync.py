@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -16,7 +16,7 @@ def _iso(dt: datetime) -> str:
 
 
 def _future(days: int = 14) -> str:
-    return _iso(datetime.now(timezone.utc) + timedelta(days=days))
+    return _iso(datetime.now(UTC) + timedelta(days=days))
 
 
 def _event_payload(**overrides: object) -> dict[str, object]:
@@ -34,9 +34,7 @@ async def test_crud_emits_change_log_entries(client: AsyncClient) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])
 
-    created = (
-        await client.post("/v1/events", json=_event_payload(), headers=headers)
-    ).json()
+    created = (await client.post("/v1/events", json=_event_payload(), headers=headers)).json()
     event_id = created["id"]
 
     await client.patch(
@@ -70,9 +68,7 @@ async def test_sync_cursor_returns_only_newer_changes(client: AsyncClient) -> No
     await client.post("/v1/events", json=_event_payload(title="B"), headers=headers)
     await client.post("/v1/events", json=_event_payload(title="C"), headers=headers)
 
-    delta = (
-        await client.get(f"/v1/sync?since={cursor}", headers=headers)
-    ).json()
+    delta = (await client.get(f"/v1/sync?since={cursor}", headers=headers)).json()
     titles = [c["payload"]["title"] for c in delta["changes"]]
     assert titles == ["B", "C"]
 
@@ -82,18 +78,14 @@ async def test_sync_pagination_signals_more(client: AsyncClient) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])
     for title in ("A", "B", "C"):
-        await client.post(
-            "/v1/events", json=_event_payload(title=title), headers=headers
-        )
+        await client.post("/v1/events", json=_event_payload(title=title), headers=headers)
 
     page = (await client.get("/v1/sync?limit=2", headers=headers)).json()
     assert len(page["changes"]) == 2
     assert page["has_more"] is True
 
     next_page = (
-        await client.get(
-            f"/v1/sync?since={page['next_seq']}&limit=2", headers=headers
-        )
+        await client.get(f"/v1/sync?since={page['next_seq']}&limit=2", headers=headers)
     ).json()
     assert [c["payload"]["title"] for c in next_page["changes"]] == ["C"]
     assert next_page["has_more"] is False
@@ -154,9 +146,7 @@ async def test_apply_update_with_stale_version_returns_conflict(
 ) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])
-    created = (
-        await client.post("/v1/events", json=_event_payload(), headers=headers)
-    ).json()
+    created = (await client.post("/v1/events", json=_event_payload(), headers=headers)).json()
 
     op = {
         "op_id": str(uuid4()),
@@ -166,9 +156,7 @@ async def test_apply_update_with_stale_version_returns_conflict(
         "base_version": 99,
         "payload": {"title": "Should fail"},
     }
-    response = await client.post(
-        "/v1/sync/apply", json={"operations": [op]}, headers=headers
-    )
+    response = await client.post("/v1/sync/apply", json={"operations": [op]}, headers=headers)
     [result] = response.json()["results"]
     assert result["status"] == "conflict"
     assert result["current_version"] == 1
@@ -186,14 +174,10 @@ async def test_apply_is_idempotent_on_same_op_id(client: AsyncClient) -> None:
         "payload": _event_payload(title="Once"),
     }
     first = (
-        await client.post(
-            "/v1/sync/apply", json={"operations": [payload]}, headers=headers
-        )
+        await client.post("/v1/sync/apply", json={"operations": [payload]}, headers=headers)
     ).json()["results"][0]
     second = (
-        await client.post(
-            "/v1/sync/apply", json={"operations": [payload]}, headers=headers
-        )
+        await client.post("/v1/sync/apply", json={"operations": [payload]}, headers=headers)
     ).json()["results"][0]
     assert first == second
 
@@ -208,9 +192,7 @@ async def test_apply_delete_on_already_deleted_is_idempotent_success(
 ) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])
-    created = (
-        await client.post("/v1/events", json=_event_payload(), headers=headers)
-    ).json()
+    created = (await client.post("/v1/events", json=_event_payload(), headers=headers)).json()
     await client.delete(f"/v1/events/{created['id']}", headers=headers)
 
     op = {
@@ -219,9 +201,7 @@ async def test_apply_delete_on_already_deleted_is_idempotent_success(
         "op": "delete",
         "entity_id": created["id"],
     }
-    response = await client.post(
-        "/v1/sync/apply", json={"operations": [op]}, headers=headers
-    )
+    response = await client.post("/v1/sync/apply", json={"operations": [op]}, headers=headers)
     [result] = response.json()["results"]
     assert result["status"] == "applied"
 
@@ -238,9 +218,7 @@ async def test_apply_unknown_entity_returns_not_found(client: AsyncClient) -> No
         "base_version": 1,
         "payload": {"title": "Ghost"},
     }
-    response = await client.post(
-        "/v1/sync/apply", json={"operations": [op]}, headers=headers
-    )
+    response = await client.post("/v1/sync/apply", json={"operations": [op]}, headers=headers)
     [result] = response.json()["results"]
     assert result["status"] == "not_found"
 
@@ -286,7 +264,5 @@ async def test_sync_changes_appear_to_other_workspace_member(
     )
 
     bela = await login_as(client, "bela@example.com")
-    page = (
-        await client.get("/v1/sync", headers=auth_header(bela["access_token"]))
-    ).json()
+    page = (await client.get("/v1/sync", headers=auth_header(bela["access_token"]))).json()
     assert [c["payload"]["title"] for c in page["changes"]] == ["Shared"]

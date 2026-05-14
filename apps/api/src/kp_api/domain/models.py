@@ -16,7 +16,7 @@ Conventions:
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 from sqlalchemy import (
@@ -32,7 +32,8 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from kp_api.domain.enums import (
@@ -69,7 +70,7 @@ def _created_at() -> Mapped[datetime]:
 
 
 def _python_utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _updated_at() -> Mapped[datetime]:
@@ -92,9 +93,7 @@ class User(Base):
     id: Mapped[UUID] = _uuid_pk()
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
-    role: Mapped[UserRole] = mapped_column(
-        String(20), nullable=False, default=UserRole.MEMBER
-    )
+    role: Mapped[UserRole] = mapped_column(String(20), nullable=False, default=UserRole.MEMBER)
     google_refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
@@ -121,9 +120,7 @@ class Workspace(Base):
 
 class WorkspaceMember(Base):
     __tablename__ = "workspace_members"
-    __table_args__ = (
-        UniqueConstraint("workspace_id", "user_id", name="uq_workspace_members"),
-    )
+    __table_args__ = (UniqueConstraint("workspace_id", "user_id", name="uq_workspace_members"),)
 
     id: Mapped[UUID] = _uuid_pk()
     workspace_id: Mapped[UUID] = mapped_column(
@@ -136,9 +133,7 @@ class WorkspaceMember(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
-    role: Mapped[UserRole] = mapped_column(
-        String(20), nullable=False, default=UserRole.MEMBER
-    )
+    role: Mapped[UserRole] = mapped_column(String(20), nullable=False, default=UserRole.MEMBER)
     created_at: Mapped[datetime] = _created_at()
 
     workspace: Mapped[Workspace] = relationship(back_populates="members")
@@ -184,9 +179,7 @@ class Event(Base):
         nullable=True,
     )
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    ends_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     venue_timezone: Mapped[str | None] = mapped_column(String(60), nullable=True)
     status: Mapped[EventStatus] = mapped_column(
         String(20), nullable=False, default=EventStatus.PLANNED
@@ -203,9 +196,7 @@ class Event(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
-    deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     workspace: Mapped[Workspace] = relationship(back_populates="events")
     venue: Mapped[Venue | None] = relationship()
@@ -260,9 +251,7 @@ class Ticket(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
-    deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Cost(Base):
@@ -305,17 +294,13 @@ class Cost(Base):
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    split: Mapped[CostSplit] = mapped_column(
-        String(20), nullable=False, default=CostSplit.SHARED
-    )
+    split: Mapped[CostSplit] = mapped_column(String(20), nullable=False, default=CostSplit.SHARED)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     paid_at: Mapped[date] = mapped_column(Date, nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
-    deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class WatchlistItem(Base):
@@ -364,9 +349,7 @@ class WatchlistItem(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[float] = mapped_column(nullable=False)
     done: Mapped[bool] = mapped_column(nullable=False, default=False)
-    done_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     done_by: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
@@ -380,9 +363,7 @@ class WatchlistItem(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
-    deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class PersonalAccessToken(Base):
@@ -403,15 +384,9 @@ class PersonalAccessToken(Base):
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     created_at: Mapped[datetime] = _created_at()
-    last_used_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class RefreshToken(Base):
@@ -429,18 +404,10 @@ class RefreshToken(Base):
         nullable=False,
     )
     family_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    parent_jti: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=True
-    )
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
-    rotated_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    parent_jti: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = _created_at()
 
 
@@ -465,9 +432,7 @@ class ChangeLog(Base):
     entity_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     op: Mapped[ChangeOp] = mapped_column(String(10), nullable=False)
     payload: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
-    actor_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=True
-    )
+    actor_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = _created_at()
 
 

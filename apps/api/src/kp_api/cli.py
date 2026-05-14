@@ -50,8 +50,7 @@ async def _cmd_mint_pat(email: str, name: str, quiet: bool) -> int:
 
     if not quiet:
         print(
-            "Personal access token (copy now — it is not stored on the server "
-            "in plaintext):",
+            "Personal access token (copy now — it is not stored on the server " "in plaintext):",
             file=sys.stderr,
         )
     sys.stdout.write(token + "\n")
@@ -82,11 +81,7 @@ async def _cmd_seed_user(email: str, name: str | None) -> int:
         )
         session.add(user)
         await session.flush()
-        session.add(
-            WorkspaceMember(
-                workspace_id=workspace.id, user_id=user.id, role=user.role
-            )
-        )
+        session.add(WorkspaceMember(workspace_id=workspace.id, user_id=user.id, role=user.role))
         await session.commit()
         print(f"created user {user.id} in workspace {workspace.id}", file=sys.stderr)
         return 0
@@ -99,9 +94,7 @@ def _parser() -> argparse.ArgumentParser:
     mp = sub.add_parser("mint-pat", help="Mint a long-lived PAT for a user")
     mp.add_argument("--email", required=True)
     mp.add_argument("--name", required=True, help="human label for the token")
-    mp.add_argument(
-        "--quiet", action="store_true", help="suppress hints, print only the token"
-    )
+    mp.add_argument("--quiet", action="store_true", help="suppress hints, print only the token")
 
     seed = sub.add_parser("seed-user", help="Create a user row without OAuth")
     seed.add_argument("--email", required=True)

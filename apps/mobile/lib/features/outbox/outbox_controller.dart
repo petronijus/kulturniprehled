@@ -95,6 +95,87 @@ class OutboxController extends Notifier<bool> {
     unawaited(pushPending());
   }
 
+  Future<String> queueWatchlistCreate({
+    required String entityId,
+    required Map<String, Object?> payload,
+  }) async {
+    final String opId = const Uuid().v4();
+    final KpDatabase db = ref.read(kpDatabaseProvider);
+    await db.insertPendingOp(
+      PendingOpsCompanion.insert(
+        opId: opId,
+        entityType: 'watchlist_item',
+        op: 'create',
+        entityId: Value<String?>(entityId),
+        baseVersion: const Value<int?>(null),
+        payloadJson: jsonEncode(payload),
+        createdAt: DateTime.now(),
+      ),
+    );
+    unawaited(pushPending());
+    return opId;
+  }
+
+  Future<String> queueWatchlistUpdate({
+    required String entityId,
+    required int baseVersion,
+    required Map<String, Object?> fields,
+  }) async {
+    final String opId = const Uuid().v4();
+    final KpDatabase db = ref.read(kpDatabaseProvider);
+    await db.insertPendingOp(
+      PendingOpsCompanion.insert(
+        opId: opId,
+        entityType: 'watchlist_item',
+        op: 'update',
+        entityId: Value<String?>(entityId),
+        baseVersion: Value<int?>(baseVersion),
+        payloadJson: jsonEncode(fields),
+        createdAt: DateTime.now(),
+      ),
+    );
+    unawaited(pushPending());
+    return opId;
+  }
+
+  Future<void> queueWatchlistMove({
+    required String entityId,
+    required int baseVersion,
+    required Map<String, Object?> payload,
+  }) async {
+    final String opId = const Uuid().v4();
+    final KpDatabase db = ref.read(kpDatabaseProvider);
+    await db.insertPendingOp(
+      PendingOpsCompanion.insert(
+        opId: opId,
+        entityType: 'watchlist_item',
+        op: 'move',
+        entityId: Value<String?>(entityId),
+        baseVersion: Value<int?>(baseVersion),
+        payloadJson: jsonEncode(payload),
+        createdAt: DateTime.now(),
+      ),
+    );
+    unawaited(pushPending());
+  }
+
+  Future<void> queueWatchlistDelete({required String entityId}) async {
+    final String opId = const Uuid().v4();
+    final KpDatabase db = ref.read(kpDatabaseProvider);
+    await db.insertPendingOp(
+      PendingOpsCompanion.insert(
+        opId: opId,
+        entityType: 'watchlist_item',
+        op: 'delete',
+        entityId: Value<String?>(entityId),
+        baseVersion: const Value<int?>(null),
+        payloadJson: '{}',
+        createdAt: DateTime.now(),
+      ),
+    );
+    unawaited(pushPending());
+  }
+
   Future<void> pushPending() async {
     if (state) {
       return;

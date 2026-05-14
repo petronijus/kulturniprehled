@@ -91,10 +91,9 @@ class _WatchlistBody extends ConsumerWidget {
   final List<CachedWatchlistItemRow> items;
 
   List<_WatchlistEntry> _layoutEntries() {
-    final List<CachedWatchlistItemRow> roots = items
-        .where((r) => r.parentId == null)
-        .toList()
-      ..sort((a, b) => a.position.compareTo(b.position));
+    final List<CachedWatchlistItemRow> roots =
+        items.where((r) => r.parentId == null).toList()
+          ..sort((a, b) => a.position.compareTo(b.position));
     final Map<String, List<CachedWatchlistItemRow>> childrenByParent =
         <String, List<CachedWatchlistItemRow>>{};
     for (final CachedWatchlistItemRow row in items) {
@@ -199,20 +198,16 @@ class _WatchlistBody extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Přesun selhal: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Přesun selhal: $e')));
       }
     }
   }
 }
 
 class _WatchlistRow extends ConsumerWidget {
-  const _WatchlistRow({
-    super.key,
-    required this.entry,
-    required this.index,
-  });
+  const _WatchlistRow({super.key, required this.entry, required this.index});
 
   final _WatchlistEntry entry;
   final int index;
@@ -223,7 +218,9 @@ class _WatchlistRow extends ConsumerWidget {
     final TextStyle? titleStyle = row.done
         ? TextStyle(
             decoration: TextDecoration.lineThrough,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.5),
           )
         : null;
 
@@ -245,9 +242,9 @@ class _WatchlistRow extends ConsumerWidget {
           await ref.read(watchlistRepositoryProvider).deleteItem(row.id);
         } catch (e) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Smazání selhalo: $e')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Smazání selhalo: $e')));
           }
         }
       },
@@ -261,11 +258,9 @@ class _WatchlistRow extends ConsumerWidget {
               onChanged: (bool? next) async {
                 if (next == null) return;
                 try {
-                  await ref.read(watchlistRepositoryProvider).setDone(
-                        id: row.id,
-                        version: row.version,
-                        done: next,
-                      );
+                  await ref
+                      .read(watchlistRepositoryProvider)
+                      .setDone(id: row.id, version: row.version, done: next);
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -331,10 +326,10 @@ class _KindBadge extends StatelessWidget {
 
   static const Map<String, ({String label, IconData icon})> _styles =
       <String, ({String label, IconData icon})>{
-    'film': (label: 'Film', icon: Icons.movie_outlined),
-    'divadlo': (label: 'Divadlo', icon: Icons.theater_comedy_outlined),
-    'koncert': (label: 'Koncert', icon: Icons.music_note_outlined),
-  };
+        'film': (label: 'Film', icon: Icons.movie_outlined),
+        'divadlo': (label: 'Divadlo', icon: Icons.theater_comedy_outlined),
+        'koncert': (label: 'Koncert', icon: Icons.music_note_outlined),
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -352,11 +347,7 @@ class _KindBadge extends StatelessWidget {
   }
 }
 
-void _showRowMenu(
-  BuildContext context,
-  WidgetRef ref,
-  _WatchlistEntry entry,
-) {
+void _showRowMenu(BuildContext context, WidgetRef ref, _WatchlistEntry entry) {
   showModalBottomSheet<void>(
     context: context,
     builder: (BuildContext context) {
@@ -444,71 +435,87 @@ void _showAddDialog(
     context: context,
     builder: (BuildContext context) {
       return StatefulBuilder(
-        builder: (BuildContext context, void Function(void Function()) setState) {
-          return AlertDialog(
-            title: Text(parentId == null ? 'Nová položka' : 'Nová podpoložka'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  TextField(
-                    controller: titleController,
-                    autofocus: true,
-                    decoration: const InputDecoration(labelText: 'Název'),
-                  ),
-                  const SizedBox(height: 12),
-                  SegmentedButton<String>(
-                    segments: const <ButtonSegment<String>>[
-                      ButtonSegment<String>(value: 'film', label: Text('Film')),
-                      ButtonSegment<String>(value: 'divadlo', label: Text('Divadlo')),
-                      ButtonSegment<String>(value: 'koncert', label: Text('Koncert')),
+        builder:
+            (BuildContext context, void Function(void Function()) setState) {
+              return AlertDialog(
+                title: Text(
+                  parentId == null ? 'Nová položka' : 'Nová podpoložka',
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      TextField(
+                        controller: titleController,
+                        autofocus: true,
+                        decoration: const InputDecoration(labelText: 'Název'),
+                      ),
+                      const SizedBox(height: 12),
+                      SegmentedButton<String>(
+                        segments: const <ButtonSegment<String>>[
+                          ButtonSegment<String>(
+                            value: 'film',
+                            label: Text('Film'),
+                          ),
+                          ButtonSegment<String>(
+                            value: 'divadlo',
+                            label: Text('Divadlo'),
+                          ),
+                          ButtonSegment<String>(
+                            value: 'koncert',
+                            label: Text('Koncert'),
+                          ),
+                        ],
+                        selected: <String>{kind},
+                        onSelectionChanged: (Set<String> next) =>
+                            setState(() => kind = next.first),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: noteController,
+                        decoration: const InputDecoration(
+                          labelText: 'Poznámka (volitelné)',
+                        ),
+                        maxLines: 2,
+                      ),
                     ],
-                    selected: <String>{kind},
-                    onSelectionChanged: (Set<String> next) =>
-                        setState(() => kind = next.first),
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: noteController,
-                    decoration: const InputDecoration(labelText: 'Poznámka (volitelné)'),
-                    maxLines: 2,
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Zrušit'),
+                  ),
+                  FilledButton(
+                    onPressed: () async {
+                      final String title = titleController.text.trim();
+                      if (title.isEmpty) return;
+                      Navigator.of(context).pop();
+                      try {
+                        await ref
+                            .read(watchlistRepositoryProvider)
+                            .createItem(
+                              title: title,
+                              kind: kind,
+                              parentId: parentId,
+                              note: noteController.text.trim().isEmpty
+                                  ? null
+                                  : noteController.text.trim(),
+                            );
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Přidání selhalo: $e')),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('Přidat'),
                   ),
                 ],
-              ),
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Zrušit'),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  final String title = titleController.text.trim();
-                  if (title.isEmpty) return;
-                  Navigator.of(context).pop();
-                  try {
-                    await ref.read(watchlistRepositoryProvider).createItem(
-                          title: title,
-                          kind: kind,
-                          parentId: parentId,
-                          note: noteController.text.trim().isEmpty
-                              ? null
-                              : noteController.text.trim(),
-                        );
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Přidání selhalo: $e')),
-                      );
-                    }
-                  }
-                },
-                child: const Text('Přidat'),
-              ),
-            ],
-          );
-        },
+              );
+            },
       );
     },
   );
@@ -519,80 +526,98 @@ void _showEditDialog(
   WidgetRef ref,
   CachedWatchlistItemRow row,
 ) {
-  final TextEditingController titleController = TextEditingController(text: row.title);
-  final TextEditingController noteController = TextEditingController(text: row.note ?? '');
+  final TextEditingController titleController = TextEditingController(
+    text: row.title,
+  );
+  final TextEditingController noteController = TextEditingController(
+    text: row.note ?? '',
+  );
   String kind = row.kind;
 
   showDialog<void>(
     context: context,
     builder: (BuildContext context) {
       return StatefulBuilder(
-        builder: (BuildContext context, void Function(void Function()) setState) {
-          return AlertDialog(
-            title: const Text('Upravit položku'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  TextField(
-                    controller: titleController,
-                    autofocus: true,
-                    decoration: const InputDecoration(labelText: 'Název'),
-                  ),
-                  const SizedBox(height: 12),
-                  SegmentedButton<String>(
-                    segments: const <ButtonSegment<String>>[
-                      ButtonSegment<String>(value: 'film', label: Text('Film')),
-                      ButtonSegment<String>(value: 'divadlo', label: Text('Divadlo')),
-                      ButtonSegment<String>(value: 'koncert', label: Text('Koncert')),
+        builder:
+            (BuildContext context, void Function(void Function()) setState) {
+              return AlertDialog(
+                title: const Text('Upravit položku'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      TextField(
+                        controller: titleController,
+                        autofocus: true,
+                        decoration: const InputDecoration(labelText: 'Název'),
+                      ),
+                      const SizedBox(height: 12),
+                      SegmentedButton<String>(
+                        segments: const <ButtonSegment<String>>[
+                          ButtonSegment<String>(
+                            value: 'film',
+                            label: Text('Film'),
+                          ),
+                          ButtonSegment<String>(
+                            value: 'divadlo',
+                            label: Text('Divadlo'),
+                          ),
+                          ButtonSegment<String>(
+                            value: 'koncert',
+                            label: Text('Koncert'),
+                          ),
+                        ],
+                        selected: <String>{kind},
+                        onSelectionChanged: (Set<String> next) =>
+                            setState(() => kind = next.first),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: noteController,
+                        decoration: const InputDecoration(
+                          labelText: 'Poznámka (volitelné)',
+                        ),
+                        maxLines: 2,
+                      ),
                     ],
-                    selected: <String>{kind},
-                    onSelectionChanged: (Set<String> next) =>
-                        setState(() => kind = next.first),
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: noteController,
-                    decoration: const InputDecoration(labelText: 'Poznámka (volitelné)'),
-                    maxLines: 2,
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Zrušit'),
+                  ),
+                  FilledButton(
+                    onPressed: () async {
+                      final String title = titleController.text.trim();
+                      if (title.isEmpty) return;
+                      Navigator.of(context).pop();
+                      try {
+                        await ref
+                            .read(watchlistRepositoryProvider)
+                            .updateItem(
+                              id: row.id,
+                              version: row.version,
+                              title: title,
+                              kind: kind,
+                              note: noteController.text.trim().isEmpty
+                                  ? null
+                                  : noteController.text.trim(),
+                            );
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Úprava selhala: $e')),
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('Uložit'),
                   ),
                 ],
-              ),
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Zrušit'),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  final String title = titleController.text.trim();
-                  if (title.isEmpty) return;
-                  Navigator.of(context).pop();
-                  try {
-                    await ref.read(watchlistRepositoryProvider).updateItem(
-                          id: row.id,
-                          version: row.version,
-                          title: title,
-                          kind: kind,
-                          note: noteController.text.trim().isEmpty
-                              ? null
-                              : noteController.text.trim(),
-                        );
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Úprava selhala: $e')),
-                      );
-                    }
-                  }
-                },
-                child: const Text('Uložit'),
-              ),
-            ],
-          );
-        },
+              );
+            },
       );
     },
   );

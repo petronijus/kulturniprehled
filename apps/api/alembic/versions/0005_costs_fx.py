@@ -61,9 +61,7 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
-        sa.CheckConstraint(
-            "amount_cents >= 0", name="ck_costs_amount_nonnegative"
-        ),
+        sa.CheckConstraint("amount_cents >= 0", name="ck_costs_amount_nonnegative"),
     )
     op.create_index(
         "ix_costs_workspace_paid_at",

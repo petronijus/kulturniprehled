@@ -93,9 +93,7 @@ async def test_two_level_depth_cap(client: AsyncClient) -> None:
 async def test_check_marks_done_by(client: AsyncClient) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])
-    created = (
-        await client.post("/v1/watchlist", json=_payload(), headers=headers)
-    ).json()
+    created = (await client.post("/v1/watchlist", json=_payload(), headers=headers)).json()
     res = await client.post(
         f"/v1/watchlist/{created['id']}/check",
         json={"version": 1, "done": True},
@@ -122,9 +120,7 @@ async def test_check_marks_done_by(client: AsyncClient) -> None:
 async def test_patch_requires_matching_version(client: AsyncClient) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])
-    created = (
-        await client.post("/v1/watchlist", json=_payload(), headers=headers)
-    ).json()
+    created = (await client.post("/v1/watchlist", json=_payload(), headers=headers)).json()
     stale = await client.patch(
         f"/v1/watchlist/{created['id']}",
         json={"version": 999, "title": "Nope"},
@@ -222,8 +218,6 @@ async def test_shared_workspace_other_member_sees_items(client: AsyncClient) -> 
         )
     ).json()
     bela = await login_as(client, "bela@example.com")
-    listing = await client.get(
-        "/v1/watchlist", headers=auth_header(bela["access_token"])
-    )
+    listing = await client.get("/v1/watchlist", headers=auth_header(bela["access_token"]))
     assert listing.status_code == 200
     assert [r["id"] for r in listing.json()["items"]] == [created["id"]]

@@ -16,7 +16,7 @@ Flow:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -43,7 +43,7 @@ events_router = APIRouter(prefix="/v1/events", tags=["tickets"])
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 async def _user_workspace(session: AsyncSession, user: User) -> Workspace:
@@ -58,9 +58,7 @@ async def _user_workspace(session: AsyncSession, user: User) -> Workspace:
     return workspace
 
 
-async def _event_in_workspace(
-    session: AsyncSession, workspace: Workspace, event_id: UUID
-) -> Event:
+async def _event_in_workspace(session: AsyncSession, workspace: Workspace, event_id: UUID) -> Event:
     event = await session.scalar(
         select(Event).where(
             Event.id == event_id,
@@ -187,9 +185,7 @@ async def list_event_tickets(
 ) -> TicketListResponse:
     workspace = await _user_workspace(session, user)
     await _event_in_workspace(session, workspace, event_id)
-    stmt = select(Ticket).where(
-        Ticket.event_id == event_id, Ticket.workspace_id == workspace.id
-    )
+    stmt = select(Ticket).where(Ticket.event_id == event_id, Ticket.workspace_id == workspace.id)
     if not include_deleted:
         stmt = stmt.where(Ticket.deleted_at.is_(None))
     stmt = stmt.order_by(Ticket.created_at.asc())

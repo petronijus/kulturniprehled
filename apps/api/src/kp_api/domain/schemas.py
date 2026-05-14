@@ -223,6 +223,35 @@ class WatchlistMoveRequest(BaseModel):
     to_end: bool = False
 
 
+class WatchlistItemSyncUpdate(BaseModel):
+    """Payload for the `("watchlist_item", "update")` outbox op.
+
+    Differs from `WatchlistItemUpdate` (REST PATCH body) in two ways: it
+    omits `version` because the sync envelope carries `base_version`, and
+    it includes `done` so a single outbox op can also toggle the checkbox
+    instead of needing a separate `/check` round-trip.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    kind: WatchlistKind | None = None
+    note: str | None = None
+    done: bool | None = None
+
+
+class WatchlistItemSyncMove(BaseModel):
+    """Payload for the `("watchlist_item", "move")` outbox op."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    parent_id: UUID | None = None
+    set_parent: bool = False
+    before_id: UUID | None = None
+    after_id: UUID | None = None
+    to_end: bool = False
+
+
 class WatchlistItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

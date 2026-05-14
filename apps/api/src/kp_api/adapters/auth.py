@@ -13,10 +13,11 @@ pattern recommended by RFC 6819 / OWASP.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from jose import jwt
+from jose.exceptions import JWTError
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,9 +25,9 @@ from kp_api.config import Settings
 from kp_api.domain.models import PersonalAccessToken, RefreshToken, User
 
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_TYPE = "access"
-REFRESH_TOKEN_TYPE = "refresh"
-PAT_TOKEN_TYPE = "pat"
+ACCESS_TOKEN_TYPE = "access"  # noqa: S105 (JWT type tag, not a secret)
+REFRESH_TOKEN_TYPE = "refresh"  # noqa: S105 (JWT type tag, not a secret)
+PAT_TOKEN_TYPE = "pat"  # noqa: S105 (JWT type tag, not a secret)
 
 
 class AuthError(Exception):
@@ -63,7 +64,7 @@ class TokenPair:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _encode(payload: dict[str, object], secret: str) -> str:
@@ -73,7 +74,7 @@ def _encode(payload: dict[str, object], secret: str) -> str:
 def _decode(token: str, secret: str) -> dict[str, object]:
     try:
         return jwt.decode(token, secret, algorithms=[JWT_ALGORITHM])
-    except jwt.JWTError as exc:
+    except JWTError as exc:
         raise AuthError("invalid token") from exc
 
 
@@ -113,9 +114,7 @@ def _issue_refresh(
     return _encode(payload, settings.api_jwt_secret), exp, jti
 
 
-async def issue_tokens_for_user(
-    session: AsyncSession, user: User, settings: Settings
-) -> TokenPair:
+async def issue_tokens_for_user(session: AsyncSession, user: User, settings: Settings) -> TokenPair:
     """Issue a fresh access + refresh pair at the start of a new login."""
 
     access, access_exp, _ = _issue_access(user, settings)
@@ -150,7 +149,7 @@ def decode_access(token: str, settings: Settings) -> AccessClaims:
             sub=UUID(str(payload["sub"])),
             email=str(payload["email"]),
             jti=UUID(str(payload["jti"])),
-            exp=datetime.fromtimestamp(int(payload["exp"]), tz=timezone.utc),
+            exp=datetime.fromtimestamp(int(str(payload["exp"])), tz=UTC),
         )
     except (KeyError, ValueError) as exc:
         raise AuthError("malformed token") from exc
@@ -230,9 +229,7 @@ async def touch_pat(session: AsyncSession, jti: UUID) -> PersonalAccessToken | N
     if row.expires_at is not None and row.expires_at < now:
         return None
     await session.execute(
-        update(PersonalAccessToken)
-        .where(PersonalAccessToken.jti == jti)
-        .values(last_used_at=now)
+        update(PersonalAccessToken).where(PersonalAccessToken.jti == jti).values(last_used_at=now)
     )
     await session.commit()
     row.last_used_at = now
@@ -246,9 +243,7 @@ async def revoke_pat(session: AsyncSession, jti: UUID) -> None:
         await session.flush()
 
 
-async def rotate_refresh(
-    session: AsyncSession, token: str, settings: Settings
-) -> TokenPair:
+async def rotate_refresh(session: AsyncSession, token: str, settings: Settings) -> TokenPair:
     """Validate the incoming refresh token, detect reuse, and issue a new pair.
 
     Reuse detection: if the presented token's DB row already has `rotated_at`
@@ -321,8 +316,6 @@ async def revoke_family(session: AsyncSession, refresh_token: str, settings: Set
     except (KeyError, ValueError) as exc:
         raise AuthError("malformed token") from exc
     await session.execute(
-        update(RefreshToken)
-        .where(RefreshToken.family_id == family_id)
-        .values(revoked_at=_utcnow())
+        update(RefreshToken).where(RefreshToken.family_id == family_id).values(revoked_at=_utcnow())
     )
     await session.flush()

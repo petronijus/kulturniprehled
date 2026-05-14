@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -15,7 +15,7 @@ def _iso(dt: datetime) -> str:
 
 
 def _future(days: int = 14) -> str:
-    return _iso(datetime.now(timezone.utc) + timedelta(days=days))
+    return _iso(datetime.now(UTC) + timedelta(days=days))
 
 
 async def _create_event(client: AsyncClient, headers: dict[str, str]) -> dict[str, str]:
@@ -49,9 +49,7 @@ async def test_create_cost_and_list_sums_amounts(client: AsyncClient) -> None:
         headers=headers,
     )
 
-    listing = await client.get(
-        f"/v1/events/{event['id']}/costs", headers=headers
-    )
+    listing = await client.get(f"/v1/events/{event['id']}/costs", headers=headers)
     body = listing.json()
     assert len(body["items"]) == 2
     assert body["total_amount_cents"] == 6000
@@ -115,9 +113,7 @@ async def test_delete_is_soft_and_change_log_emits_delete(
     page = (await client.get("/v1/sync", headers=headers)).json()
     cost_entries = [c for c in page["changes"] if c["entity_type"] == "cost"]
     assert [c["op"] for c in cost_entries[-2:]] == ["upsert", "delete"]
-    listing = (
-        await client.get(f"/v1/events/{event['id']}/costs", headers=headers)
-    ).json()
+    listing = (await client.get(f"/v1/events/{event['id']}/costs", headers=headers)).json()
     assert listing["items"] == []
     assert listing["total_amount_cents"] == 0
 

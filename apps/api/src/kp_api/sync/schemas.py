@@ -10,11 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from kp_api.domain.enums import ChangeOp
 
-OperationKind = Literal["create", "update", "delete"]
-EntityKind = Literal["event"]
-OperationStatus = Literal[
-    "applied", "conflict", "not_found", "invalid", "forbidden"
-]
+OperationKind = Literal["create", "update", "delete", "move"]
+EntityKind = Literal["event", "watchlist_item"]
+OperationStatus = Literal["applied", "conflict", "not_found", "invalid", "forbidden"]
 
 
 class ChangeEntry(BaseModel):

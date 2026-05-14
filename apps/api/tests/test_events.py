@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -14,9 +14,7 @@ def _event_payload(**overrides: object) -> dict[str, object]:
     base: dict[str, object] = {
         "title": "Nick Cave & The Bad Seeds",
         "category": "concert",
-        "starts_at": (datetime.now(timezone.utc) + timedelta(days=14))
-        .isoformat()
-        .replace("+00:00", "Z"),
+        "starts_at": (datetime.now(UTC) + timedelta(days=14)).isoformat().replace("+00:00", "Z"),
     }
     base.update(overrides)
     return base
@@ -43,7 +41,7 @@ async def test_create_and_get_event(client: AsyncClient) -> None:
 async def test_list_filters_by_date_and_category(client: AsyncClient) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now = datetime.now(UTC).replace(microsecond=0)
     await client.post(
         "/v1/events",
         json=_event_payload(
@@ -81,9 +79,7 @@ async def test_list_filters_by_date_and_category(client: AsyncClient) -> None:
     assert "Past concert" not in titles
     assert titles == ["Future film", "Future play"]
 
-    cinema = await client.get(
-        "/v1/events", params={"category": "cinema"}, headers=headers
-    )
+    cinema = await client.get("/v1/events", params={"category": "cinema"}, headers=headers)
     assert [e["title"] for e in cinema.json()["items"]] == ["Future film"]
 
 
@@ -91,9 +87,7 @@ async def test_list_filters_by_date_and_category(client: AsyncClient) -> None:
 async def test_patch_requires_matching_version(client: AsyncClient) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])
-    created = (
-        await client.post("/v1/events", json=_event_payload(), headers=headers)
-    ).json()
+    created = (await client.post("/v1/events", json=_event_payload(), headers=headers)).json()
     event_id = created["id"]
 
     stale = await client.patch(
@@ -121,9 +115,7 @@ async def test_patch_requires_matching_version(client: AsyncClient) -> None:
 async def test_delete_is_soft_and_hides_from_list(client: AsyncClient) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])
-    created = (
-        await client.post("/v1/events", json=_event_payload(), headers=headers)
-    ).json()
+    created = (await client.post("/v1/events", json=_event_payload(), headers=headers)).json()
     event_id = created["id"]
 
     deleted = await client.delete(f"/v1/events/{event_id}", headers=headers)
@@ -148,8 +140,6 @@ async def test_shared_workspace_other_member_sees_event(client: AsyncClient) -> 
         )
     ).json()
     bela = await login_as(client, "bela@example.com")
-    listing = await client.get(
-        "/v1/events", headers=auth_header(bela["access_token"])
-    )
+    listing = await client.get("/v1/events", headers=auth_header(bela["access_token"]))
     assert listing.status_code == 200
     assert [e["id"] for e in listing.json()["items"]] == [created["id"]]

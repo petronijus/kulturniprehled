@@ -8,7 +8,7 @@ last-seen `version`, and the server returns 409 on mismatch.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -43,7 +43,7 @@ async def _user_workspace(session: AsyncSession, user: User) -> Workspace:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @router.get("", response_model=EventListResponse)
@@ -68,12 +68,8 @@ async def list_events(
     if category is not None:
         base = base.where(Event.category == category)
 
-    total = await session.scalar(
-        select(func.count()).select_from(base.subquery())
-    )
-    rows = await session.scalars(
-        base.order_by(Event.starts_at.asc()).offset(offset).limit(limit)
-    )
+    total = await session.scalar(select(func.count()).select_from(base.subquery()))
+    rows = await session.scalars(base.order_by(Event.starts_at.asc()).offset(offset).limit(limit))
     return EventListResponse(
         items=[EventResponse.model_validate(e) for e in rows.all()],
         total=int(total or 0),
@@ -109,9 +105,7 @@ async def create_event(
     return EventResponse.model_validate(event)
 
 
-async def _get_active_event(
-    session: AsyncSession, workspace: Workspace, event_id: UUID
-) -> Event:
+async def _get_active_event(session: AsyncSession, workspace: Workspace, event_id: UUID) -> Event:
     event = await session.scalar(
         select(Event).where(
             Event.id == event_id,
@@ -177,4 +171,4 @@ async def delete_event(
 
 
 # Re-export to make the router list explicit in main.
-__all__ = ["router", "EventCategory", "EventSource", "EventStatus"]
+__all__ = ["EventCategory", "EventSource", "EventStatus", "router"]

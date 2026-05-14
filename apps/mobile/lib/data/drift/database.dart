@@ -367,6 +367,23 @@ class KpDatabase extends _$KpDatabase {
 
   Future<void> upsertWatchlistItem(CachedWatchlistItemsCompanion row) =>
       into(cachedWatchlistItems).insertOnConflictUpdate(row);
+
+  /// Returns any cached row's `workspace_id`. Used to stamp optimistic local
+  /// writes before the server-assigned identifier arrives via /v1/sync.
+  /// Null only when the cache is empty — i.e. before the first sync, when
+  /// the user shouldn't be able to mutate anything anyway.
+  Future<String?> anyCachedWorkspaceId() async {
+    final CachedWatchlistItemRow? wl = await (select(
+      cachedWatchlistItems,
+    )..limit(1)).getSingleOrNull();
+    if (wl != null) {
+      return wl.workspaceId;
+    }
+    final CachedEventRow? event = await (select(
+      cachedEvents,
+    )..limit(1)).getSingleOrNull();
+    return event?.workspaceId;
+  }
 }
 
 LazyDatabase _openConnection() {

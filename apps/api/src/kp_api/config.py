@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     postgres_db: str = "kp"
     postgres_user: str = "kp"
-    postgres_password: str = "changeme"
+    postgres_password: str = "changeme"  # noqa: S105 (dev default, prod overrides)
 
     # MinIO
     minio_endpoint: str = "localhost:9000"
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     minio_public_endpoint: str | None = None
     minio_public_use_ssl: bool | None = None
     minio_access_key: str = "kp-minio"
-    minio_secret_key: str = "changeme-changeme"
+    minio_secret_key: str = "changeme-changeme"  # noqa: S105 (dev default, prod overrides)
     minio_bucket_tickets: str = "tickets"
     minio_region: str = "eu-central-1"
     minio_use_ssl: bool = False
@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # API
     api_host: str = "0.0.0.0"  # noqa: S104  (binding inside container)
     api_port: int = 8000
-    api_jwt_secret: str = "replace-me"
+    api_jwt_secret: str = "replace-me"  # noqa: S105 (dev default, prod overrides)
     api_jwt_access_ttl_seconds: int = 900
     api_jwt_refresh_ttl_seconds: int = 2_592_000
 
@@ -78,9 +78,7 @@ class Settings(BaseSettings):
 
     @property
     def allowed_emails_set(self) -> frozenset[str]:
-        return frozenset(
-            e.strip().lower() for e in self.allowed_emails.split(",") if e.strip()
-        )
+        return frozenset(e.strip().lower() for e in self.allowed_emails.split(",") if e.strip())
 
     @property
     def google_oauth_audiences(self) -> list[str]:
@@ -88,9 +86,7 @@ class Settings(BaseSettings):
         # web `serverClientId`, while iOS pins it to the in-app `GIDClientID`
         # (the iOS OAuth client). The env value is a comma-separated list so
         # we accept both — and the same setting still works with a single ID.
-        return [
-            a.strip() for a in self.google_oauth_client_id.split(",") if a.strip()
-        ]
+        return [a.strip() for a in self.google_oauth_client_id.split(",") if a.strip()]
 
     enabled_features: list[str] = Field(default_factory=list)
 

@@ -145,9 +145,7 @@ def upgrade() -> None:
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
     )
-    op.create_index(
-        "ix_events_workspace_starts_at", "events", ["workspace_id", "starts_at"]
-    )
+    op.create_index("ix_events_workspace_starts_at", "events", ["workspace_id", "starts_at"])
     op.create_index(
         "ix_events_workspace_active",
         "events",
@@ -176,9 +174,7 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
     )
-    op.create_index(
-        "ix_refresh_tokens_family_id", "refresh_tokens", ["family_id"]
-    )
+    op.create_index("ix_refresh_tokens_family_id", "refresh_tokens", ["family_id"])
 
     op.create_table(
         "change_log",
@@ -201,9 +197,7 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint("seq > 0", name="ck_change_log_seq_positive"),
     )
-    op.create_index(
-        "ix_change_log_entity", "change_log", ["entity_type", "entity_id"]
-    )
+    op.create_index("ix_change_log_entity", "change_log", ["entity_type", "entity_id"])
 
 
 def downgrade() -> None:

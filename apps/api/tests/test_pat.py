@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from httpx import AsyncClient
@@ -21,9 +21,7 @@ async def test_pat_authenticates_like_an_access_jwt(
 ) -> None:
     # Establish the user via Google login so we have a known User row.
     await login_as(client, "petr@example.com")
-    user = await db_session.scalar(
-        select(User).where(User.email == "petr@example.com")
-    )
+    user = await db_session.scalar(select(User).where(User.email == "petr@example.com"))
     assert user is not None
     pat = await mint_pat(db_session, user, name="skill", settings=settings)
     await db_session.commit()
@@ -37,14 +35,12 @@ async def test_pat_updates_last_used_at(
     client: AsyncClient, settings: Settings, db_session: AsyncSession
 ) -> None:
     await login_as(client, "petr@example.com")
-    user = await db_session.scalar(
-        select(User).where(User.email == "petr@example.com")
-    )
+    user = await db_session.scalar(select(User).where(User.email == "petr@example.com"))
     assert user is not None
     pat = await mint_pat(db_session, user, name="skill", settings=settings)
     await db_session.commit()
 
-    before = datetime.now(timezone.utc)
+    before = datetime.now(UTC)
     response = await client.get("/v1/events", headers=auth_header(pat))
     assert response.status_code == 200
 
@@ -64,9 +60,7 @@ async def test_revoked_pat_is_rejected(
     client: AsyncClient, settings: Settings, db_session: AsyncSession
 ) -> None:
     await login_as(client, "petr@example.com")
-    user = await db_session.scalar(
-        select(User).where(User.email == "petr@example.com")
-    )
+    user = await db_session.scalar(select(User).where(User.email == "petr@example.com"))
     assert user is not None
     pat = await mint_pat(db_session, user, name="skill", settings=settings)
     row = (
@@ -87,9 +81,7 @@ async def test_unknown_pat_is_rejected(
 ) -> None:
     # Sign a PAT for a user, then drop the row so the jti is unknown.
     await login_as(client, "petr@example.com")
-    user = await db_session.scalar(
-        select(User).where(User.email == "petr@example.com")
-    )
+    user = await db_session.scalar(select(User).where(User.email == "petr@example.com"))
     assert user is not None
     pat = await mint_pat(db_session, user, name="skill", settings=settings)
     row = (

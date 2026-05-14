@@ -20,9 +20,7 @@ async def test_login_with_allowed_email_returns_token_pair(client: AsyncClient) 
 
 @pytest.mark.asyncio
 async def test_login_with_unknown_email_is_rejected(client: AsyncClient) -> None:
-    response = await client.post(
-        "/v1/auth/google", json={"id_token": "stranger@example.com"}
-    )
+    response = await client.post("/v1/auth/google", json={"id_token": "stranger@example.com"})
     assert response.status_code == 401
 
 
@@ -37,9 +35,7 @@ async def test_refresh_rotates_and_old_refresh_is_burnt(client: AsyncClient) -> 
     assert new_pair["refresh_token"] != first["refresh_token"]
 
     # Reusing the original refresh must fail AND burn the whole family.
-    reuse = await client.post(
-        "/v1/auth/refresh", json={"refresh_token": first["refresh_token"]}
-    )
+    reuse = await client.post("/v1/auth/refresh", json={"refresh_token": first["refresh_token"]})
     assert reuse.status_code == 401
 
     # After reuse detection the second (legitimate) refresh is revoked too.
@@ -52,13 +48,9 @@ async def test_refresh_rotates_and_old_refresh_is_burnt(client: AsyncClient) -> 
 @pytest.mark.asyncio
 async def test_logout_revokes_family(client: AsyncClient) -> None:
     pair = await login_as(client, "petr@example.com")
-    response = await client.post(
-        "/v1/auth/logout", json={"refresh_token": pair["refresh_token"]}
-    )
+    response = await client.post("/v1/auth/logout", json={"refresh_token": pair["refresh_token"]})
     assert response.status_code == 204
-    after = await client.post(
-        "/v1/auth/refresh", json={"refresh_token": pair["refresh_token"]}
-    )
+    after = await client.post("/v1/auth/refresh", json={"refresh_token": pair["refresh_token"]})
     assert after.status_code == 401
 
 

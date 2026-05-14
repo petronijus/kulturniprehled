@@ -7,6 +7,7 @@ tickets and creates events automatically.
 ## Features
 
 - Shared agenda of concerts, theatre, cinema and other cultural events.
+- Shared watchlist (todo-style) of films, divadlo and concerts to catch later, with one level of nesting (e.g. "Godard" → individual films), drag-to-reorder, and 10-second polling so both devices stay in sync.
 - Mobile agenda view (chronological) and monthly calendar view.
 - One-way sync to a shared Google Calendar.
 - LLM-powered ticket ingestion: drop a ticket file into Claude on the
@@ -128,7 +129,8 @@ For routine releases: `ssh deploy@kp-vm /opt/kp/infra/deploy/upgrade.sh`.
 - **M6** Monthly calendar, ticket viewer, outbox + conflict UI.
 - **M7** Costs + year-in-review stats + PDF viewer.
 - **M8** Backups, deploy scripts, error reporting, polish, **v1.0.0 GA**.
-- **M9+** AI recommendations agent (deferred — schema is in place).
+- **M9** Watchlist — shared todo list with 2-level nesting, drag reorder, 10-second sync polling.
+- **M10+** AI recommendations agent (deferred — schema is in place).
 
 ## License
 

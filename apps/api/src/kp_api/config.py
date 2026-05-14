@@ -82,6 +82,16 @@ class Settings(BaseSettings):
             e.strip().lower() for e in self.allowed_emails.split(",") if e.strip()
         )
 
+    @property
+    def google_oauth_audiences(self) -> list[str]:
+        # Mobile platforms diverge: Android sets the ID token's `aud` to the
+        # web `serverClientId`, while iOS pins it to the in-app `GIDClientID`
+        # (the iOS OAuth client). The env value is a comma-separated list so
+        # we accept both — and the same setting still works with a single ID.
+        return [
+            a.strip() for a in self.google_oauth_client_id.split(",") if a.strip()
+        ]
+
     enabled_features: list[str] = Field(default_factory=list)
 
 

@@ -41,10 +41,11 @@ class GoogleIdTokenVerifier:
 
     def verify(self, id_token: str) -> GoogleIdentity:
         try:
+            audiences = self._settings.google_oauth_audiences
             claims = google_id_token.verify_oauth2_token(
                 id_token,
                 self._request,
-                audience=self._settings.google_oauth_client_id or None,
+                audience=audiences or None,
             )
         except ValueError as exc:
             raise OAuthError(f"invalid id token: {exc}") from exc

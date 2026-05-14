@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -120,25 +122,42 @@ class _HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<_HomeShell>
     with WidgetsBindingObserver {
+  static const Duration _pollInterval = Duration(seconds: 10);
+
+  Timer? _pollTimer;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _startPolling();
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(_pollInterval, (_) {
+      ref.read(syncControllerProvider.notifier).pullChanges();
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Pull on every foregrounding so a switch to the other device picks
-    // up its writes the moment the user returns. Mutations are sparse in
-    // this app — a single pull per resume costs effectively nothing.
+    // up its writes the moment the user returns. Also pause/resume the
+    // poll so we don't bang the API while the app is backgrounded.
     if (state == AppLifecycleState.resumed) {
       ref.read(syncControllerProvider.notifier).pullChanges();
+      _startPolling();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _pollTimer?.cancel();
     }
   }
 

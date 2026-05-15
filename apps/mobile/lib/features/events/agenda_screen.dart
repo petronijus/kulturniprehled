@@ -90,18 +90,63 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
                       e.startsAt.toLocal().isBefore(cutoff),
                 )
                 .toList();
+            // Flatten the agenda into a stream of widgets: optional imminent
+            // banner, then month-header / tile / tile / month-header / ...
+            // Months with zero events emit nothing — the header lives next
+            // to its first tile.
+            final List<Widget> items = <Widget>[];
+            if (imminent.isNotEmpty) {
+              items.add(_ImminentBanner(events: imminent));
+            }
+            int? lastYear;
+            int? lastMonth;
+            for (final CachedEventRow e in rows) {
+              final DateTime local = e.startsAt.toLocal();
+              if (local.year != lastYear || local.month != lastMonth) {
+                items.add(_MonthHeader(year: local.year, month: local.month));
+                lastYear = local.year;
+                lastMonth = local.month;
+              }
+              items.add(_AgendaTile(event: e));
+            }
             return ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: rows.length + (imminent.isEmpty ? 0 : 1),
-              itemBuilder: (context, index) {
-                if (imminent.isNotEmpty && index == 0) {
-                  return _ImminentBanner(events: imminent);
-                }
-                final int rowIndex = imminent.isEmpty ? index : index - 1;
-                return _AgendaTile(event: rows[rowIndex]);
-              },
+              itemCount: items.length,
+              itemBuilder: (context, index) => items[index],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _MonthHeader extends StatelessWidget {
+  const _MonthHeader({required this.year, required this.month});
+
+  final int year;
+  final int month;
+
+  @override
+  Widget build(BuildContext context) {
+    // Format as e.g. "Červen 2026" — DateFormat lowercases the month name
+    // in cs locale, so we uppercase the first letter for a header look.
+    final String raw = DateFormat(
+      'LLLL yyyy',
+      'cs',
+    ).format(DateTime(year, month));
+    final String label = raw.isEmpty
+        ? raw
+        : raw[0].toUpperCase() + raw.substring(1);
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: scheme.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.4,
         ),
       ),
     );

@@ -77,18 +77,24 @@ async def stats(
     ).all()
     by_month_events = {int(row[0]): int(row[1]) for row in by_month_rows}
 
+    # Bucket costs by the *event* month, not by when the ticket was paid.
+    # The user reads the by-month chart as "cost of going out in May" — the
+    # paid_at date is an accounting timestamp (often weeks earlier when the
+    # advance ticket was bought) and made the chart confusing.
     by_month_cost_rows = (
         await session.execute(
             select(
-                func.extract("month", Cost.paid_at).label("month"),
+                func.extract("month", Event.starts_at).label("month"),
                 func.coalesce(func.sum(Cost.amount_cents), 0).label("total"),
             )
+            .join(Event, Cost.event_id == Event.id)
             .where(
                 Cost.workspace_id == workspace.id,
                 Cost.deleted_at.is_(None),
-                func.extract("year", Cost.paid_at) == year,
+                Event.deleted_at.is_(None),
+                func.extract("year", Event.starts_at) == year,
             )
-            .group_by(func.extract("month", Cost.paid_at))
+            .group_by(func.extract("month", Event.starts_at))
         )
     ).all()
     by_month_cost = {int(row[0]): int(row[1]) for row in by_month_cost_rows}

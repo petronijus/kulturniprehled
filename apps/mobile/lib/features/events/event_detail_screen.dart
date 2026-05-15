@@ -97,21 +97,6 @@ class _EventDetailBody extends StatelessWidget {
   final CachedEventRow event;
   final List<CachedTicketRow> tickets;
 
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'planned':
-        return 'Plánováno';
-      case 'attended':
-        return 'Bylo to';
-      case 'cancelled':
-        return 'Zrušeno';
-      case 'missed':
-        return 'Nestihli';
-      default:
-        return status;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final DateFormat fmt = DateFormat('EEEE d. MMMM yyyy · HH:mm', 'cs');
@@ -157,23 +142,21 @@ class _EventDetailBody extends StatelessWidget {
             context,
           ).textTheme.titleMedium?.copyWith(color: scheme.onSurfaceVariant),
         ),
-        const SizedBox(height: 8),
-        Chip(label: Text(_statusLabel(event.status))),
         const SizedBox(height: 16),
-        if (event.venueAddress != null &&
-            event.venueAddress!.isNotEmpty) ...<Widget>[
-          _VenueSection(
-            address: event.venueAddress!,
-            imageUrl: event.venueImageUrl,
-          ),
-          const SizedBox(height: 16),
-        ],
         if (event.notes != null && event.notes!.isNotEmpty) ...<Widget>[
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Text(event.notes!),
             ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        if (event.venueAddress != null &&
+            event.venueAddress!.isNotEmpty) ...<Widget>[
+          _VenueSection(
+            address: event.venueAddress!,
+            imageUrl: event.venueImageUrl,
           ),
           const SizedBox(height: 16),
         ],

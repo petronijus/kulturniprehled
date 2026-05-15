@@ -86,6 +86,49 @@ async def test_stats_aggregates_events_and_costs(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_stats_by_month_buckets_costs_by_event_date_not_paid_at(
+    client: AsyncClient,
+) -> None:
+    # Buying a ticket in May for a June concert should put the cost under
+    # June in the by_month chart, not May. Otherwise the user reads "we
+    # spent 500 Kč going out in May" when in fact nothing happened in May.
+    pair = await login_as(client, "petr@example.com")
+    headers = auth_header(pair["access_token"])
+    year = 2026
+
+    event = (
+        await client.post(
+            "/v1/events",
+            json={
+                "title": "Future concert",
+                "category": "concert",
+                "starts_at": _iso(datetime(year, 6, 4, 19, 0, tzinfo=UTC)),
+            },
+            headers=headers,
+        )
+    ).json()
+
+    # Paid in May (ticket pre-sale), event happens in June.
+    await client.post(
+        f"/v1/events/{event['id']}/costs",
+        json={
+            "amount_cents": 50000,
+            "kind": "ticket",
+            "paid_at": date(year, 5, 15).isoformat(),
+        },
+        headers=headers,
+    )
+
+    body = (await client.get(f"/v1/stats?year={year}", headers=headers)).json()
+    months = {row["month"]: row for row in body["by_month"]}
+
+    # Cost shows under the event month (June), not the payment month (May).
+    assert months[6]["total_cost_cents"] == 50000
+    assert 5 not in months
+    assert body["total_cost_cents"] == 50000
+
+
+@pytest.mark.asyncio
 async def test_stats_for_empty_year_returns_zeros(client: AsyncClient) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])

@@ -15,7 +15,7 @@ extended Claude Code skill.
 | Hosting      | Proxmox VM, Docker Compose, Cloudflare Tunnel                         |
 | Auth         | Google OAuth2 (PKCE) → backend issues JWT + refresh-token rotation    |
 | Push         | APNs (iOS) + FCM (Android) behind `NotificationProvider` abstraction  |
-| CI/CD        | GitHub Actions, GHCR registry                                         |
+| CI/CD        | None — solo dev, manual release flow documented below                 |
 
 ## Language policy
 
@@ -27,8 +27,7 @@ Only the chat conversation with the user can remain Czech.
 Android is the primary development and testing target — fastest iteration loop.
 iOS keeps **full feature parity**, no Android-only features allowed. Every
 package choice must work identically on both. Material 3 design system avoids
-Cupertino-only widgets while still feeling native enough. CI builds `.apk` and
-`.ipa` from day 1.
+Cupertino-only widgets while still feeling native enough.
 
 ## Repository layout
 
@@ -39,7 +38,6 @@ packages/          Shared specs / generated clients
 skills/            Claude Code skill source (ticket parser)
 infra/             Docker Compose, Cloudflare Tunnel, backup scripts
 docs/              Architecture, API, sync, deployment docs
-.github/workflows/ CI pipelines
 ```
 
 ## Conventions
@@ -47,7 +45,8 @@ docs/              Architecture, API, sync, deployment docs
 - **Commits**: [Conventional Commits](https://www.conventionalcommits.org/) —
   `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`, `perf:`, `ci:`.
 - **Branches**: `main` is always deployable. Work in `feat/*` or `fix/*` branches,
-  open PRs into `main`. Branch protection: required CI green + linear history.
+  open PRs into `main` so each change has a description + release notes get
+  auto-generated. Pushing straight to `main` for one-line typo fixes is fine.
 - **PR template**: change summary, why, test plan, screenshots for UI changes.
 
 ## Code style
@@ -75,16 +74,120 @@ docs/              Architecture, API, sync, deployment docs
 1. Code written, formatted, lint passes.
 2. Tests written and green. Every bug fix adds a regression test.
 3. Commit in Conventional Commit format.
-4. Push to a feature branch, open PR.
-5. CI green: lint + tests + Android `.apk` build + iOS `.ipa` build.
+4. Push to a feature branch, open PR (or push to `main` for trivial changes).
+5. Local checks (next section) green before merge.
 6. Manual verification (dev compose up, click through UI or curl endpoint).
 
 ## Commit cadence (explicit project policy)
 
 - **After every fix**: commit + push.
 - **After every milestone (M0…M8)**: tag (`v0.1.0`, … `v1.0.0`), push the tag,
-  write GitHub release notes.
+  publish the signed APK to GitHub Releases (procedure below).
 - **Never** `--no-verify`. **Never** force-push to `main`.
+
+## Local pre-merge checklist (no CI runs this for you)
+
+Run these before opening / merging a PR. Same gates the old GitHub Actions
+workflows used to enforce.
+
+**Backend** (from `apps/api/`):
+
+```bash
+uv run ruff check .
+uv run black --check .
+uv run mypy src/kp_api
+uv run pytest -q          # 60+ tests, ~1 min with warm testcontainer
+```
+
+**Mobile** (from `apps/mobile/`):
+
+```bash
+dart format --output=none --set-exit-if-changed .
+flutter analyze --fatal-infos --fatal-warnings
+flutter test                    # 9+ widget + unit tests
+```
+
+If any of those is red, fix before merging — no human is going to catch it
+for you on a green-CI prompt.
+
+## Release procedure (signed APK + API redeploy)
+
+The release.yml workflow is **gone**; everything below runs locally.
+
+### 1. Bump version
+
+`apps/mobile/pubspec.yaml` → `version: 1.0.X+Y` (semver + Android version code).
+Commit the bump on its own line: `chore(mobile): bump to v1.0.X`.
+
+### 2. Run the pre-merge checklist
+
+See the section above. Both backend + mobile need to be green.
+
+### 3. Tag the release
+
+```bash
+git tag -a v1.0.X -m "Short one-line summary of what's in this release"
+git push origin v1.0.X
+```
+
+### 4. Build the signed APK locally
+
+The release keystore lives at `~/.android/kp-release.keystore`. Local key
+properties are at `apps/mobile/android/key.properties` (gitignored). Both are
+also stored in 1Password (`Kulturni Prehled Android Release Keystore`) for
+recovery.
+
+```bash
+cd apps/mobile
+GOOG_CLIENT_ID=$(op-cache "Kulturni prehled google Web OAuth client" "client ID")
+flutter build apk --release \
+  --dart-define=KP_API_BASE=https://kulturniprehled.example.com \
+  --dart-define=KP_GOOGLE_OAUTH_SERVER_CLIENT_ID="$GOOG_CLIENT_ID"
+unset GOOG_CLIENT_ID
+mv build/app/outputs/flutter-apk/app-release.apk \
+   build/app/outputs/flutter-apk/kp-mobile-v1.0.X.apk
+```
+
+Sanity-check the signature SHA-1 (must match the one registered in the
+Android OAuth client for `com.kulturniprehled.kp_mobile` — release-key entry
+in Google Cloud is `DC:B7:D3:89:9A:A7:79:DF:53:EF:AF:40:3B:DC:7B:BB:9A:44:29:64`):
+
+```bash
+$ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs \
+  build/app/outputs/flutter-apk/kp-mobile-v1.0.X.apk \
+  | grep "SHA-1 digest"
+```
+
+### 5. Create the GitHub Release with the APK attached
+
+```bash
+gh release create v1.0.X build/app/outputs/flutter-apk/kp-mobile-v1.0.X.apk \
+  --title "v1.0.X" \
+  --generate-notes
+```
+
+Bělka + Petr download the APK from
+<https://github.com/petronijus/kulturniprehled/releases> on their phones.
+First install needs "Install unknown apps" toggled on for the browser.
+
+### 6. Backend deploy (only when API changed)
+
+The Proxmox VM builds the API image from source on each upgrade — no GHCR
+push needed.
+
+```bash
+ssh petronijus@192.0.2.101 '/opt/kp/infra/deploy/upgrade.sh'
+```
+
+The script re-reads its own contents at start. If your release also changes
+`infra/deploy/upgrade.sh`, run it twice — the first run pulls the new
+script, the second uses it.
+
+### 7. Smoke test
+
+- `curl https://kulturniprehled.example.com/healthz` → `200 {"status":"ok",…}`
+- Install the new APK on the Pixel, sign in, agenda + detail + month view
+  + watchlist + stats all render the way the release notes describe.
 
 ## Secrets
 

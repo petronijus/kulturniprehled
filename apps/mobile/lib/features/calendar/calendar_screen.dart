@@ -14,6 +14,69 @@ class CalendarScreen extends ConsumerStatefulWidget {
   ConsumerState<CalendarScreen> createState() => _CalendarScreenState();
 }
 
+class _NextEventBanner extends StatelessWidget {
+  const _NextEventBanner({required this.event, required this.onTap});
+
+  final CachedEventRow event;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final DateFormat fmt = DateFormat('EEEE d. MMMM · HH:mm', 'cs');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Material(
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: <Widget>[
+                Icon(Icons.event_available, color: scheme.onSecondaryContainer),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'Nejbližší',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: scheme.onSecondaryContainer,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        event.title,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: scheme.onSecondaryContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        fmt.format(event.startsAt.toLocal()),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSecondaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: scheme.onSecondaryContainer),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   DateTime _focused = DateTime.now();
   DateTime? _selected = DateTime.now();
@@ -64,6 +127,23 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
+  void _onNextTap(CachedEventRow event) {
+    final DateTime eventDay = _dayKey(event.startsAt.toLocal());
+    final bool alreadyFocused =
+        _focused.year == eventDay.year && _focused.month == eventDay.month;
+    final bool alreadySelected =
+        _selected != null && isSameDay(_selected!, eventDay);
+    if (alreadyFocused && alreadySelected) {
+      // Second tap on the banner — go to the detail.
+      context.go('/agenda/events/${event.id}');
+      return;
+    }
+    setState(() {
+      _focused = eventDay;
+      _selected = eventDay;
+    });
+  }
+
   Color _markerColor(BuildContext context, String category) {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     switch (category) {
@@ -94,8 +174,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           final List<CachedEventRow> selectedRows = selected == null
               ? <CachedEventRow>[]
               : (buckets[_dayKey(selected)] ?? <CachedEventRow>[]);
+          final DateTime now = DateTime.now();
+          final CachedEventRow? next = rows
+              .where((e) => e.startsAt.toLocal().isAfter(now))
+              .fold<CachedEventRow?>(null, (acc, e) {
+                if (acc == null) return e;
+                return e.startsAt.isBefore(acc.startsAt) ? e : acc;
+              });
           return Column(
             children: <Widget>[
+              if (next != null)
+                _NextEventBanner(event: next, onTap: () => _onNextTap(next)),
               TableCalendar<CachedEventRow>(
                 locale: 'cs_CZ',
                 firstDay: DateTime.utc(2020),

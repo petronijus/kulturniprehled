@@ -166,7 +166,7 @@ gh release create v1.0.X build/app/outputs/flutter-apk/kp-mobile-v1.0.X.apk \
   --generate-notes
 ```
 
-Bělka + Petr download the APK from
+Běla + Petr download the APK from
 <https://github.com/petronijus/kulturniprehled/releases> on their phones.
 First install needs "Install unknown apps" toggled on for the browser.
 

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:kp_mobile/core/widgets/blur_in_text.dart';
+import 'package:kp_mobile/core/widgets/morphing_hero_cover.dart';
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
 import 'package:kp_mobile/features/outbox/conflict_dialog.dart';
@@ -55,6 +57,11 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     });
 
     final EventsRepository repo = ref.read(eventsRepositoryProvider);
+    // Agenda passes the CachedEventRow as `extra` so we can render the
+    // cover Hero on the first frame — required for the push-direction
+    // Hero flight to find a destination endpoint.
+    final CachedEventRow? initialEvent =
+        GoRouterState.of(context).extra as CachedEventRow?;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Detail události'),
@@ -69,12 +76,13 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
       ),
       body: FutureBuilder<CachedEventRow?>(
         future: repo.getEvent(widget.eventId),
+        initialData: initialEvent,
         builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
           final CachedEventRow? event = snapshot.data;
           if (event == null) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const Center(child: CircularProgressIndicator());
+            }
             return const Center(child: Text('Událost nenalezena.'));
           }
           return FutureBuilder<List<CachedTicketRow>>(
@@ -106,35 +114,31 @@ class _EventDetailBody extends StatelessWidget {
       children: <Widget>[
         if (event.coverImageUrl != null &&
             event.coverImageUrl!.isNotEmpty) ...<Widget>[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.network(
-                event.coverImageUrl!,
-                fit: BoxFit.cover,
-                // Skeleton + error states so a flaky CDN never breaks the screen.
-                loadingBuilder: (context, child, progress) => progress == null
-                    ? child
-                    : Container(
-                        color: scheme.surfaceContainerHighest,
-                        alignment: Alignment.center,
-                        child: const CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                errorBuilder: (context, _, _) => Container(
-                  color: scheme.surfaceContainerHighest,
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.image_not_supported_outlined,
-                    color: scheme.onSurfaceVariant,
-                  ),
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: MorphingHeroCover(
+              tag: 'cover-${event.id}',
+              imageUrl: event.coverImageUrl,
+              borderRadius: BorderRadius.circular(12),
+              fallback: Container(
+                color: scheme.surfaceContainerHighest,
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.image_not_supported_outlined,
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
             ),
           ),
           const SizedBox(height: 16),
         ],
-        Text(event.title, style: Theme.of(context).textTheme.headlineSmall),
+        BlurInText(
+          key: ValueKey<String>('detail-title-${event.id}'),
+          text: event.title,
+          style:
+              Theme.of(context).textTheme.headlineSmall ??
+              const TextStyle(fontSize: 24),
+        ),
         const SizedBox(height: 8),
         Text(
           fmt.format(event.startsAt.toLocal()),

@@ -90,7 +90,9 @@ void main() {
     addTearDown(container.dispose);
 
     await tester.pumpWidget(_wrap(container));
-    await tester.pump();
+    // pumpAndSettle so the BlurInText title animation completes and the
+    // widget collapses back into a single Text widget that find.text can hit.
+    await tester.pumpAndSettle();
 
     expect(find.text('PJ Harvey'), findsOneWidget);
     expect(find.text('Sokolov'), findsOneWidget);

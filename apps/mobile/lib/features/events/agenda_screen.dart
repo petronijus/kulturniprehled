@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:kp_mobile/core/widgets/blur_in_text.dart';
+import 'package:kp_mobile/core/widgets/morphing_hero_cover.dart';
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
 import 'package:kp_mobile/features/sync/sync_controller.dart';
@@ -235,50 +237,73 @@ class _EventCard extends StatelessWidget {
     final String catLabel = _categoryLabel(event.category);
 
     return InkWell(
-      onTap: () => context.go('/agenda/events/${event.id}'),
+      // Pass the cached row as extra so the detail screen can render the
+      // cover Hero on the very first frame — without it, Hero push has no
+      // destination registered and falls back to a plain fade.
+      onTap: () => context.go('/agenda/events/${event.id}', extra: event),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 16, 0, 24),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: <Widget>[
-            // Circular cover image — small bleed past the right edge, the
-            // bulk of the disc sits inside the frame per Figma 2007:198.
-            Positioned(
-              right: -16,
-              top: 0,
-              child: _CircularCover(
-                imageUrl: event.coverImageUrl,
-                fallbackIcon: _iconFor(event.category),
-              ),
-            ),
-            // Title + date row, sitting on top of the cover.
-            Padding(
-              padding: const EdgeInsets.only(right: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  SizedBox(
-                    width: 240,
-                    child: Text(
-                      event.title,
-                      style: const TextStyle(
-                        fontFamily: 'Gloock',
-                        fontSize: 50,
-                        height: 1.0,
-                        color: Colors.black,
+        // SizedBox locks the tile height to the cover diameter so taps on
+        // the lower half of the cover hit *this* card's InkWell instead of
+        // leaking through to the next list item.
+        child: SizedBox(
+          height: _coverDiameter,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              // Circular cover, slight bleed past the right edge per Figma.
+              Positioned(
+                right: -16,
+                top: 0,
+                child: SizedBox(
+                  width: _coverDiameter,
+                  height: _coverDiameter,
+                  child: MorphingHeroCover(
+                    tag: 'cover-${event.id}',
+                    imageUrl: event.coverImageUrl,
+                    borderRadius: BorderRadius.circular(_coverDiameter / 2),
+                    fallback: Container(
+                      color: const Color(0xFFEFEFEF),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        _iconFor(event.category),
+                        size: 64,
+                        color: Colors.black38,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  _DateRow(
-                    leading: catLabel,
-                    center: dateLabel,
-                    trailing: timeLabel,
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
+              // Title + date row, sitting on top of the cover.
+              Padding(
+                padding: const EdgeInsets.only(right: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    SizedBox(
+                      width: 240,
+                      child: BlurInText(
+                        key: ValueKey<String>('title-${event.id}'),
+                        text: event.title,
+                        style: const TextStyle(
+                          fontFamily: 'Gloock',
+                          fontSize: 50,
+                          height: 1.0,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _DateRow(
+                      leading: catLabel,
+                      center: dateLabel,
+                      trailing: timeLabel,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -286,35 +311,6 @@ class _EventCard extends StatelessWidget {
 
   String _capitalize(String s) =>
       s.isEmpty ? s : (s[0].toUpperCase() + s.substring(1));
-}
-
-class _CircularCover extends StatelessWidget {
-  const _CircularCover({required this.imageUrl, required this.fallbackIcon});
-
-  final String? imageUrl;
-  final IconData fallbackIcon;
-
-  @override
-  Widget build(BuildContext context) {
-    final bool has = imageUrl != null && imageUrl!.isNotEmpty;
-    return ClipOval(
-      child: Container(
-        width: _coverDiameter,
-        height: _coverDiameter,
-        color: const Color(0xFFEFEFEF),
-        child: has
-            ? Image.network(
-                imageUrl!,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, progress) =>
-                    progress == null ? child : const SizedBox.shrink(),
-                errorBuilder: (context, _, _) =>
-                    Icon(fallbackIcon, size: 64, color: Colors.black38),
-              )
-            : Icon(fallbackIcon, size: 64, color: Colors.black38),
-      ),
-    );
-  }
 }
 
 class _DateRow extends StatelessWidget {

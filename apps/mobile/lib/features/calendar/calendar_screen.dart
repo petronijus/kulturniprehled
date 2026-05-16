@@ -164,7 +164,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       agendaProvider,
     );
     return Scaffold(
-      appBar: AppBar(title: const Text('Kalendář')),
+      backgroundColor: Colors.white,
       body: agendaAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(child: Text('Chyba: $error')),
@@ -183,6 +183,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               });
           return Column(
             children: <Widget>[
+              SizedBox(height: MediaQuery.of(context).padding.top + 64),
               if (next != null)
                 _NextEventBanner(event: next, onTap: () => _onNextTap(next)),
               TableCalendar<CachedEventRow>(

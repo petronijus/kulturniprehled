@@ -13,6 +13,18 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
     DeviceOrientation.portraitUp,
   ]);
+  // Transparent system bars so the white app background bleeds all the way
+  // up — no Android scrim under the status-bar clock/icons.
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   await initializeDateFormatting('cs');
 
   const String dsn = AppConfig.sentryDsn;
@@ -41,7 +53,7 @@ class KpApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: buildLightTheme(),
       darkTheme: buildDarkTheme(),
-      themeMode: ThemeMode.dark,
+      themeMode: ThemeMode.light,
       routerConfig: ref.watch(appRouterProvider),
     );
   }

@@ -171,35 +171,217 @@ class _HomeShellState extends ConsumerState<_HomeShell>
     ref.read(syncControllerProvider.notifier).pullChanges();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: widget.navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: widget.navigationShell.currentIndex,
-        onDestinationSelected: _goBranch,
-        destinations: const <NavigationDestination>[
-          NavigationDestination(
-            icon: Icon(Icons.list_alt_outlined),
-            selectedIcon: Icon(Icons.list_alt),
-            label: 'Agenda',
+  int _previousIndex = 0;
+
+  Future<void> _confirmSignOut(BuildContext context) async {
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Odhlásit?'),
+        content: const Text('Odhlásí tě z účtu Kulturní Přehled.'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Zrušit'),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: 'Měsíc',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.checklist_outlined),
-            selectedIcon: Icon(Icons.checklist),
-            label: 'Watchlist',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart),
-            label: 'Statistiky',
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Odhlásit'),
           ),
         ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(authControllerProvider.notifier).signOut();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final int current = widget.navigationShell.currentIndex;
+    final bool forward = current >= _previousIndex;
+    _previousIndex = current;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: <Widget>[
+          // Branches with a horizontal slide between them. Right→left when
+          // the user taps a tab to the right; left→right going back.
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                final bool isIncoming = child.key == ValueKey<int>(current);
+                final Offset begin = isIncoming
+                    ? (forward ? const Offset(1, 0) : const Offset(-1, 0))
+                    : (forward ? const Offset(-1, 0) : const Offset(1, 0));
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: begin,
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: FadeTransition(opacity: animation, child: child),
+                );
+              },
+              child: KeyedSubtree(
+                key: ValueKey<int>(current),
+                child: widget.navigationShell,
+              ),
+            ),
+          ),
+          // Floating Kp logo (tap → logout confirm). Sits on every screen.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: _FloatingLogo(onTap: () => _confirmSignOut(context)),
+          ),
+          // Floating bottom nav.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _CulturalNav(selectedIndex: current, onTap: _goBranch),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FloatingLogo extends StatelessWidget {
+  const _FloatingLogo({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Center(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Image.asset(
+                  'assets/brand/kp_logo.png',
+                  height: 80,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CulturalNav extends StatelessWidget {
+  const _CulturalNav({required this.selectedIndex, required this.onTap});
+
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  static const List<String> _labels = <String>[
+    'Agenda',
+    'Měsíc',
+    'Watchlist',
+    'Stats',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 110,
+      child: Stack(
+        children: <Widget>[
+          // Transparent→white gradient so the cards above fade out under the
+          // nav instead of being cut off by a hard edge.
+          const IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: <Color>[
+                    Color(0x00FFFFFF),
+                    Color(0xCCFFFFFF),
+                    Color(0xFFFFFFFF),
+                  ],
+                  stops: <double>[0.0, 0.5, 1.0],
+                ),
+              ),
+              child: SizedBox.expand(),
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: <Widget>[
+                    for (int i = 0; i < _labels.length; i++)
+                      _NavLabel(
+                        label: _labels[i],
+                        selected: i == selectedIndex,
+                        onTap: () => onTap(i),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavLabel extends StatelessWidget {
+  const _NavLabel({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      customBorder: const StadiumBorder(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          style: TextStyle(
+            fontFamily: 'StackSansNotch',
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+            letterSpacing: 0.48,
+            color: selected
+                ? Colors.black
+                : Colors.black.withValues(alpha: 0.3),
+          ),
+          child: Text(label),
+        ),
       ),
     );
   }

@@ -43,28 +43,36 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
       watchlistProvider,
     );
 
+    final double topPad = MediaQuery.of(context).padding.top + 64;
     return Scaffold(
-      appBar: AppBar(title: const Text('Watchlist')),
+      backgroundColor: Colors.white,
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: rows.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, _) => ListView(
+            padding: EdgeInsets.only(top: topPad),
             children: <Widget>[
-              const SizedBox(height: 120),
+              const SizedBox(height: 56),
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text('Chyba: $error', textAlign: TextAlign.center),
               ),
             ],
           ),
-          data: (items) => _WatchlistBody(items: items),
+          data: (items) => Padding(
+            padding: EdgeInsets.only(top: topPad),
+            child: _WatchlistBody(items: items),
+          ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddDialog(context, ref, parentId: null),
-        tooltip: 'Přidat',
-        child: const Icon(Icons.add),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 96),
+        child: FloatingActionButton(
+          onPressed: () => _showAddDialog(context, ref, parentId: null),
+          tooltip: 'Přidat',
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }

@@ -1,7 +1,7 @@
 name: kp_mobile
 description: "Kulturní Přehled — shared cultural-event tracker (Android + iOS)."
 publish_to: "none"
-version: 1.0.2+3
+version: 1.0.3+4
 
 environment:
   sdk: ^3.11.5
@@ -37,3 +37,23 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/brand/
+  fonts:
+    - family: Gloock
+      fonts:
+        - asset: assets/fonts/Gloock-Regular.ttf
+    - family: StackSansNotch
+      fonts:
+        - asset: assets/fonts/StackSansNotch-ExtraLight.ttf
+          weight: 200
+        - asset: assets/fonts/StackSansNotch-Light.ttf
+          weight: 300
+        - asset: assets/fonts/StackSansNotch-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/StackSansNotch-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/StackSansNotch-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/StackSansNotch-Bold.ttf
+          weight: 700

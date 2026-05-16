@@ -83,32 +83,51 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Statistiky'),
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
-            tooltip: 'Předchozí rok',
-            onPressed: () {
-              setState(() => _year -= 1);
-              unawaitedLoad();
-            },
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Center(child: Text('$_year')),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right),
-            tooltip: 'Další rok',
-            onPressed: () {
-              setState(() => _year += 1);
-              unawaitedLoad();
-            },
-          ),
-        ],
+      backgroundColor: Colors.white,
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: Column(
+          children: <Widget>[
+            SizedBox(height: MediaQuery.of(context).padding.top + 64),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    tooltip: 'Předchozí rok',
+                    onPressed: () {
+                      setState(() => _year -= 1);
+                      unawaitedLoad();
+                    },
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Text(
+                      '$_year',
+                      style: const TextStyle(
+                        fontFamily: 'StackSansNotch',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    tooltip: 'Další rok',
+                    onPressed: () {
+                      setState(() => _year += 1);
+                      unawaitedLoad();
+                    },
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: _build()),
+          ],
+        ),
       ),
-      body: RefreshIndicator(onRefresh: _load, child: _build()),
     );
   }
 

@@ -1,13 +1,18 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:kp_mobile/data/drift/database.dart';
-import 'package:kp_mobile/features/auth/auth_controller.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
 import 'package:kp_mobile/features/sync/sync_controller.dart';
-import 'package:kp_mobile/features/system/server_status.dart';
+
+const Color _ghostColor = Color(0xFFB1B1B1);
+const double _ghostFontSize = 100;
+const double _ghostBlur = 7.5;
+const double _coverDiameter = 300;
 
 class AgendaScreen extends ConsumerStatefulWidget {
   const AgendaScreen({super.key});
@@ -20,9 +25,6 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
   @override
   void initState() {
     super.initState();
-    // Fire a non-blocking sync the moment the screen mounts. The agenda
-    // renders from cache immediately so the user is never staring at a
-    // spinner.
     Future<void>.microtask(
       () => ref.read(syncControllerProvider.notifier).pullChanges(),
     );
@@ -36,27 +38,8 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
     final AsyncValue<List<CachedEventRow>> agendaAsync = ref.watch(
       agendaProvider,
     );
-    final ServerHealth health = ref.watch(serverStatusProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Kulturní přehled'),
-        actions: <Widget>[
-          if (health == ServerHealth.unreachable)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Tooltip(
-                message: 'Server nedostupný — pracuju z cache.',
-                child: Icon(Icons.cloud_off, size: 20),
-              ),
-            ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Odhlásit',
-            onPressed: () =>
-                ref.read(authControllerProvider.notifier).signOut(),
-          ),
-        ],
-      ),
+      backgroundColor: Colors.white,
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: agendaAsync.when(
@@ -65,96 +48,152 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
             message: 'Načítání selhalo: $error',
             onRetry: _refresh,
           ),
-          data: (rows) {
-            if (rows.isEmpty) {
-              return ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(32),
-                children: const <Widget>[
-                  SizedBox(height: 80),
-                  Icon(Icons.event_busy, size: 80),
-                  SizedBox(height: 16),
-                  Text(
-                    'Žádné události — přidej první lístek nebo počkej na sync.',
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              );
-            }
-            final DateTime now = DateTime.now();
-            final DateTime cutoff = now.add(const Duration(hours: 24));
-            final List<CachedEventRow> imminent = rows
-                .where(
-                  (e) =>
-                      e.startsAt.toLocal().isAfter(now) &&
-                      e.startsAt.toLocal().isBefore(cutoff),
-                )
-                .toList();
-            // Flatten the agenda into a stream of widgets: optional imminent
-            // banner, then month-header / tile / tile / month-header / ...
-            // Months with zero events emit nothing — the header lives next
-            // to its first tile.
-            final List<Widget> items = <Widget>[];
-            if (imminent.isNotEmpty) {
-              items.add(_ImminentBanner(events: imminent));
-            }
-            int? lastYear;
-            int? lastMonth;
-            for (final CachedEventRow e in rows) {
-              final DateTime local = e.startsAt.toLocal();
-              if (local.year != lastYear || local.month != lastMonth) {
-                items.add(_MonthHeader(year: local.year, month: local.month));
-                lastYear = local.year;
-                lastMonth = local.month;
-              }
-              items.add(_AgendaTile(event: e));
-            }
-            return ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: items.length,
-              itemBuilder: (context, index) => items[index],
-            );
-          },
+          data: _AgendaList.new,
         ),
       ),
     );
   }
 }
 
-class _MonthHeader extends StatelessWidget {
-  const _MonthHeader({required this.year, required this.month});
+class _AgendaList extends StatelessWidget {
+  const _AgendaList(this.rows);
 
-  final int year;
-  final int month;
+  final List<CachedEventRow> rows;
 
   @override
   Widget build(BuildContext context) {
-    // Format as e.g. "Červen 2026" — DateFormat lowercases the month name
-    // in cs locale, so we uppercase the first letter for a header look.
+    if (rows.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(
+          32,
+          MediaQuery.of(context).padding.top + 120,
+          32,
+          120,
+        ),
+        children: const <Widget>[
+          Text(
+            'Žádné události',
+            style: TextStyle(
+              fontFamily: 'Gloock',
+              fontSize: 40,
+              height: 1.0,
+              color: Colors.black,
+            ),
+          ),
+          SizedBox(height: 12),
+          Text(
+            'Přidej první lístek nebo počkej na sync.',
+            style: TextStyle(fontSize: 14, color: Colors.black54),
+          ),
+        ],
+      );
+    }
+
+    final List<_MonthGroup> months = _groupByMonth(rows);
+
+    // Top padding clears the floating Kp logo overlay (logo lives in the
+    // home shell now, not in this screen). Bottom padding is ~half the
+    // screen height so the last card can be scrolled up into the middle
+    // of the viewport — gives the bottom item the same breathing room as
+    // any other.
+    final MediaQueryData mq = MediaQuery.of(context);
+    return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.only(
+        top: mq.padding.top + 64,
+        bottom: mq.size.height * 0.5,
+      ),
+      itemCount: months.length,
+      itemBuilder: (context, index) => _MonthSection(group: months[index]),
+    );
+  }
+
+  static List<_MonthGroup> _groupByMonth(List<CachedEventRow> rows) {
+    final List<_MonthGroup> out = <_MonthGroup>[];
+    int? lastYear;
+    int? lastMonth;
+    for (final CachedEventRow e in rows) {
+      final DateTime local = e.startsAt.toLocal();
+      if (local.year != lastYear || local.month != lastMonth) {
+        out.add(_MonthGroup(year: local.year, month: local.month, events: []));
+        lastYear = local.year;
+        lastMonth = local.month;
+      }
+      out.last.events.add(e);
+    }
+    return out;
+  }
+}
+
+class _MonthGroup {
+  _MonthGroup({required this.year, required this.month, required this.events});
+
+  final int year;
+  final int month;
+  final List<CachedEventRow> events;
+}
+
+class _MonthSection extends StatelessWidget {
+  const _MonthSection({required this.group});
+
+  final _MonthGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    // Czech month name, first letter uppercase.
     final String raw = DateFormat(
-      'LLLL yyyy',
+      'LLLL',
       'cs',
-    ).format(DateTime(year, month));
+    ).format(DateTime(group.year, group.month));
     final String label = raw.isEmpty
         ? raw
         : raw[0].toUpperCase() + raw.substring(1);
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-          color: scheme.onSurfaceVariant,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.4,
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: <Widget>[
+        // Giant blurred month label sitting behind the first card.
+        Positioned(
+          left: -20,
+          top: 24,
+          right: 0,
+          child: IgnorePointer(
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(
+                sigmaX: _ghostBlur,
+                sigmaY: _ghostBlur,
+              ),
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontFamily: 'StackSansNotch',
+                  fontWeight: FontWeight.w700,
+                  fontSize: _ghostFontSize,
+                  color: _ghostColor,
+                  height: 1.0,
+                ),
+              ),
+            ),
+          ),
         ),
-      ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            // Reserve vertical space so the giant ghost lives mostly behind
+            // the first card without pushing layout.
+            const SizedBox(height: 80),
+            for (final CachedEventRow e in group.events) _EventCard(event: e),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ],
     );
   }
 }
 
-class _AgendaTile extends StatelessWidget {
-  const _AgendaTile({required this.event});
+class _EventCard extends StatelessWidget {
+  const _EventCard({required this.event});
 
   final CachedEventRow event;
 
@@ -171,110 +210,70 @@ class _AgendaTile extends StatelessWidget {
     }
   }
 
-  /// Pulls a short program/teaser line out of `notes`. The skill writes a
-  /// stable format starting with the program/season blurb on line one; we
-  /// strip empty lines and seat-info / transit-info lines so the tile shows
-  /// the headline, not logistics.
-  String? _previewFromNotes(String? notes) {
-    if (notes == null) {
-      return null;
+  String _categoryLabel(String category) {
+    switch (category) {
+      case 'concert':
+        return 'Koncert';
+      case 'theatre':
+        return 'Divadlo';
+      case 'cinema':
+        return 'Film';
+      case 'exhibition':
+        return 'Výstava';
+      default:
+        return 'Událost';
     }
-    for (final String raw in notes.split('\n')) {
-      final String line = raw.trim();
-      if (line.isEmpty) continue;
-      if (line.startsWith('Místa:')) continue;
-      if (line.startsWith('Místo:')) continue;
-      if (line.startsWith('🚌')) continue;
-      if (line.startsWith('Vstupenky')) continue;
-      if (line.startsWith('•')) continue;
-      return line;
-    }
-    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final DateFormat fmt = DateFormat('EEE d. M. yyyy · HH:mm', 'cs');
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    final String? preview = _previewFromNotes(event.notes);
-    final bool hasCover =
-        event.coverImageUrl != null && event.coverImageUrl!.isNotEmpty;
+    final DateTime local = event.startsAt.toLocal();
+    final DateFormat dateFmt = DateFormat('EEEE d.M.', 'cs');
+    final DateFormat timeFmt = DateFormat('HH:mm', 'cs');
+    final String dateLabel = _capitalize(dateFmt.format(local));
+    final String timeLabel = timeFmt.format(local);
+    final String catLabel = _categoryLabel(event.category);
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.go('/agenda/events/${event.id}'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return InkWell(
+      onTap: () => context.go('/agenda/events/${event.id}'),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 0, 24),
+        child: Stack(
+          clipBehavior: Clip.none,
           children: <Widget>[
-            if (hasCover)
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Image.network(
-                  event.coverImageUrl!,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, progress) => progress == null
-                      ? child
-                      : Container(color: scheme.surfaceContainerHighest),
-                  errorBuilder: (context, _, _) => Container(
-                    color: scheme.surfaceContainerHighest,
-                    alignment: Alignment.center,
-                    child: Icon(
-                      _iconFor(event.category),
-                      size: 32,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
+            // Circular cover image — small bleed past the right edge, the
+            // bulk of the disc sits inside the frame per Figma 2007:198.
+            Positioned(
+              right: -16,
+              top: 0,
+              child: _CircularCover(
+                imageUrl: event.coverImageUrl,
+                fallbackIcon: _iconFor(event.category),
               ),
+            ),
+            // Title + date row, sitting on top of the cover.
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.only(right: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  if (!hasCover)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 12, top: 4),
-                      child: CircleAvatar(
-                        backgroundColor: scheme.primaryContainer,
-                        foregroundColor: scheme.onPrimaryContainer,
-                        child: Icon(_iconFor(event.category)),
+                  SizedBox(
+                    width: 240,
+                    child: Text(
+                      event.title,
+                      style: const TextStyle(
+                        fontFamily: 'Gloock',
+                        fontSize: 50,
+                        height: 1.0,
+                        color: Colors.black,
                       ),
                     ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          event.title,
-                          style: Theme.of(context).textTheme.titleMedium,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          fmt.format(event.startsAt.toLocal()),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
-                        if (preview != null) ...<Widget>[
-                          const SizedBox(height: 6),
-                          Text(
-                            preview,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ],
-                    ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Icon(
-                      Icons.chevron_right,
-                      color: scheme.onSurfaceVariant,
-                    ),
+                  const SizedBox(height: 24),
+                  _DateRow(
+                    leading: catLabel,
+                    center: dateLabel,
+                    trailing: timeLabel,
                   ),
                 ],
               ),
@@ -284,54 +283,83 @@ class _AgendaTile extends StatelessWidget {
       ),
     );
   }
+
+  String _capitalize(String s) =>
+      s.isEmpty ? s : (s[0].toUpperCase() + s.substring(1));
 }
 
-class _ImminentBanner extends StatelessWidget {
-  const _ImminentBanner({required this.events});
+class _CircularCover extends StatelessWidget {
+  const _CircularCover({required this.imageUrl, required this.fallbackIcon});
 
-  final List<CachedEventRow> events;
+  final String? imageUrl;
+  final IconData fallbackIcon;
 
   @override
   Widget build(BuildContext context) {
-    final DateFormat fmt = DateFormat('HH:mm', 'cs');
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Icon(
-                Icons.notifications_active_outlined,
-                color: scheme.onSecondaryContainer,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'V nejbližších 24 h',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: scheme.onSecondaryContainer,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          for (final CachedEventRow e in events)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Text(
-                '${fmt.format(e.startsAt.toLocal())} · ${e.title}',
-                style: TextStyle(color: scheme.onSecondaryContainer),
-              ),
-            ),
-        ],
+    final bool has = imageUrl != null && imageUrl!.isNotEmpty;
+    return ClipOval(
+      child: Container(
+        width: _coverDiameter,
+        height: _coverDiameter,
+        color: const Color(0xFFEFEFEF),
+        child: has
+            ? Image.network(
+                imageUrl!,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) =>
+                    progress == null ? child : const SizedBox.shrink(),
+                errorBuilder: (context, _, _) =>
+                    Icon(fallbackIcon, size: 64, color: Colors.black38),
+              )
+            : Icon(fallbackIcon, size: 64, color: Colors.black38),
       ),
     );
+  }
+}
+
+class _DateRow extends StatelessWidget {
+  const _DateRow({
+    required this.leading,
+    required this.center,
+    required this.trailing,
+  });
+
+  final String leading;
+  final String center;
+  final String trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    const TextStyle style = TextStyle(
+      fontFamily: 'StackSansNotch',
+      fontWeight: FontWeight.w600,
+      fontSize: 12,
+      color: Colors.black,
+      letterSpacing: 0.48,
+      height: 1.2,
+    );
+    return Row(
+      children: <Widget>[
+        Text(leading, style: style),
+        const SizedBox(width: 8),
+        const Expanded(child: _Hairline()),
+        const SizedBox(width: 8),
+        Text(center, style: style),
+        const SizedBox(width: 8),
+        const Expanded(child: _Hairline()),
+        const SizedBox(width: 8),
+        Text(trailing, style: style),
+      ],
+    );
+  }
+}
+
+class _Hairline extends StatelessWidget {
+  const _Hairline();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(height: 1, color: Colors.black);
   }
 }
 
@@ -347,7 +375,7 @@ class _ErrorList extends StatelessWidget {
       padding: const EdgeInsets.all(32),
       children: <Widget>[
         const SizedBox(height: 80),
-        const Icon(Icons.cloud_off, size: 80),
+        const Icon(Icons.cloud_off, size: 80, color: Colors.black38),
         const SizedBox(height: 16),
         Text(message, textAlign: TextAlign.center),
         const SizedBox(height: 16),

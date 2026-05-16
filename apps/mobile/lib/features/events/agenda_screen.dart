@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 
 import 'package:kp_mobile/core/widgets/blur_in_text.dart';
 import 'package:kp_mobile/core/widgets/morphing_hero_cover.dart';
@@ -24,12 +27,40 @@ class AgendaScreen extends ConsumerStatefulWidget {
 }
 
 class _AgendaScreenState extends ConsumerState<AgendaScreen> {
+  final ScrollController _scrollCtrl = ScrollController();
+  final ValueNotifier<Offset> _tilt = ValueNotifier<Offset>(Offset.zero);
+  StreamSubscription<AccelerometerEvent>? _accelSub;
+
   @override
   void initState() {
     super.initState();
     Future<void>.microtask(
       () => ref.read(syncControllerProvider.notifier).pullChanges(),
     );
+    // Accelerometer drives the tilt parallax. UI-rate sampling, plus a
+    // simple exponential smoother so layers don't jitter on every micro
+    // movement of the user's hand.
+    _accelSub =
+        accelerometerEventStream(
+          samplingPeriod: SensorInterval.uiInterval,
+        ).listen((event) {
+          // Normalise: x is left/right tilt, (y - 9.81) is forward/back from
+          // a phone-held-vertical reference. Clamp to ±1.
+          final Offset raw = Offset(
+            (event.x / 3.0).clamp(-1.0, 1.0),
+            ((event.y - 9.81) / 3.0).clamp(-1.0, 1.0),
+          );
+          const double alpha = 0.15;
+          _tilt.value = _tilt.value * (1 - alpha) + raw * alpha;
+        });
+  }
+
+  @override
+  void dispose() {
+    _accelSub?.cancel();
+    _tilt.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _refresh() =>
@@ -42,30 +73,104 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
     );
     return Scaffold(
       backgroundColor: Colors.white,
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: agendaAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stack) => _ErrorList(
-            message: 'Načítání selhalo: $error',
-            onRetry: _refresh,
+      body: _ParallaxScope(
+        scrollCtrl: _scrollCtrl,
+        tilt: _tilt,
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          child: agendaAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stack) => _ErrorList(
+              message: 'Načítání selhalo: $error',
+              onRetry: _refresh,
+            ),
+            data: (rows) =>
+                _AgendaList(rows: rows, scrollCtrl: _scrollCtrl),
           ),
-          data: _AgendaList.new,
         ),
       ),
     );
   }
 }
 
+/// Inherited carrier for the parallax inputs (scroll position + smoothed
+/// device tilt). Wrapped widgets call `_ParallaxScope.of(context)` to grab
+/// the listenables without prop-drilling them down through every layer.
+class _ParallaxScope extends InheritedWidget {
+  const _ParallaxScope({
+    required this.scrollCtrl,
+    required this.tilt,
+    required super.child,
+  });
+
+  final ScrollController scrollCtrl;
+  final ValueListenable<Offset> tilt;
+
+  static _ParallaxScope of(BuildContext context) {
+    final _ParallaxScope? scope = context
+        .dependOnInheritedWidgetOfExactType<_ParallaxScope>();
+    assert(scope != null, '_ParallaxScope missing from context');
+    return scope!;
+  }
+
+  @override
+  bool updateShouldNotify(_ParallaxScope old) =>
+      scrollCtrl != old.scrollCtrl || tilt != old.tilt;
+}
+
+/// Wraps a layer with a Transform.translate driven by scroll position and
+/// device tilt. Apply the same widget multiple times with different scale
+/// factors to build a multi-layer parallax — background gets a small tilt
+/// amplitude but a large scroll factor (it sticks), foreground gets the
+/// opposite (it moves with the scroll, drifts more on tilt).
+class _ParallaxLayer extends StatelessWidget {
+  const _ParallaxLayer({
+    required this.child,
+    this.scrollFactor = 0,
+    this.tiltAmplitude = Offset.zero,
+  });
+
+  final Widget child;
+
+  /// Positive values translate the child *down* as the user scrolls down,
+  /// which visually makes it lag behind the rest of the list (more "back").
+  final double scrollFactor;
+
+  /// Pixels of drift at full tilt (±1 on the normalised tilt input).
+  final Offset tiltAmplitude;
+
+  @override
+  Widget build(BuildContext context) {
+    final _ParallaxScope scope = _ParallaxScope.of(context);
+    return AnimatedBuilder(
+      animation: Listenable.merge(<Listenable>[scope.scrollCtrl, scope.tilt]),
+      builder: (context, _) {
+        final double scroll = scope.scrollCtrl.hasClients
+            ? scope.scrollCtrl.offset
+            : 0.0;
+        final Offset tilt = scope.tilt.value;
+        final double dx = tilt.dx * tiltAmplitude.dx;
+        final double dy = scroll * scrollFactor + tilt.dy * tiltAmplitude.dy;
+        return Transform.translate(
+          offset: Offset(dx, dy),
+          child: child,
+        );
+      },
+    );
+  }
+}
+
 class _AgendaList extends StatelessWidget {
-  const _AgendaList(this.rows);
+  const _AgendaList({required this.rows, required this.scrollCtrl});
 
   final List<CachedEventRow> rows;
+  final ScrollController scrollCtrl;
 
   @override
   Widget build(BuildContext context) {
     if (rows.isEmpty) {
       return ListView(
+        controller: scrollCtrl,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.fromLTRB(
           32,
@@ -94,13 +199,9 @@ class _AgendaList extends StatelessWidget {
 
     final List<_MonthGroup> months = _groupByMonth(rows);
 
-    // Top padding clears the floating Kp logo overlay (logo lives in the
-    // home shell now, not in this screen). Bottom padding is ~half the
-    // screen height so the last card can be scrolled up into the middle
-    // of the viewport — gives the bottom item the same breathing room as
-    // any other.
     final MediaQueryData mq = MediaQuery.of(context);
     return ListView.builder(
+      controller: scrollCtrl,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.only(
         top: mq.padding.top + 64,
@@ -143,7 +244,6 @@ class _MonthSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Czech month name, first letter uppercase.
     final String raw = DateFormat(
       'LLLL',
       'cs',
@@ -155,25 +255,30 @@ class _MonthSection extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: <Widget>[
-        // Giant blurred month label sitting behind the first card.
+        // Giant blurred month label — slowest scroll layer, smallest tilt
+        // drift. Sits behind the first card.
         Positioned(
           left: -20,
           top: 24,
           right: 0,
           child: IgnorePointer(
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(
-                sigmaX: _ghostBlur,
-                sigmaY: _ghostBlur,
-              ),
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontFamily: 'StackSansNotch',
-                  fontWeight: FontWeight.w700,
-                  fontSize: _ghostFontSize,
-                  color: _ghostColor,
-                  height: 1.0,
+            child: _ParallaxLayer(
+              scrollFactor: 0.35,
+              tiltAmplitude: const Offset(4, 4),
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(
+                  sigmaX: _ghostBlur,
+                  sigmaY: _ghostBlur,
+                ),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    fontFamily: 'StackSansNotch',
+                    fontWeight: FontWeight.w700,
+                    fontSize: _ghostFontSize,
+                    color: _ghostColor,
+                    height: 1.0,
+                  ),
                 ),
               ),
             ),
@@ -182,8 +287,6 @@ class _MonthSection extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            // Reserve vertical space so the giant ghost lives mostly behind
-            // the first card without pushing layout.
             const SizedBox(height: 80),
             for (final CachedEventRow e in group.events) _EventCard(event: e),
             const SizedBox(height: 16),
@@ -237,69 +340,71 @@ class _EventCard extends StatelessWidget {
     final String catLabel = _categoryLabel(event.category);
 
     return InkWell(
-      // Pass the cached row as extra so the detail screen can render the
-      // cover Hero on the very first frame — without it, Hero push has no
-      // destination registered and falls back to a plain fade.
       onTap: () => context.go('/agenda/events/${event.id}', extra: event),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 16, 0, 24),
-        // SizedBox locks the tile height to the cover diameter so taps on
-        // the lower half of the cover hit *this* card's InkWell instead of
-        // leaking through to the next list item.
         child: SizedBox(
           height: _coverDiameter,
           child: Stack(
             clipBehavior: Clip.none,
             children: <Widget>[
-              // Circular cover, slight bleed past the right edge per Figma.
+              // Mid-depth: cover image, modest scroll lag, medium tilt drift.
               Positioned(
                 right: -16,
                 top: 0,
-                child: SizedBox(
-                  width: _coverDiameter,
-                  height: _coverDiameter,
-                  child: MorphingHeroCover(
-                    tag: 'cover-${event.id}',
-                    imageUrl: event.coverImageUrl,
-                    borderRadius: BorderRadius.circular(_coverDiameter / 2),
-                    fallback: Container(
-                      color: const Color(0xFFEFEFEF),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        _iconFor(event.category),
-                        size: 64,
-                        color: Colors.black38,
+                child: _ParallaxLayer(
+                  scrollFactor: 0.18,
+                  tiltAmplitude: const Offset(8, 8),
+                  child: SizedBox(
+                    width: _coverDiameter,
+                    height: _coverDiameter,
+                    child: MorphingHeroCover(
+                      tag: 'cover-${event.id}',
+                      imageUrl: event.coverImageUrl,
+                      borderRadius: BorderRadius.circular(_coverDiameter / 2),
+                      fallback: Container(
+                        color: const Color(0xFFEFEFEF),
+                        alignment: Alignment.center,
+                        child: Icon(
+                          _iconFor(event.category),
+                          size: 64,
+                          color: Colors.black38,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-              // Title + date row, sitting on top of the cover.
-              Padding(
-                padding: const EdgeInsets.only(right: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    SizedBox(
-                      width: 240,
-                      child: BlurInText(
-                        key: ValueKey<String>('title-${event.id}'),
-                        text: event.title,
-                        style: const TextStyle(
-                          fontFamily: 'Gloock',
-                          fontSize: 50,
-                          height: 1.0,
-                          color: Colors.black,
+              // Foreground: title + date row. No scroll lag (moves with the
+              // viewport at full speed), largest tilt drift.
+              _ParallaxLayer(
+                tiltAmplitude: const Offset(12, 12),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      SizedBox(
+                        width: 240,
+                        child: BlurInText(
+                          key: ValueKey<String>('title-${event.id}'),
+                          text: event.title,
+                          style: const TextStyle(
+                            fontFamily: 'Gloock',
+                            fontSize: 50,
+                            height: 1.0,
+                            color: Colors.black,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    _DateRow(
-                      leading: catLabel,
-                      center: dateLabel,
-                      trailing: timeLabel,
-                    ),
-                  ],
+                      const SizedBox(height: 24),
+                      _DateRow(
+                        leading: catLabel,
+                        center: dateLabel,
+                        trailing: timeLabel,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

@@ -189,6 +189,67 @@ script, the second uses it.
 - Install the new APK on the Pixel, sign in, agenda + detail + month view
   + watchlist + stats all render the way the release notes describe.
 
+## iOS dev sideload (physical device, free Apple ID)
+
+Pre-Apple-Developer-Program flow for installing release builds on a
+physical iPhone — works with the free Apple ID tier. App expires after
+**7 days** and needs reinstalling. No TestFlight, no App Store, just
+USB + signing certs Xcode mints on the fly.
+
+### One-time setup per device
+
+1. **Pair** — plug iPhone in USB-C, unlock, tap "Trust This Computer".
+   First time only, also pair in **Xcode → Window → Devices and
+   Simulators** (the device shows up as "unpaired" in
+   `flutter devices` until you confirm pairing there).
+2. **Developer Mode** — only appears in iOS Settings *after* the device
+   has been paired with a Mac running Xcode or `flutter devices`. Then:
+   Settings → Privacy & Security → Developer Mode → ON → restart →
+   confirm.
+3. **Xcode signing** — open `apps/mobile/ios/Runner.xcworkspace`,
+   select the Runner target → Signing & Capabilities → tick
+   "Automatically manage signing" → pick your Apple ID team from the
+   dropdown. For Petr's personal Apple ID the Team ID is
+   **`YOURTEAMID`** (already pinned in `project.pbxproj`; no re-pick
+   needed unless the file is reset).
+
+### Run on device
+
+```bash
+cd apps/mobile
+GOOG_CLIENT_ID=$(op-cache "Kulturni prehled google Web OAuth client" "client ID")
+flutter run --release -d <device-id> \
+  --dart-define=KP_API_BASE=https://kulturniprehled.example.com \
+  --dart-define=KP_GOOGLE_OAUTH_SERVER_CLIENT_ID="$GOOG_CLIENT_ID"
+unset GOOG_CLIENT_ID
+```
+
+Find `<device-id>` via `flutter devices`. Běla's iPhone is
+`00000000-0000000000000000`.
+
+`--release` matters: a release-mode app keeps running after you Ctrl-C
+the `flutter run` console and after the USB cable is removed. Debug
+builds need the daemon connection to stay alive.
+
+### First-launch gotcha
+
+The first install on a fresh Apple ID typically fails with
+`Could not run … on <udid>` — the device hasn't yet trusted the
+developer certificate Xcode minted. On the iPhone:
+
+- Settings → General → VPN & Device Management → Developer App → tap
+  your Apple ID → **Trust**
+
+…then re-run `flutter run`. Subsequent installs skip the trust step.
+
+### Cert expiry
+
+Free Apple ID provisioning profiles last **7 days**. After that the
+app refuses to launch ("Untrusted Developer" / "Could not verify
+app"). Fix: `flutter run --release` again — Xcode mints a fresh 7-day
+cert each time. For longer-lived installs (TestFlight, no re-sign),
+see the next section.
+
 ## iOS release procedure (TestFlight)
 
 iOS distribution lives on the **Mac** — Xcode + CocoaPods can't run on Linux.

@@ -13,6 +13,7 @@ import 'package:kp_mobile/features/events/agenda_replay_provider.dart';
 import 'package:kp_mobile/features/events/agenda_screen.dart';
 import 'package:kp_mobile/features/events/edit_event_screen.dart';
 import 'package:kp_mobile/features/events/event_detail_screen.dart';
+import 'package:kp_mobile/features/stats/stats_replay_provider.dart';
 import 'package:kp_mobile/features/stats/stats_screen.dart';
 import 'package:kp_mobile/features/sync/sync_controller.dart';
 import 'package:kp_mobile/features/tickets/ticket_viewer_screen.dart';
@@ -179,6 +180,8 @@ class _HomeShellState extends ConsumerState<_HomeShell>
       ref.read(agendaReplayProvider.notifier).state++;
     } else if (index == 2) {
       ref.read(watchlistReplayProvider.notifier).state++;
+    } else if (index == 3) {
+      ref.read(statsReplayProvider.notifier).state++;
     }
   }
 

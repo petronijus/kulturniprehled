@@ -349,7 +349,17 @@ class _MonthTitleSlider extends StatelessWidget {
         // stage means the new peek doesn't pop into existence at
         // progress=1 — it slides into the right slot continuously.
         Widget titleAt(int offset) {
-          final double x = _restLeft + slideStep * (offset - progress);
+          // The current (and any already-left) title drags behind the
+          // incoming month: its effective progress is `easeInCubic`,
+          // which starts slow and accelerates, so the leaving title
+          // hesitates near centre while the next title slides crisply
+          // toward its rest slot. Right-side titles use linear progress
+          // so the incoming feel stays direct.
+          final double effectiveProgress = offset <= 0
+              ? Curves.easeInCubic.transform(progress)
+              : progress;
+          final double pos = offset - effectiveProgress;
+          final double x = _restLeft + slideStep * pos;
           final int index = base + offset;
           final DateTime month = _CalendarScreenState._monthFor(index);
           // Tap targets: tapping the current month goes one month back
@@ -371,7 +381,10 @@ class _MonthTitleSlider extends StatelessWidget {
           // Flutter updates the existing ImageFiltered's filter
           // property instead of recycling it as a Text↔ImageFiltered
           // identity flip per frame.
-          final double pos = offset - progress;
+          //
+          // Blur is driven by the effective (lagged) `pos`, so the
+          // leaving title's blur ramps up at the same easeIn rhythm
+          // as its drift.
           final double overshoot = pos >= 0
               ? (pos - 1.0).clamp(0.0, 1.0)
               : (-pos).clamp(0.0, 1.0);

@@ -548,21 +548,17 @@ class _DayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Event days get the prominent black-filled pill. Selected day
+    // shares the same fill (only one day is ever selected at once,
+    // and the events list below makes which one obvious).
+    final bool filled = isInMonth && (hasEvent || isSelected);
     final Color textColor;
-    if (isSelected) {
+    if (filled) {
       textColor = Colors.white;
     } else if (!isInMonth) {
       textColor = Colors.black.withValues(alpha: 0.25);
     } else {
       textColor = Colors.black;
-    }
-    final Color? bg;
-    if (isSelected) {
-      bg = Colors.black;
-    } else if (hasEvent && isInMonth) {
-      bg = const Color(0xFFE8E8E8);
-    } else {
-      bg = null;
     }
     return InkResponse(
       onTap: onTap,
@@ -572,14 +568,14 @@ class _DayCell extends StatelessWidget {
           width: 38,
           height: 38,
           alignment: Alignment.center,
-          decoration: bg == null
-              ? null
-              : BoxDecoration(color: bg, shape: BoxShape.circle),
+          decoration: filled
+              ? const BoxDecoration(color: Colors.black, shape: BoxShape.circle)
+              : null,
           child: Text(
             '${day.day}',
             style: TextStyle(
               fontFamily: 'StackSansNotch',
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              fontWeight: filled ? FontWeight.w600 : FontWeight.w400,
               fontSize: 14,
               color: textColor,
             ),

@@ -1,23 +1,91 @@
 import 'package:flutter/material.dart';
 
-const Color _seedColor = Color(0xFF8B3A6F);
 const String _serif = 'Gloock';
 const String _sans = 'StackSansNotch';
 
-ThemeData buildLightTheme() {
-  final ColorScheme scheme = ColorScheme.fromSeed(
-    seedColor: _seedColor,
-  ).copyWith(surface: Colors.white);
-  return _baseTheme(scheme);
-}
+// Monochrome theme — Material 3 generates tinted neutrals from any seed
+// colour, so we don't seed at all. Every accent slot is hand-set to
+// black / white / grey so buttons, chips, focus rings, errors, and
+// status indicators stay strictly black-and-white across the app.
 
-ThemeData buildDarkTheme() {
-  final ColorScheme scheme = ColorScheme.fromSeed(
-    seedColor: _seedColor,
-    brightness: Brightness.dark,
-  );
-  return _baseTheme(scheme);
-}
+ThemeData buildLightTheme() => _baseTheme(_lightScheme);
+ThemeData buildDarkTheme() => _baseTheme(_darkScheme);
+
+const ColorScheme _lightScheme = ColorScheme(
+  brightness: Brightness.light,
+  primary: Colors.black,
+  onPrimary: Colors.white,
+  primaryContainer: Color(0xFFEEEEEE),
+  onPrimaryContainer: Colors.black,
+  secondary: Colors.black,
+  onSecondary: Colors.white,
+  secondaryContainer: Color(0xFFEEEEEE),
+  onSecondaryContainer: Colors.black,
+  tertiary: Colors.black,
+  onTertiary: Colors.white,
+  tertiaryContainer: Color(0xFFEEEEEE),
+  onTertiaryContainer: Colors.black,
+  error: Color(0xFF1F1F1F),
+  onError: Colors.white,
+  errorContainer: Color(0xFFE0E0E0),
+  onErrorContainer: Colors.black,
+  surface: Colors.white,
+  onSurface: Colors.black,
+  surfaceDim: Color(0xFFE0E0E0),
+  surfaceBright: Colors.white,
+  surfaceContainerLowest: Colors.white,
+  surfaceContainerLow: Color(0xFFFAFAFA),
+  surfaceContainer: Color(0xFFF5F5F5),
+  surfaceContainerHigh: Color(0xFFEFEFEF),
+  surfaceContainerHighest: Color(0xFFE8E8E8),
+  onSurfaceVariant: Color(0xFF616161),
+  outline: Color(0xFFBDBDBD),
+  outlineVariant: Color(0xFFE0E0E0),
+  inverseSurface: Color(0xFF1A1A1A),
+  onInverseSurface: Colors.white,
+  inversePrimary: Colors.white,
+  surfaceTint: Colors.black,
+  scrim: Color(0xCC000000),
+  shadow: Colors.black,
+);
+
+const ColorScheme _darkScheme = ColorScheme(
+  brightness: Brightness.dark,
+  primary: Colors.white,
+  onPrimary: Colors.black,
+  primaryContainer: Color(0xFF2A2A2A),
+  onPrimaryContainer: Colors.white,
+  secondary: Colors.white,
+  onSecondary: Colors.black,
+  secondaryContainer: Color(0xFF2A2A2A),
+  onSecondaryContainer: Colors.white,
+  tertiary: Colors.white,
+  onTertiary: Colors.black,
+  tertiaryContainer: Color(0xFF2A2A2A),
+  onTertiaryContainer: Colors.white,
+  error: Color(0xFFE0E0E0),
+  onError: Colors.black,
+  errorContainer: Color(0xFF2A2A2A),
+  onErrorContainer: Colors.white,
+  surface: Colors.black,
+  onSurface: Colors.white,
+  surfaceDim: Color(0xFF101010),
+  surfaceBright: Color(0xFF2A2A2A),
+  surfaceContainerLowest: Colors.black,
+  surfaceContainerLow: Color(0xFF121212),
+  surfaceContainer: Color(0xFF1A1A1A),
+  surfaceContainerHigh: Color(0xFF222222),
+  surfaceContainerHighest: Color(0xFF2A2A2A),
+  onSurfaceVariant: Color(0xFFBDBDBD),
+  outline: Color(0xFF616161),
+  outlineVariant: Color(0xFF2A2A2A),
+  inverseSurface: Colors.white,
+  onInverseSurface: Colors.black,
+  inversePrimary: Colors.black,
+  surfaceTint: Colors.white,
+  scrim: Color(0xCC000000),
+  shadow: Colors.black,
+);
 
 ThemeData _baseTheme(ColorScheme scheme) {
   final TextTheme base = ThemeData(brightness: scheme.brightness).textTheme;

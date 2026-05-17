@@ -2,16 +2,31 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-/// Hero that morphs the cover image's clip shape between endpoints — circle
-/// on the agenda tile, rounded rectangle on the detail screen.
+/// Hero that morphs the cover image's clip shape between endpoints —
+/// circle on the agenda tile, full-bleed rectangle on the detail
+/// screen.
 ///
-/// The flight shuttle reads the current rendered size via [LayoutBuilder] and
-/// computes the corner radius proportionally to that size, so the source end
-/// always renders as a perfect circle and the destination as the requested
-/// rounded rect. This avoids the "stadium snap" the earlier fixed-radius
-/// lerp produced in mid-flight. We also use [MaterialRectArcTween] for the
-/// rect motion so the cover sweeps along a smooth arc instead of a straight
-/// line.
+/// **Push** (agenda → detail). The box uses a plain
+/// [MaterialRectArcTween]; the source is already square so the shape
+/// can hold a true circle throughout the flight while the radius lerps
+/// down to 0 with the destination's sharp corners.
+///
+/// **Pop** (detail → agenda). A plain arc would force the box through
+/// wide non-square sizes for almost the whole flight, leaving the
+/// shape as a stadium until the very end and snapping to a circle on
+/// the last frame. [_CoverHeroTween] splits the pop flight in two:
+///
+///   1. **Squarify** (first [_popSquareSplit] of the flight) — the
+///      box shrinks in place from the detail rect to a `dest.size`
+///      square anchored at the source's top edge. The radius lerps to
+///      `shortestSide / 2` over the same window.
+///   2. **Arc-move** — the now-square box arc-moves to the agenda
+///      position with the radius held at the circle endpoint, which
+///      on a square box renders as a clean circle.
+///
+/// Clipping is always a single [ClipRRect] so the swipe-back gesture's
+/// value wiggle across a phase boundary can't blink between two clip
+/// widget types.
 class MorphingHeroCover extends StatelessWidget {
   const MorphingHeroCover({
     super.key,
@@ -33,7 +48,7 @@ class MorphingHeroCover extends StatelessWidget {
     return Hero(
       tag: tag,
       createRectTween: (begin, end) =>
-          MaterialRectArcTween(begin: begin, end: end),
+          _CoverHeroTween(begin: begin!, end: end!),
       flightShuttleBuilder: _flightShuttle,
       child: _CoverEndpoint(
         borderRadius: borderRadius,
@@ -51,71 +66,109 @@ class MorphingHeroCover extends StatelessWidget {
     BuildContext fromHeroContext,
     BuildContext toHeroContext,
   ) {
-    // Both directions use the same morph: push goes circle → rect, pop
-    // goes rect → circle. The detail endpoint is now a sharp rect
-    // (BorderRadius.zero), so the lerp is from a full circle to flat
-    // corners and back — no more "stadium snap" the rounded-12 endpoint
-    // produced.
-    //
-    // Defensive cast — in normal Flutter this never fails because Hero.child
-    // is exactly what we passed in (`_CoverEndpoint`). Fall back to sane
-    // defaults if the framework ever wraps it.
-    BorderRadius beginRadius = const BorderRadius.all(Radius.circular(150));
-    BorderRadius endRadius = const BorderRadius.all(Radius.circular(12));
-    String? visualUrl = imageUrl;
-    Widget visualFallback = fallback;
-    BoxFit visualFit = fit;
+    final _CoverEndpoint fromChild =
+        (fromHeroContext.widget as Hero).child as _CoverEndpoint;
+    final _CoverEndpoint toChild =
+        (toHeroContext.widget as Hero).child as _CoverEndpoint;
+    final double beginRadius = fromChild.borderRadius.topLeft.x;
+    final double endRadius = toChild.borderRadius.topLeft.x;
 
-    final Widget fromChild = (fromHeroContext.widget as Hero).child;
-    final Widget toChild = (toHeroContext.widget as Hero).child;
-    if (fromChild is _CoverEndpoint) {
-      beginRadius = fromChild.borderRadius;
-    }
-    if (toChild is _CoverEndpoint) {
-      endRadius = toChild.borderRadius;
-      visualUrl = toChild.imageUrl;
-      visualFallback = toChild.fallback;
-      visualFit = toChild.fit;
-    }
+    // The "circle side" of the morph is whichever endpoint asked for
+    // the larger radius. We replace that side's static radius with the
+    // current shuttle box's `shortestSide / 2` each frame so it stays
+    // a true circle for whatever box the tween is producing — the
+    // landing matches the destination widget's actual clip exactly.
+    final bool circleIsBegin = beginRadius >= endRadius;
+    final double rectIntent = circleIsBegin ? endRadius : beginRadius;
+    final bool isPop = direction == HeroFlightDirection.pop;
 
-    // Why the "circle intent" endpoint is recomputed per frame:
-    //   The static radius requested by the agenda is 150 — that's the right
-    //   number for a 300×300 box only. As the shuttle's box morphs to the
-    //   detail's wider rect, "150" no longer renders as a circle. If we
-    //   lerp between two static radii and stop, the pop landing differs
-    //   from the actual destination widget's clipping (which IS a perfect
-    //   circle on the agenda) — and the user sees the shape snap at the
-    //   end of the flight.
-    //
-    //   Fix: each frame, replace the larger of the two requested radii
-    //   with `box.shortestSide / 2` for the current shuttle box. That keeps
-    //   the "circle" side a true circle for whatever box size the Hero
-    //   tween is showing at this instant. The landing matches the dest
-    //   widget exactly; no blink.
-    final bool circleIsBegin = beginRadius.topLeft.x >= endRadius.topLeft.x;
-    final double rectIntent = circleIsBegin
-        ? endRadius.topLeft.x
-        : beginRadius.topLeft.x;
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, _) {
-        final double t = Curves.easeInOutCubic.transform(animation.value);
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final double circleIntent = constraints.biggest.shortestSide / 2;
-            final double from = circleIsBegin ? circleIntent : rectIntent;
-            final double to = circleIsBegin ? rectIntent : circleIntent;
-            final double radius = lerpDouble(from, to, t)!;
-            return _CoverEndpoint(
-              borderRadius: BorderRadius.circular(radius),
-              imageUrl: visualUrl,
-              fallback: visualFallback,
-              fit: visualFit,
-            );
-          },
-        );
-      },
+    // Built once per flight — the per-frame [ClipRRect] is the only
+    // thing that rebuilds, so the Image.network widget instance stays
+    // stable across all 60+ frames.
+    final Widget content = _CoverContent(
+      imageUrl: toChild.imageUrl,
+      fallback: toChild.fallback,
+      fit: toChild.fit,
     );
+
+    // Hero shuttles render in the navigator overlay without an
+    // ancestor [Material]; wrap explicitly so clip + decoration code
+    // paths don't fall back to platform defaults that can flash.
+    return Material(
+      type: MaterialType.transparency,
+      child: AnimatedBuilder(
+        animation: animation,
+        builder: (context, _) {
+          // animation.value goes 0 → 1 forward for push, 1 → 0 for pop.
+          // The tween's squarify phase always sits at the detail-end of
+          // the tween's parameter, so for pop the shape morph window
+          // is `1 - animation.value`. See [_CoverHeroTween].
+          final double t;
+          if (isPop) {
+            final double phase = ((1.0 - animation.value) / _popSquareSplit)
+                .clamp(0.0, 1.0);
+            t = Curves.easeOutCubic.transform(phase);
+          } else {
+            t = Curves.easeInOutCubic.transform(animation.value);
+          }
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final double circleIntent = constraints.biggest.shortestSide / 2;
+              final double from = circleIsBegin ? circleIntent : rectIntent;
+              final double to = circleIsBegin ? rectIntent : circleIntent;
+              final double radius = lerpDouble(from, to, t)!;
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(radius),
+                child: content,
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Fraction of the pop flight in which the box squarifies in place.
+/// The remaining `1 - _popSquareSplit` arcs the square box to the
+/// agenda position.
+const double _popSquareSplit = 0.4;
+
+class _CoverHeroTween extends RectTween {
+  _CoverHeroTween({required Rect super.begin, required Rect super.end});
+
+  /// True when `begin` is a clearly wider rectangle and `end` is a
+  /// near-square endpoint — the shape that drives the pop morph.
+  bool get _isWideToSquare {
+    final double beginAspect = begin!.width / begin!.height;
+    final double endAspect = end!.width / end!.height;
+    return (beginAspect - 1.0).abs() > 0.15 && (endAspect - 1.0).abs() < 0.05;
+  }
+
+  /// A `dest.size` square horizontally centered on `begin` and
+  /// anchored at `begin.top` — the intermediate rect at the end of
+  /// the squarify phase.
+  Rect get _squared {
+    final Rect b = begin!;
+    final Rect e = end!;
+    return Rect.fromCenter(
+      center: Offset(b.center.dx, b.top + e.height / 2),
+      width: e.width,
+      height: e.height,
+    );
+  }
+
+  @override
+  Rect lerp(double t) {
+    if (!_isWideToSquare) {
+      return MaterialRectArcTween(begin: begin, end: end).lerp(t);
+    }
+    final Rect squared = _squared;
+    if (t <= _popSquareSplit) {
+      return Rect.lerp(begin, squared, t / _popSquareSplit)!;
+    }
+    final double subT = (t - _popSquareSplit) / (1.0 - _popSquareSplit);
+    return MaterialRectArcTween(begin: squared, end: end).lerp(subT);
   }
 }
 
@@ -134,21 +187,41 @@ class _CoverEndpoint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool has = imageUrl != null && imageUrl!.isNotEmpty;
     return ClipRRect(
       borderRadius: borderRadius,
-      child: Container(
-        color: const Color(0xFFEFEFEF),
-        child: has
-            ? Image.network(
-                imageUrl!,
-                fit: fit,
-                loadingBuilder: (context, child, progress) =>
-                    progress == null ? child : const SizedBox.shrink(),
-                errorBuilder: (context, _, _) => fallback,
-              )
-            : fallback,
-      ),
+      child: _CoverContent(imageUrl: imageUrl, fallback: fallback, fit: fit),
+    );
+  }
+}
+
+/// Unclipped image + fallback. Shared by [_CoverEndpoint] and the
+/// flight shuttle so the per-frame [ClipRRect] in the shuttle wraps
+/// the same widget instance every frame.
+class _CoverContent extends StatelessWidget {
+  const _CoverContent({
+    required this.imageUrl,
+    required this.fallback,
+    required this.fit,
+  });
+
+  final String? imageUrl;
+  final Widget fallback;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool has = imageUrl != null && imageUrl!.isNotEmpty;
+    return Container(
+      color: const Color(0xFFEFEFEF),
+      child: has
+          ? Image.network(
+              imageUrl!,
+              fit: fit,
+              loadingBuilder: (context, child, progress) =>
+                  progress == null ? child : const SizedBox.shrink(),
+              errorBuilder: (context, _, _) => fallback,
+            )
+          : fallback,
     );
   }
 }

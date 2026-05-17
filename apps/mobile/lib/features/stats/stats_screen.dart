@@ -88,7 +88,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         onRefresh: _load,
         child: Column(
           children: <Widget>[
-            SizedBox(height: MediaQuery.of(context).padding.top + 64),
+            SizedBox(height: MediaQuery.of(context).padding.top + 96),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: Row(

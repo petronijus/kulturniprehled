@@ -43,7 +43,7 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
       watchlistProvider,
     );
 
-    final double topPad = MediaQuery.of(context).padding.top + 64;
+    final double topPad = MediaQuery.of(context).padding.top + 96;
     return Scaffold(
       backgroundColor: Colors.white,
       body: RefreshIndicator(

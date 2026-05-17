@@ -106,7 +106,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           final List<CachedEventRow> selectedRows = sel == null
               ? const <CachedEventRow>[]
               : (buckets[_dayKey(sel)] ?? const <CachedEventRow>[]);
-          final double topPad = MediaQuery.of(context).padding.top + 64;
+          final double topPad = MediaQuery.of(context).padding.top + 96;
           return Stack(
             children: <Widget>[
               // Ghost year — blurred grey number sitting behind the month
@@ -137,7 +137,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     _NextBanner(event: next, onTap: () => _focusEvent(next)),
                   const SizedBox(height: 12),
                   SizedBox(
-                    height: 56,
+                    height: 64,
                     child: _MonthTitleSlider(pageController: _pageCtrl),
                   ),
                   const SizedBox(height: 14),
@@ -223,8 +223,8 @@ class _NextBanner extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 8, 16, 8),
         child: Row(
           children: <Widget>[
-            const Icon(Icons.arrow_forward, size: 36, color: Colors.black),
-            const SizedBox(width: 18),
+            const Icon(Icons.arrow_forward, size: 72, color: Colors.black),
+            const SizedBox(width: 20),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,8 +270,17 @@ class _MonthTitleSlider extends StatelessWidget {
 
   final PageController pageController;
 
+  static const double _restLeft = 24.0;
+  static const double _peekWidth = 70.0;
+
   @override
   Widget build(BuildContext context) {
+    // The slide distance per page change is anchored to the screen
+    // width so that — regardless of how long a month's name is —
+    // exactly [_peekWidth] px of the next title is always visible on
+    // the right edge at rest.
+    final double slideStep =
+        MediaQuery.of(context).size.width - _peekWidth - _restLeft;
     return AnimatedBuilder(
       animation: pageController,
       builder: (BuildContext context, _) {
@@ -282,30 +291,38 @@ class _MonthTitleSlider extends StatelessWidget {
             : pageController.initialPage.toDouble();
         final int base = page.floor();
         final double progress = page - base;
-        // Titles slide as one unit. The gap between current and next
-        // (320 px in the Figma frame) is wider than zero but narrower
-        // than the grid page width, so the next month peeks at rest
-        // and snaps into place when progress reaches 1.
-        const double titleSpacing = 320.0;
-        const double restLeft = 24.0;
-        final double currentX = restLeft - titleSpacing * progress;
-        final double nextX = restLeft + titleSpacing - titleSpacing * progress;
+        // Render the four titles that can be visible at any moment of
+        // a forward/backward swipe: base-1 (off-screen left), base
+        // (current), base+1 (peek right), and base+2 (slides in from
+        // the right as the user advances). Having base+2 already on
+        // stage means the new peek doesn't pop into existence at
+        // progress=1 — it slides into the right slot continuously.
+        Widget titleAt(int offset) {
+          final double x = _restLeft + slideStep * (offset - progress);
+          final int index = base + offset;
+          final DateTime month = _CalendarScreenState._monthFor(index);
+          // Tap targets: tapping the current month goes one month back
+          // (replaces the now-deleted left chevron); any other title
+          // scrolls the PageView to itself.
+          final int target = offset == 0 ? index - 1 : index;
+          return Positioned(
+            left: x,
+            top: 0,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => pageController.animateToPage(
+                target,
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutCubic,
+              ),
+              child: _MonthTitle(month: month),
+            ),
+          );
+        }
+
         return ClipRect(
           child: Stack(
-            children: <Widget>[
-              Positioned(
-                left: currentX,
-                top: 0,
-                child: _MonthTitle(month: _CalendarScreenState._monthFor(base)),
-              ),
-              Positioned(
-                left: nextX,
-                top: 0,
-                child: _MonthTitle(
-                  month: _CalendarScreenState._monthFor(base + 1),
-                ),
-              ),
-            ],
+            children: <Widget>[titleAt(-1), titleAt(0), titleAt(1), titleAt(2)],
           ),
         );
       },
@@ -324,7 +341,7 @@ class _MonthTitle extends StatelessWidget {
       _monthName(month),
       style: const TextStyle(
         fontFamily: 'Gloock',
-        fontSize: 40,
+        fontSize: 50,
         height: 1.0,
         color: Colors.black,
       ),

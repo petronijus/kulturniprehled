@@ -26,12 +26,25 @@ Read each PDF and extract:
 - Performer / play / film title
 - Category — one of `concert`, `theatre`, `cinema`, `other`
 - Date and time (start), including timezone
-- Venue name + full address (for Google Calendar) + city
+- Venue full address (street + house number + ZIP + city) — KP stores this
+  as a single string in `venue_address`
 - Seat info (sector, row, seat numbers) — keep for the event description
   and the email
 
 Use the **`category`** that best matches: classical/rock/jazz → `concert`,
 divadlo → `theatre`, kino → `cinema`, otherwise `other`.
+
+While you're online for the program lookup (step 4), grab two image URLs
+that the mobile app uses for the detail screen:
+
+- `cover_image_url` — a press photo of the performer / ensemble / play /
+  film, ideally from the organizer's event page. Direct link, not the HTML
+  page. Wikipedia / official press kit / organizer CDN is fine.
+- `venue_image_url` — a photo of the venue building. Wikipedia Commons is
+  the easiest source; an official venue site works too.
+
+Both are optional — leave the field `null` if you can't find a clean
+direct URL. Do not invent URLs or link to image-search result pages.
 
 ### 3. Journey time from home (Svatovítská 16, Praha)
 
@@ -83,8 +96,14 @@ EVENT_ID=$(curl -fsS \
     --arg start "$EVENT_STARTS_AT_ISO" \
     --arg tz "$EVENT_TIMEZONE" \
     --arg notes "$EVENT_NOTES" \
+    --arg venue_address "$EVENT_VENUE_ADDRESS" \
+    --arg venue_image_url "$EVENT_VENUE_IMAGE_URL" \
+    --arg cover_image_url "$EVENT_COVER_IMAGE_URL" \
     '{title:$title, category:$cat, starts_at:$start, venue_timezone:$tz,
-      source:"skill", notes:$notes}')" \
+      source:"skill", notes:$notes,
+      venue_address:(if $venue_address=="" then null else $venue_address end),
+      venue_image_url:(if $venue_image_url=="" then null else $venue_image_url end),
+      cover_image_url:(if $cover_image_url=="" then null else $cover_image_url end)}')" \
   "$KP_API_BASE/v1/events" | jq -r '.id')
 [ -n "$EVENT_ID" ] && [ "$EVENT_ID" != "null" ] || { echo "event creation failed"; exit 1; }
 ```
@@ -96,7 +115,16 @@ Where:
 - `EVENT_STARTS_AT_ISO` — start in ISO 8601 with timezone, e.g. `2026-06-12T20:00:00+02:00`
 - `EVENT_TIMEZONE` — IANA tz, e.g. `Europe/Prague`
 - `EVENT_NOTES` — Czech-formatted: program (or "Program zatím nezveřejněn"),
-  seat info, departure time + transit hint
+  seat info, departure time + transit hint. **Do not include a `Místo:`
+  block** — the venue is rendered separately on mobile from
+  `venue_address` / `venue_image_url`, repeating it inline is redundant.
+- `EVENT_VENUE_ADDRESS` — full venue address as a single string,
+  e.g. `Rudolfinum, Alšovo nábřeží 12, 110 00 Praha 1`. Empty string ⇒
+  serialized as `null`.
+- `EVENT_VENUE_IMAGE_URL` — direct URL to a venue building photo (step 2).
+  Empty string ⇒ `null`.
+- `EVENT_COVER_IMAGE_URL` — direct URL to the cover image (step 2). Empty
+  string ⇒ `null`.
 
 ### 7. Upload each ticket to KP MinIO
 

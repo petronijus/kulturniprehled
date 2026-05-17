@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
@@ -27,6 +30,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   late final PageController _pageCtrl;
   late int _focusedIndex;
   DateTime? _selected;
+  final ValueNotifier<Offset> _tilt = ValueNotifier<Offset>(Offset.zero);
+  StreamSubscription<AccelerometerEvent>? _accelSub;
 
   @override
   void initState() {
@@ -35,10 +40,26 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     _focusedIndex = _indexFor(DateTime(now.year, now.month));
     _selected = DateTime(now.year, now.month, now.day);
     _pageCtrl = PageController(initialPage: _focusedIndex);
+    // Accelerometer drives a subtle parallax on the ghost year, the
+    // banner, the title slider, and the grid. Smoothed exponentially
+    // so the layers don't twitch on every micro hand movement.
+    _accelSub =
+        accelerometerEventStream(
+          samplingPeriod: SensorInterval.uiInterval,
+        ).listen((AccelerometerEvent event) {
+          final Offset raw = Offset(
+            (event.x / 3.0).clamp(-1.0, 1.0),
+            ((event.y - 9.81) / 3.0).clamp(-1.0, 1.0),
+          );
+          const double alpha = 0.15;
+          _tilt.value = _tilt.value * (1 - alpha) + raw * alpha;
+        });
   }
 
   @override
   void dispose() {
+    _accelSub?.cancel();
+    _tilt.dispose();
     _pageCtrl.dispose();
     super.dispose();
   }
@@ -82,7 +103,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     if (!sameMonth) {
       _pageCtrl.animateToPage(
         idx,
-        duration: const Duration(milliseconds: 320),
+        duration: const Duration(milliseconds: 550),
         curve: Curves.easeOutCubic,
       );
     }
@@ -107,80 +128,102 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               ? const <CachedEventRow>[]
               : (buckets[_dayKey(sel)] ?? const <CachedEventRow>[]);
           final double topPad = MediaQuery.of(context).padding.top + 96;
-          return Stack(
-            children: <Widget>[
-              // Ghost year — blurred grey number sitting behind the month
-              // title (mirrors the agenda's ghost month label).
-              Positioned(
-                left: -20,
-                top: topPad + 67,
-                child: IgnorePointer(
-                  child: ImageFiltered(
-                    imageFilter: ImageFilter.blur(sigmaX: 7.5, sigmaY: 7.5),
-                    child: Text(
-                      '${focused.year}',
-                      style: const TextStyle(
-                        fontFamily: 'StackSansNotch',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 100,
-                        height: 1.0,
-                        color: Color(0xFFB1B1B1),
+          return _TiltScope(
+            tilt: _tilt,
+            child: Stack(
+              children: <Widget>[
+                // Ghost year — blurred grey number sitting behind the
+                // month title (mirrors the agenda's ghost month label).
+                // Lowest tilt amplitude — sits "deep" behind everything.
+                Positioned(
+                  left: -20,
+                  top: topPad + 67,
+                  child: IgnorePointer(
+                    child: _TiltLayer(
+                      amplitude: const Offset(4, 4),
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(sigmaX: 7.5, sigmaY: 7.5),
+                        child: Text(
+                          '${focused.year}',
+                          style: const TextStyle(
+                            fontFamily: 'StackSansNotch',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 100,
+                            height: 1.0,
+                            color: Color(0xFFB1B1B1),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              Column(
-                children: <Widget>[
-                  SizedBox(height: topPad),
-                  if (next != null)
-                    _NextBanner(event: next, onTap: () => _focusEvent(next)),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 64,
-                    child: _MonthTitleSlider(pageController: _pageCtrl),
-                  ),
-                  const SizedBox(height: 14),
-                  const _DayOfWeekRow(),
-                  const SizedBox(height: 6),
-                  SizedBox(
-                    height: 6 * 52.0,
-                    child: PageView.builder(
-                      controller: _pageCtrl,
-                      onPageChanged: (int i) {
-                        setState(() => _focusedIndex = i);
-                      },
-                      itemBuilder: (BuildContext context, int index) {
-                        final DateTime month = _monthFor(index);
-                        return _MonthGrid(
-                          month: month,
-                          selected: _selected,
-                          eventDays: buckets.keys
-                              .where(
-                                (DateTime d) =>
-                                    d.year == month.year &&
-                                    d.month == month.month,
-                              )
-                              .toSet(),
-                          onDayTap: (DateTime d) =>
-                              setState(() => _selected = d),
-                        );
-                      },
+                Column(
+                  children: <Widget>[
+                    SizedBox(height: topPad),
+                    if (next != null)
+                      _TiltLayer(
+                        amplitude: const Offset(10, 10),
+                        child: _NextBanner(
+                          event: next,
+                          onTap: () => _focusEvent(next),
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    // Title slider gets extra vertical room so the blur
+                    // halo of the de-focused titles has space to render
+                    // beyond the glyph baseline without being clipped.
+                    SizedBox(
+                      height: 80,
+                      child: _TiltLayer(
+                        amplitude: const Offset(8, 8),
+                        child: _MonthTitleSlider(pageController: _pageCtrl),
+                      ),
                     ),
-                  ),
-                  Container(
-                    height: 1,
-                    color: Colors.black.withValues(alpha: 0.08),
-                  ),
-                  Expanded(
-                    child: _SelectedDayEvents(
-                      selected: sel,
-                      rows: selectedRows,
+                    const SizedBox(height: 6),
+                    const _DayOfWeekRow(),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: 6 * 52.0,
+                      child: _TiltLayer(
+                        amplitude: const Offset(4, 4),
+                        child: PageView.builder(
+                          controller: _pageCtrl,
+                          onPageChanged: (int i) {
+                            setState(() => _focusedIndex = i);
+                          },
+                          itemBuilder: (BuildContext context, int index) {
+                            final DateTime month = _monthFor(index);
+                            return _MonthGrid(
+                              month: month,
+                              selected: _selected,
+                              eventDays: buckets.keys
+                                  .where(
+                                    (DateTime d) =>
+                                        d.year == month.year &&
+                                        d.month == month.month,
+                                  )
+                                  .toSet(),
+                              onDayTap: (DateTime d) =>
+                                  setState(() => _selected = d),
+                            );
+                          },
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    Container(
+                      height: 1,
+                      color: Colors.black.withValues(alpha: 0.08),
+                    ),
+                    Expanded(
+                      child: _SelectedDayEvents(
+                        selected: sel,
+                        rows: selectedRows,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           );
         },
       ),
@@ -272,6 +315,14 @@ class _MonthTitleSlider extends StatelessWidget {
 
   static const double _restLeft = 24.0;
   static const double _peekWidth = 70.0;
+  // Max blur sigma at fully off-screen positions. 3× the previous
+  // value to make the dissolve into the void really obvious.
+  static const double _maxSigma = 42.0;
+  // Padding around each title inside its ImageFiltered, so the blur
+  // halo has room to render without being clipped to the glyph's tight
+  // bounding box. Roughly 3 × max sigma covers the full Gaussian
+  // falloff.
+  static const double _blurHaloPad = 70.0;
 
   @override
   Widget build(BuildContext context) {
@@ -305,25 +356,61 @@ class _MonthTitleSlider extends StatelessWidget {
           // (replaces the now-deleted left chevron); any other title
           // scrolls the PageView to itself.
           final int target = offset == 0 ? index - 1 : index;
+          // Blur is asymmetric in slot-units (the signed
+          // `offset - progress`):
+          //   * Right side: sharp from 0 (centre) through 1 (the
+          //     70-px peek rest position) — the peek lands crisply.
+          //     Beyond 1 (further offscreen right) the blur ramps up,
+          //     reaching full intensity at pos 2.
+          //   * Left side: there is no rest peek, so blur ramps up
+          //     immediately from 0 (centre, sharp) toward -1 (fully
+          //     off-screen left, full blur) — the leaving title
+          //     dissolves into the void.
+          //
+          // Keep the same widget tree across all sigma values so
+          // Flutter updates the existing ImageFiltered's filter
+          // property instead of recycling it as a Text↔ImageFiltered
+          // identity flip per frame.
+          final double pos = offset - progress;
+          final double overshoot = pos >= 0
+              ? (pos - 1.0).clamp(0.0, 1.0)
+              : (-pos).clamp(0.0, 1.0);
+          // Lower bound 0.01 keeps the ImageFiltered render object
+          // active so Flutter actually calls markNeedsPaint when the
+          // filter value changes back upward.
+          final double sigma = (overshoot * _maxSigma).clamp(0.01, _maxSigma);
           return Positioned(
-            left: x,
-            top: 0,
+            // Compensate for the [_blurHaloPad] around the text so the
+            // glyph itself still lands at the computed `x`/baseline.
+            left: x - _blurHaloPad,
+            top: -_blurHaloPad,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () => pageController.animateToPage(
                 target,
-                duration: const Duration(milliseconds: 320),
+                duration: const Duration(milliseconds: 550),
                 curve: Curves.easeOutCubic,
               ),
-              child: _MonthTitle(month: month),
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(
+                  sigmaX: sigma,
+                  sigmaY: sigma,
+                  tileMode: TileMode.decal,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(_blurHaloPad),
+                  child: _MonthTitle(month: month),
+                ),
+              ),
             ),
           );
         }
 
-        return ClipRect(
-          child: Stack(
-            children: <Widget>[titleAt(-1), titleAt(0), titleAt(1), titleAt(2)],
-          ),
+        // Stack must not clip — the halo of off-centre titles bleeds
+        // outside the slider's SizedBox height.
+        return Stack(
+          clipBehavior: Clip.none,
+          children: <Widget>[titleAt(-1), titleAt(0), titleAt(1), titleAt(2)],
         );
       },
     );
@@ -602,6 +689,49 @@ class _EventRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Inherited carrier for the smoothed device-tilt notifier. Layers that
+/// want to drift with the phone's tilt read it via [_TiltScope.of] and
+/// scale it by their own per-layer amplitude (see [_TiltLayer]).
+class _TiltScope extends InheritedWidget {
+  const _TiltScope({required this.tilt, required super.child});
+
+  final ValueListenable<Offset> tilt;
+
+  static ValueListenable<Offset> of(BuildContext context) {
+    final _TiltScope? scope = context
+        .dependOnInheritedWidgetOfExactType<_TiltScope>();
+    assert(scope != null, '_TiltScope missing from context');
+    return scope!.tilt;
+  }
+
+  @override
+  bool updateShouldNotify(_TiltScope old) => tilt != old.tilt;
+}
+
+/// Translates [child] by `tilt * amplitude` every accelerometer frame
+/// without re-laying out the tree. Use a small amplitude for "deep"
+/// background layers and a larger one for foreground content.
+class _TiltLayer extends StatelessWidget {
+  const _TiltLayer({required this.child, required this.amplitude});
+
+  final Widget child;
+  final Offset amplitude;
+
+  @override
+  Widget build(BuildContext context) {
+    final ValueListenable<Offset> tilt = _TiltScope.of(context);
+    return ValueListenableBuilder<Offset>(
+      valueListenable: tilt,
+      builder: (BuildContext context, Offset value, Widget? c) =>
+          Transform.translate(
+            offset: Offset(value.dx * amplitude.dx, value.dy * amplitude.dy),
+            child: c,
+          ),
+      child: child,
     );
   }
 }

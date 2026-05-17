@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:kp_mobile/core/widgets/blur_in_text.dart';
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/sync/sync_controller.dart';
+import 'package:kp_mobile/features/watchlist/watchlist_replay_provider.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_repository.dart';
 
 // Shared watchlist screen.
@@ -23,15 +25,23 @@ class WatchlistScreen extends ConsumerStatefulWidget {
 }
 
 class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
+  // Per-screen replay tick. Bumped when the global
+  // [watchlistReplayProvider] fires (i.e. the user tabs back to
+  // Watchlist) so the BlurInText title replays.
+  final ValueNotifier<int> _replayTick = ValueNotifier<int>(0);
+
   @override
   void initState() {
     super.initState();
-    // Non-blocking sync on mount — same pattern as AgendaScreen. The list
-    // renders from the local cache immediately; the pull tops it up with
-    // anything the other device wrote since.
     Future<void>.microtask(
       () => ref.read(syncControllerProvider.notifier).pullChanges(),
     );
+  }
+
+  @override
+  void dispose() {
+    _replayTick.dispose();
+    super.dispose();
   }
 
   Future<void> _refresh() =>
@@ -42,6 +52,9 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
     final AsyncValue<List<CachedWatchlistItemRow>> rows = ref.watch(
       watchlistProvider,
     );
+    ref.listen<int>(watchlistReplayProvider, (int? previous, int next) {
+      if (previous != next) _replayTick.value++;
+    });
 
     final double topPad = MediaQuery.of(context).padding.top + 96;
     return Scaffold(
@@ -50,29 +63,79 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
         onRefresh: _refresh,
         child: rows.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => ListView(
+          error: (Object error, _) => ListView(
             padding: EdgeInsets.only(top: topPad),
             children: <Widget>[
-              const SizedBox(height: 56),
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text('Chyba: $error', textAlign: TextAlign.center),
               ),
             ],
           ),
-          data: (items) => Padding(
-            padding: EdgeInsets.only(top: topPad),
-            child: _WatchlistBody(items: items),
+          data: (List<CachedWatchlistItemRow> items) => _WatchlistBody(
+            items: items,
+            topPad: topPad,
+            replayTrigger: _replayTick,
           ),
         ),
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 96),
-        child: FloatingActionButton(
-          onPressed: () => _showAddDialog(context, ref, parentId: null),
-          tooltip: 'Přidat',
-          child: const Icon(Icons.add),
-        ),
+    );
+  }
+}
+
+class _WatchlistHeader extends StatelessWidget {
+  const _WatchlistHeader({required this.onAdd, required this.replayTrigger});
+
+  final VoidCallback onAdd;
+  final Listenable replayTrigger;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 16, 0),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                BlurInText(
+                  key: const ValueKey<String>('watchlist-title'),
+                  text: 'Watchlist',
+                  restartTrigger: replayTrigger,
+                  style: const TextStyle(
+                    fontFamily: 'Gloock',
+                    fontSize: 50,
+                    height: 1.0,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Filmy · Divadlo · Koncerty · Cokoliv',
+                  style: TextStyle(
+                    fontFamily: 'StackSansNotch',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    letterSpacing: 0.48,
+                    color: Colors.black.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Big plus button replaces the floating action button —
+          // anchored at the top-right of the screen header per Figma.
+          InkResponse(
+            onTap: onAdd,
+            radius: 64,
+            child: const SizedBox(
+              width: 120,
+              height: 120,
+              child: Icon(Icons.add, size: 110, color: Colors.black),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -94,14 +157,23 @@ class _WatchlistEntry {
 }
 
 class _WatchlistBody extends ConsumerWidget {
-  const _WatchlistBody({required this.items});
+  const _WatchlistBody({
+    required this.items,
+    required this.topPad,
+    required this.replayTrigger,
+  });
 
   final List<CachedWatchlistItemRow> items;
+  final double topPad;
+  final Listenable replayTrigger;
 
   List<_WatchlistEntry> _layoutEntries() {
     final List<CachedWatchlistItemRow> roots =
-        items.where((r) => r.parentId == null).toList()
-          ..sort((a, b) => a.position.compareTo(b.position));
+        items.where((CachedWatchlistItemRow r) => r.parentId == null).toList()
+          ..sort(
+            (CachedWatchlistItemRow a, CachedWatchlistItemRow b) =>
+                a.position.compareTo(b.position),
+          );
     final Map<String, List<CachedWatchlistItemRow>> childrenByParent =
         <String, List<CachedWatchlistItemRow>>{};
     for (final CachedWatchlistItemRow row in items) {
@@ -110,7 +182,10 @@ class _WatchlistBody extends ConsumerWidget {
       (childrenByParent[pid] ??= <CachedWatchlistItemRow>[]).add(row);
     }
     for (final List<CachedWatchlistItemRow> bucket in childrenByParent.values) {
-      bucket.sort((a, b) => a.position.compareTo(b.position));
+      bucket.sort(
+        (CachedWatchlistItemRow a, CachedWatchlistItemRow b) =>
+            a.position.compareTo(b.position),
+      );
     }
 
     final List<_WatchlistEntry> out = <_WatchlistEntry>[];
@@ -127,18 +202,27 @@ class _WatchlistBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final Widget header = _WatchlistHeader(
+      onAdd: () => _showAddDialog(context, ref, parentId: null),
+      replayTrigger: replayTrigger,
+    );
     if (items.isEmpty) {
-      // Use a scrollable ListView so the parent RefreshIndicator works
-      // even when the list is empty (pull-down from the empty state).
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const <Widget>[
-          SizedBox(height: 120),
-          Padding(
-            padding: EdgeInsets.all(24),
+        children: <Widget>[
+          SizedBox(height: topPad),
+          header,
+          const SizedBox(height: 32),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
             child: Text(
               'Watchlist je prázdný — přidej první film, divadlo nebo koncert.',
-              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'StackSansNotch',
+                fontWeight: FontWeight.w400,
+                fontSize: 13,
+                color: Colors.black,
+              ),
             ),
           ),
         ],
@@ -147,9 +231,17 @@ class _WatchlistBody extends ConsumerWidget {
 
     final List<_WatchlistEntry> entries = _layoutEntries();
 
+    // ReorderableListView's leading header slot is the cleanest way to
+    // keep the title + plus-button sticky-at-top while the list scrolls
+    // and stays reorderable.
     return ReorderableListView.builder(
+      padding: EdgeInsets.only(top: topPad, bottom: 160),
       buildDefaultDragHandles: false,
       itemCount: entries.length,
+      header: Padding(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: header,
+      ),
       itemBuilder: (BuildContext context, int index) {
         final _WatchlistEntry entry = entries[index];
         return _WatchlistRow(
@@ -188,9 +280,6 @@ class _WatchlistBody extends ConsumerWidget {
 
     final WatchlistRepository repo = ref.read(watchlistRepositoryProvider);
     try {
-      // Land just after the target (or just before if dragging upward — same
-      // result by symmetry: pinning to target.id is enough because the
-      // server fills in the new midpoint position from the live state.
       if (newIndex > oldIndex) {
         await repo.moveItem(
           id: moving.row.id,
@@ -220,29 +309,31 @@ class _WatchlistRow extends ConsumerWidget {
   final _WatchlistEntry entry;
   final int index;
 
+  String _kindLabel(String kind) {
+    switch (kind) {
+      case 'film':
+        return 'Film';
+      case 'divadlo':
+        return 'Divadlo';
+      case 'koncert':
+        return 'Koncert';
+      default:
+        return kind.isEmpty ? kind : kind[0].toUpperCase() + kind.substring(1);
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final CachedWatchlistItemRow row = entry.row;
-    final TextStyle? titleStyle = row.done
-        ? TextStyle(
-            decoration: TextDecoration.lineThrough,
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.5),
-          )
-        : null;
-
+    final double indent = entry.depth == 1 ? 32 : 0;
     return Dismissible(
       key: ValueKey<String>('dismiss-${row.id}'),
       direction: DismissDirection.endToStart,
       background: Container(
-        color: Theme.of(context).colorScheme.errorContainer,
+        color: const Color(0xFFE0E0E0),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Icon(
-          Icons.delete_outline,
-          color: Theme.of(context).colorScheme.onErrorContainer,
-        ),
+        child: const Icon(Icons.delete_outline, color: Colors.black),
       ),
       confirmDismiss: (_) async => _confirmDelete(context),
       onDismissed: (_) async {
@@ -258,42 +349,109 @@ class _WatchlistRow extends ConsumerWidget {
       },
       child: InkWell(
         onLongPress: () => _showRowMenu(context, ref, entry),
-        child: Padding(
-          padding: EdgeInsets.only(left: entry.depth == 1 ? 32 : 0),
-          child: ListTile(
-            leading: Checkbox(
-              value: row.done,
-              onChanged: (bool? next) async {
-                if (next == null) return;
-                try {
-                  await ref
-                      .read(watchlistRepositoryProvider)
-                      .setDone(id: row.id, version: row.version, done: next);
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Změna stavu selhala: $e')),
-                    );
-                  }
-                }
-              },
-            ),
-            title: Text(row.title, style: titleStyle),
-            subtitle: row.note == null || row.note!.isEmpty
-                ? _KindBadge(kind: row.kind)
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      _KindBadge(kind: row.kind),
-                      const SizedBox(height: 4),
-                      Text(row.note!),
-                    ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Padding(
+              padding: EdgeInsets.fromLTRB(24 + indent, 10, 24, 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _SquareCheckbox(
+                    value: row.done,
+                    onChanged: (bool next) async {
+                      try {
+                        await ref
+                            .read(watchlistRepositoryProvider)
+                            .setDone(
+                              id: row.id,
+                              version: row.version,
+                              done: next,
+                            );
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Změna stavu selhala: $e')),
+                          );
+                        }
+                      }
+                    },
                   ),
-            trailing: ReorderableDragStartListener(
-              index: index,
-              child: const Icon(Icons.drag_handle),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          row.title,
+                          style: TextStyle(
+                            fontFamily: 'StackSansNotch',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            color: row.done
+                                ? Colors.black.withValues(alpha: 0.45)
+                                : Colors.black,
+                            decoration: row.done
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _kindLabel(row.kind),
+                          style: TextStyle(
+                            fontFamily: 'StackSansNotch',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 10,
+                            letterSpacing: 0.4,
+                            color: Colors.black.withValues(alpha: 0.45),
+                          ),
+                        ),
+                        if (row.note != null &&
+                            row.note!.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 4),
+                          Text(
+                            row.note!,
+                            style: TextStyle(
+                              fontFamily: 'StackSansNotch',
+                              fontWeight: FontWeight.w400,
+                              fontSize: 12,
+                              color: Colors.black.withValues(alpha: 0.55),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: SizedBox(
+                      width: 24,
+                      height: 32,
+                      child: Center(
+                        child: Text(
+                          '⋮⋮',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 18,
+                            color: Colors.black.withValues(alpha: 0.3),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+            // Hairline divider between rows (skips the very last row
+            // visually — handled by the parent's bottom padding).
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              height: 1,
+              color: Colors.black.withValues(alpha: 0.06),
+            ),
+          ],
         ),
       ),
     );
@@ -327,30 +485,37 @@ class _WatchlistRow extends ConsumerWidget {
   }
 }
 
-class _KindBadge extends StatelessWidget {
-  const _KindBadge({required this.kind});
+/// Square 20×20 checkbox with a 1.5 px border. Checked state is a
+/// plain black fill — no inner glyph — to match the Figma's minimal
+/// monochrome look. Replaces Material's Checkbox (which has a slight
+/// corner radius and always renders a checkmark).
+class _SquareCheckbox extends StatelessWidget {
+  const _SquareCheckbox({required this.value, required this.onChanged});
 
-  final String kind;
-
-  static const Map<String, ({String label, IconData icon})> _styles =
-      <String, ({String label, IconData icon})>{
-        'film': (label: 'Film', icon: Icons.movie_outlined),
-        'divadlo': (label: 'Divadlo', icon: Icons.theater_comedy_outlined),
-        'koncert': (label: 'Koncert', icon: Icons.music_note_outlined),
-      };
+  final bool value;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final ({String label, IconData icon}) style =
-        _styles[kind] ?? (label: kind, icon: Icons.label_outline);
-    final Color fg = Theme.of(context).colorScheme.onSurfaceVariant;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Icon(style.icon, size: 14, color: fg),
-        const SizedBox(width: 4),
-        Text(style.label, style: TextStyle(fontSize: 12, color: fg)),
-      ],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onChanged(!value),
+      child: Padding(
+        // Pad the tap target so it's comfortable to hit while the
+        // visual is a tight 20×20.
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Container(
+          width: 20,
+          height: 20,
+          decoration: BoxDecoration(
+            color: value ? Colors.black : Colors.transparent,
+            border: Border.all(
+              color: Colors.black.withValues(alpha: 0.5),
+              width: 1.5,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

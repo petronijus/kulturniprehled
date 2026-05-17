@@ -16,6 +16,7 @@ import 'package:kp_mobile/features/events/event_detail_screen.dart';
 import 'package:kp_mobile/features/stats/stats_screen.dart';
 import 'package:kp_mobile/features/sync/sync_controller.dart';
 import 'package:kp_mobile/features/tickets/ticket_viewer_screen.dart';
+import 'package:kp_mobile/features/watchlist/watchlist_replay_provider.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_screen.dart';
 
 final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
@@ -170,11 +171,14 @@ class _HomeShellState extends ConsumerState<_HomeShell>
     // Pulling on every tab switch keeps each feature's cache fresh
     // without each screen having to know to sync in initState.
     ref.read(syncControllerProvider.notifier).pullChanges();
-    // Entering the agenda from another tab replays its blur-in titles —
-    // the screen widget itself stays in tree (StatefulShellRoute keeps
-    // branch state), so initState won't fire on its own.
+    // Entering a branch from another tab replays that branch's blur-in
+    // headers — the screen widgets themselves stay in tree
+    // (StatefulShellRoute keeps branch state), so initState won't fire
+    // on its own.
     if (index == 0) {
       ref.read(agendaReplayProvider.notifier).state++;
+    } else if (index == 2) {
+      ref.read(watchlistReplayProvider.notifier).state++;
     }
   }
 

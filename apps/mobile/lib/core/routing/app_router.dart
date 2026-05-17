@@ -9,6 +9,7 @@ import 'package:kp_mobile/features/auth/auth_state.dart';
 import 'package:kp_mobile/features/auth/login_screen.dart';
 import 'package:kp_mobile/features/calendar/calendar_screen.dart';
 import 'package:kp_mobile/features/costs/cost_editor_screen.dart';
+import 'package:kp_mobile/features/events/agenda_replay_provider.dart';
 import 'package:kp_mobile/features/events/agenda_screen.dart';
 import 'package:kp_mobile/features/events/edit_event_screen.dart';
 import 'package:kp_mobile/features/events/event_detail_screen.dart';
@@ -169,6 +170,12 @@ class _HomeShellState extends ConsumerState<_HomeShell>
     // Pulling on every tab switch keeps each feature's cache fresh
     // without each screen having to know to sync in initState.
     ref.read(syncControllerProvider.notifier).pullChanges();
+    // Entering the agenda from another tab replays its blur-in titles —
+    // the screen widget itself stays in tree (StatefulShellRoute keeps
+    // branch state), so initState won't fire on its own.
+    if (index == 0) {
+      ref.read(agendaReplayProvider.notifier).state++;
+    }
   }
 
   int _previousIndex = 0;
@@ -305,20 +312,17 @@ class _CulturalNav extends StatelessWidget {
       height: 110,
       child: Stack(
         children: <Widget>[
-          // Transparent→white gradient so the cards above fade out under the
-          // nav instead of being cut off by a hard edge.
+          // Transparent→white gradient so the cards above fade out under
+          // the nav. Reaches full white by 60 % (per Figma) so the labels
+          // sit on a solid, opaque base.
           const IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: <Color>[
-                    Color(0x00FFFFFF),
-                    Color(0xCCFFFFFF),
-                    Color(0xFFFFFFFF),
-                  ],
-                  stops: <double>[0.0, 0.5, 1.0],
+                  colors: <Color>[Color(0x00FFFFFF), Color(0xFFFFFFFF)],
+                  stops: <double>[0.0, 0.6049],
                 ),
               ),
               child: SizedBox.expand(),

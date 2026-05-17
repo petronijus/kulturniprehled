@@ -51,14 +51,12 @@ class MorphingHeroCover extends StatelessWidget {
     BuildContext fromHeroContext,
     BuildContext toHeroContext,
   ) {
-    // Pop: skip the morph entirely (user gave up on it after several
-    // iterations couldn't get the back trajectory to match the forward
-    // one). Returning an empty shuttle hides the cover during the flight;
-    // the default Navigator page transition handles the back gesture, and
-    // the agenda's cover snaps in when the route is fully popped.
-    if (direction == HeroFlightDirection.pop) {
-      return const SizedBox.shrink();
-    }
+    // Both directions use the same morph: push goes circle → rect, pop
+    // goes rect → circle. The detail endpoint is now a sharp rect
+    // (BorderRadius.zero), so the lerp is from a full circle to flat
+    // corners and back — no more "stadium snap" the rounded-12 endpoint
+    // produced.
+    //
     // Defensive cast — in normal Flutter this never fails because Hero.child
     // is exactly what we passed in (`_CoverEndpoint`). Fall back to sane
     // defaults if the framework ever wraps it.

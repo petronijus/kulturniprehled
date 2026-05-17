@@ -49,6 +49,16 @@ ThemeData _baseTheme(ColorScheme scheme) {
     scaffoldBackgroundColor: scheme.surface,
     fontFamily: _sans,
     textTheme: text,
+    // Cupertino-style transitions on both platforms — the swipe-back
+    // gesture is driven by Flutter's Navigator instead of Android's
+    // predictive-back system animation, so Hero flights actually run
+    // when the user swipes back from a detail screen.
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: <TargetPlatform, PageTransitionsBuilder>{
+        TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+      },
+    ),
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surface,
       foregroundColor: scheme.onSurface,

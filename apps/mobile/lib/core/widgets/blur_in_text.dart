@@ -23,6 +23,7 @@ class BlurInText extends StatefulWidget {
     this.maxLines,
     this.overflow,
     this.textAlign,
+    this.restartTrigger,
   });
 
   final String text;
@@ -33,6 +34,12 @@ class BlurInText extends StatefulWidget {
   final int? maxLines;
   final TextOverflow? overflow;
   final TextAlign? textAlign;
+
+  /// Optional listener — every time it notifies, the controller resets
+  /// and the blur-in animation plays again. Lets callers replay the
+  /// animation when a screen comes back into view, without having to
+  /// rebuild this widget.
+  final Listenable? restartTrigger;
 
   @override
   State<BlurInText> createState() => _BlurInTextState();
@@ -47,6 +54,7 @@ class _BlurInTextState extends State<BlurInText>
   void initState() {
     super.initState();
     _initController();
+    widget.restartTrigger?.addListener(_replay);
   }
 
   void _initController() {
@@ -59,9 +67,21 @@ class _BlurInTextState extends State<BlurInText>
     )..forward();
   }
 
+  void _replay() {
+    if (!mounted) return;
+    _ctrl
+      ..stop()
+      ..reset()
+      ..forward();
+  }
+
   @override
   void didUpdateWidget(covariant BlurInText oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.restartTrigger != widget.restartTrigger) {
+      oldWidget.restartTrigger?.removeListener(_replay);
+      widget.restartTrigger?.addListener(_replay);
+    }
     if (oldWidget.text != widget.text) {
       _ctrl.dispose();
       _initController();
@@ -70,6 +90,7 @@ class _BlurInTextState extends State<BlurInText>
 
   @override
   void dispose() {
+    widget.restartTrigger?.removeListener(_replay);
     _ctrl.dispose();
     super.dispose();
   }

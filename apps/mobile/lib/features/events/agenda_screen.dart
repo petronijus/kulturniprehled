@@ -9,8 +9,10 @@ import 'package:intl/intl.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 import 'package:kp_mobile/core/widgets/blur_in_text.dart';
+import 'package:kp_mobile/core/widgets/date_row.dart';
 import 'package:kp_mobile/core/widgets/morphing_hero_cover.dart';
 import 'package:kp_mobile/data/drift/database.dart';
+import 'package:kp_mobile/features/events/agenda_replay_provider.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
 import 'package:kp_mobile/features/sync/sync_controller.dart';
 
@@ -29,6 +31,9 @@ class AgendaScreen extends ConsumerStatefulWidget {
 class _AgendaScreenState extends ConsumerState<AgendaScreen> {
   final ScrollController _scrollCtrl = ScrollController();
   final ValueNotifier<Offset> _tilt = ValueNotifier<Offset>(Offset.zero);
+  // Per-frame replay signal — every notify causes BlurInText to reset
+  // and play through. Bumped by agendaReplayProvider listener below.
+  final ValueNotifier<int> _replayTick = ValueNotifier<int>(0);
   StreamSubscription<AccelerometerEvent>? _accelSub;
 
   @override
@@ -59,6 +64,7 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
   void dispose() {
     _accelSub?.cancel();
     _tilt.dispose();
+    _replayTick.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
@@ -71,26 +77,53 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
     final AsyncValue<List<CachedEventRow>> agendaAsync = ref.watch(
       agendaProvider,
     );
+    // Replay BlurInText titles every time something signals it
+    // (returning from detail, tapping the agenda tab from another branch).
+    ref.listen<int>(agendaReplayProvider, (previous, next) {
+      if (previous != next) {
+        _replayTick.value++;
+      }
+    });
     return Scaffold(
       backgroundColor: Colors.white,
       body: _ParallaxScope(
         scrollCtrl: _scrollCtrl,
         tilt: _tilt,
-        child: RefreshIndicator(
-          onRefresh: _refresh,
-          child: agendaAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stack) => _ErrorList(
-              message: 'Načítání selhalo: $error',
-              onRetry: _refresh,
+        child: _ReplayScope(
+          tick: _replayTick,
+          child: RefreshIndicator(
+            onRefresh: _refresh,
+            child: agendaAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stack) => _ErrorList(
+                message: 'Načítání selhalo: $error',
+                onRetry: _refresh,
+              ),
+              data: (rows) => _AgendaList(rows: rows, scrollCtrl: _scrollCtrl),
             ),
-            data: (rows) =>
-                _AgendaList(rows: rows, scrollCtrl: _scrollCtrl),
           ),
         ),
       ),
     );
   }
+}
+
+/// Carries the BlurInText replay signal down through the tree so each
+/// event card can wire its title without prop-drilling.
+class _ReplayScope extends InheritedWidget {
+  const _ReplayScope({required this.tick, required super.child});
+
+  final ValueListenable<int> tick;
+
+  static ValueListenable<int> of(BuildContext context) {
+    final _ReplayScope? scope = context
+        .dependOnInheritedWidgetOfExactType<_ReplayScope>();
+    assert(scope != null, '_ReplayScope missing from context');
+    return scope!.tick;
+  }
+
+  @override
+  bool updateShouldNotify(_ReplayScope old) => tick != old.tick;
 }
 
 /// Inherited carrier for the parallax inputs (scroll position + smoothed
@@ -151,10 +184,7 @@ class _ParallaxLayer extends StatelessWidget {
         final Offset tilt = scope.tilt.value;
         final double dx = tilt.dx * tiltAmplitude.dx;
         final double dy = scroll * scrollFactor + tilt.dy * tiltAmplitude.dy;
-        return Transform.translate(
-          offset: Offset(dx, dy),
-          child: child,
-        );
+        return Transform.translate(offset: Offset(dx, dy), child: child);
       },
     );
   }
@@ -389,6 +419,7 @@ class _EventCard extends StatelessWidget {
                         child: BlurInText(
                           key: ValueKey<String>('title-${event.id}'),
                           text: event.title,
+                          restartTrigger: _ReplayScope.of(context),
                           style: const TextStyle(
                             fontFamily: 'Gloock',
                             fontSize: 50,
@@ -398,10 +429,16 @@ class _EventCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      _DateRow(
-                        leading: catLabel,
-                        center: dateLabel,
-                        trailing: timeLabel,
+                      Hero(
+                        tag: 'daterow-${event.id}',
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: DateRow(
+                            leading: catLabel,
+                            center: dateLabel,
+                            trailing: timeLabel,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -416,52 +453,6 @@ class _EventCard extends StatelessWidget {
 
   String _capitalize(String s) =>
       s.isEmpty ? s : (s[0].toUpperCase() + s.substring(1));
-}
-
-class _DateRow extends StatelessWidget {
-  const _DateRow({
-    required this.leading,
-    required this.center,
-    required this.trailing,
-  });
-
-  final String leading;
-  final String center;
-  final String trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    const TextStyle style = TextStyle(
-      fontFamily: 'StackSansNotch',
-      fontWeight: FontWeight.w600,
-      fontSize: 12,
-      color: Colors.black,
-      letterSpacing: 0.48,
-      height: 1.2,
-    );
-    return Row(
-      children: <Widget>[
-        Text(leading, style: style),
-        const SizedBox(width: 8),
-        const Expanded(child: _Hairline()),
-        const SizedBox(width: 8),
-        Text(center, style: style),
-        const SizedBox(width: 8),
-        const Expanded(child: _Hairline()),
-        const SizedBox(width: 8),
-        Text(trailing, style: style),
-      ],
-    );
-  }
-}
-
-class _Hairline extends StatelessWidget {
-  const _Hairline();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(height: 1, color: Colors.black);
-  }
 }
 
 class _ErrorList extends StatelessWidget {

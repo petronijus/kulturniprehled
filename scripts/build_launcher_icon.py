@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Render the Kulturní Přehled KP mark into Android mipmaps + in-app PNG.
+"""Render the Kulturní Přehled KP mark into Android mipmaps, iOS appiconset,
+and in-app PNG.
 
 Source: `apps/mobile/assets/brand/kp_logo.svg` exported from Figma. We
 rasterise once at 1024 px (white background, centred with safe-zone padding)
-and downsample to each Android launcher density and to a transparent
-in-app PNG used by the agenda top bar.
+and downsample to each Android launcher density, every iOS AppIcon slot,
+and to a transparent in-app PNG used by the agenda top bar.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ REPO = Path(__file__).resolve().parents[1]
 SVG = REPO / "apps/mobile/assets/brand/kp_logo.svg"
 BRAND = REPO / "apps/mobile/assets/brand"
 ANDROID_RES = REPO / "apps/mobile/android/app/src/main/res"
+IOS_APPICON = REPO / "apps/mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset"
 
 MIPMAPS = {
     "mipmap-mdpi": 48,
@@ -25,6 +27,26 @@ MIPMAPS = {
     "mipmap-xhdpi": 96,
     "mipmap-xxhdpi": 144,
     "mipmap-xxxhdpi": 192,
+}
+
+# iOS AppIcon.appiconset slot → pixel size. Filenames must match the existing
+# Contents.json shipped with the Flutter template.
+IOS_ICONS = {
+    "Icon-App-20x20@1x.png": 20,
+    "Icon-App-20x20@2x.png": 40,
+    "Icon-App-20x20@3x.png": 60,
+    "Icon-App-29x29@1x.png": 29,
+    "Icon-App-29x29@2x.png": 58,
+    "Icon-App-29x29@3x.png": 87,
+    "Icon-App-40x40@1x.png": 40,
+    "Icon-App-40x40@2x.png": 80,
+    "Icon-App-40x40@3x.png": 120,
+    "Icon-App-60x60@2x.png": 120,
+    "Icon-App-60x60@3x.png": 180,
+    "Icon-App-76x76@1x.png": 76,
+    "Icon-App-76x76@2x.png": 152,
+    "Icon-App-83.5x83.5@2x.png": 167,
+    "Icon-App-1024x1024@1x.png": 1024,
 }
 
 CANVAS = 1024  # master render size
@@ -72,7 +94,15 @@ def main() -> None:
     for folder, px in MIPMAPS.items():
         target = ANDROID_RES / folder / "ic_launcher.png"
         master.resize((px, px), Image.LANCZOS).save(target)
-        print(f"launcher: {target.relative_to(REPO)} ({px}x{px})")
+        print(f"android:  {target.relative_to(REPO)} ({px}x{px})")
+
+    # iOS rejects any alpha channel on the 1024 marketing icon and prefers
+    # opaque RGB for all slots — flatten once and reuse.
+    master_rgb = master.convert("RGB")
+    for filename, px in IOS_ICONS.items():
+        target = IOS_APPICON / filename
+        master_rgb.resize((px, px), Image.LANCZOS).save(target)
+        print(f"ios:      {target.relative_to(REPO)} ({px}x{px})")
 
     inapp = in_app_mark()
     inapp_path = BRAND / "kp_logo.png"

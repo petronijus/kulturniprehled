@@ -100,3 +100,6 @@ Thumbs.db
 
 # Per-machine Claude Code overrides (permissions/autoMode tied to local LAN/keys)
 .claude/settings.local.json
+
+# Generated launcher-icon intermediate (Pillow output of scripts/build_launcher_icon.py)
+apps/mobile/assets/brand/launcher_master.png

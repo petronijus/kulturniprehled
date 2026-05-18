@@ -256,99 +256,89 @@ iOS distribution lives on the **Mac** — Xcode + CocoaPods can't run on Linux.
 Petr's Mac (per the 2026-05-14 toolchain notes in `docs/handover.md`) already
 has Flutter 3.41.9, CocoaPods 1.16.2, and the iOS-26-5 Simulator runtime.
 
-### One-time setup (do this once after Apple Developer Program approval)
+### One-time setup (done 2026-05-18 — do NOT redo unless rebuilding the account)
 
-1. **App Store Connect record**
-   - Sign in at <https://appstoreconnect.apple.com> with the Apple ID tied
-     to the Developer Program enrollment.
-   - **My Apps → +** → New App
-   - Platform: iOS
-   - Name: `Kulturní Přehled`
-   - Primary language: Czech
-   - Bundle ID: `com.kulturniprehled.kpMobile` (registered automatically
-     on first upload, but you can pre-register at Certificates, Identifiers
-     & Profiles → Identifiers).
-   - SKU: `kp-mobile-001` (arbitrary, must be unique within the account)
+1. **App Store Connect record** — `Kulturní Přehled`, bundle ID
+   `com.kulturniprehled.kpMobile`, SKU `kp-mobile-001`, primary
+   language Czech. App Store Connect → My Apps lists it; if it
+   disappears, recreate at <https://appstoreconnect.apple.com>.
 
-2. **Xcode signing**
-   - Xcode → Settings → Accounts → +Apple ID → sign in
-   - Open `apps/mobile/ios/Runner.xcworkspace`
-   - Select the Runner target → Signing & Capabilities
-   - Tick **Automatically manage signing**
-   - Pick your Team from the dropdown — Xcode creates the development
-     and distribution certificates + provisioning profile on the fly
+2. **Xcode signing** — Team `YOURTEAMID` is pinned in
+   `apps/mobile/ios/Runner.xcodeproj/project.pbxproj`. Automatic
+   signing is enabled. Don't touch unless the team changes.
 
-3. **App-specific password for CLI uploads**
-   - <https://appleid.apple.com> → Sign-In and Security → App-Specific
-     Passwords → +
-   - Label: `kulturni-prehled-upload`
-   - Store the generated `xxxx-xxxx-xxxx-xxxx` in 1Password as item
-     `Kulturni prehled Apple ID app-specific password`. This is what
-     `xcrun altool` needs in step 5 of every release.
+3. **App-specific password** — stored in 1Password as
+   `Kulturni prehled Apple ID app-specific password` →
+   `credential`. Used by `xcrun altool` (see per-release flow below).
+   To rotate: <https://appleid.apple.com> → Sign-In and Security →
+   App-Specific Passwords → revoke old + create new + overwrite the
+   1Password item.
 
-4. **Add Bělaberankova@gmail.com as TestFlight tester** (one-time)
-   - App Store Connect → your app → TestFlight → Internal Testing →
-     Create Group "Družina" → Add Tester → her Apple ID email
-   - Internal testers skip Apple's Beta App Review on every upload (the
-     first build gets a quick review anyway, takes minutes-to-hours).
-   - She'll get an invite mail. Asks her to install **TestFlight** from
-     the App Store, then accept the invite — afterwards every new build
-     pings her phone with an auto-update.
+4. **Internal Testing group `Družina`** — Běla is in App Store
+   Connect as an **App Manager** team member (Users and Access →
+   People). Internal Testing group `Družina` lists her as the only
+   tester. **Auto-Distribute new builds** is enabled on the group,
+   so every fresh upload pings her TestFlight app within minutes of
+   ASC finishing processing. Internal Testing skips Apple's Beta
+   App Review entirely.
 
-### Per-release steps (every time you bump the version)
+   Note: Internal Testing requires team membership. Adding
+   external-only testers later (anyone not on the ASC team) needs a
+   separate External Testing group **with** per-build Beta App
+   Review (hours-to-a-day on the first build of each version).
 
-After running steps 1–3 from the Android release procedure above (bump
-pubspec, run checklist, tag), continue on the Mac:
+5. **`apps/mobile/ios/ExportOptions.plist`** is committed — Flutter
+   reads it via `--export-options-plist=ios/ExportOptions.plist` so
+   the IPA export step doesn't fall over on missing dSYMs (`error:
+   exportArchive Copy failed` from the `objective_c.framework`
+   frame). Key entries: `method=app-store`,
+   `signingStyle=automatic`, `teamID=YOURTEAMID`,
+   `uploadSymbols=false`. Trade-off: TestFlight / App Store crash
+   reports are no longer auto-symbolicated, but mobile crash
+   reporting will move to Sentry/GlitchTip anyway (see follow-ups
+   in `docs/handover.md`).
+
+6. **`Info.plist: ITSAppUsesNonExemptEncryption = false`** — uses
+   only standard HTTPS, no proprietary crypto, so we're export-
+   exempt. With this flag ASC doesn't prompt for export compliance
+   on every upload.
+
+### Per-release steps
 
 ```bash
 cd apps/mobile
-# Same dart-defines as Android — KP_GOOGLE_OAUTH_SERVER_CLIENT_ID is the
-# Web client ID; iOS auto-picks the iOS GIDClientID from Info.plist.
+# bump version in pubspec.yaml — `version: 1.0.X+Y` (Y must be unique
+# and monotonically increasing per CFBundleVersion)
+
 GOOG_CLIENT_ID=$(op-cache "Kulturni prehled google Web OAuth client" "client ID")
+ALTOOL_PW=$(op-cache "Kulturni prehled Apple ID app-specific password" credential)
+
 flutter build ipa --release \
+  --export-options-plist=ios/ExportOptions.plist \
   --dart-define=KP_API_BASE=https://kulturniprehled.example.com \
   --dart-define=KP_GOOGLE_OAUTH_SERVER_CLIENT_ID="$GOOG_CLIENT_ID"
-unset GOOG_CLIENT_ID
-```
 
-The IPA lands at `build/ios/ipa/kp_mobile.ipa`.
-
-### Upload to TestFlight
-
-Two equivalent paths — pick whichever is less friction:
-
-**A. GUI — Transporter.app** (App Store free download):
-- Drag `build/ios/ipa/kp_mobile.ipa` into Transporter
-- Click **Deliver**
-- Watch the upload progress bar; expect 2–5 minutes
-
-**B. CLI — `xcrun altool`**:
-
-```bash
-altool_pw=$(op-cache "Kulturni prehled Apple ID app-specific password" credential)
 xcrun altool --upload-app \
   -f build/ios/ipa/kp_mobile.ipa \
   -t ios \
   -u petronijus@example.com \
-  -p "$altool_pw"
-unset altool_pw
+  -p "$ALTOOL_PW"
+
+unset GOOG_CLIENT_ID ALTOOL_PW
 ```
 
-### Wait for App Store Connect to process
-
-App Store Connect needs ~5–15 minutes to process the build. You'll get
-an email when the build appears under TestFlight → Builds. While
-"Processing", testers can't see it; once "Ready to Submit" / "Ready
-to Test", it's pushed to anyone in the assigned internal testing group.
-
-For the **very first** build, expect Apple's Beta App Review to take
-extra time (~minutes-to-hours). Subsequent builds skip the review.
+That's the full release pipeline. Apple processes the build
+(~5–15 min), then the Auto-Distribute setting on `Družina` pushes
+it to Běla's TestFlight automatically. No clicks in App Store
+Connect, no clicks in Xcode.
 
 ### Smoke test on iPhone
 
-- Open TestFlight on Běla's iPhone → Kulturní Přehled → Update / Install
-- Sign in with her Google account
-- Agenda + detail + month view + watchlist + stats render correctly.
+- TestFlight on Běla's iPhone → Kulturní Přehled → Update / Install
+- Sign in with her Google account (iOS GIDClientID picked up from
+  `Info.plist`).
+- Agenda + detail + month view + watchlist + stats render
+  correctly.
 
 ## Secrets
 

@@ -20,6 +20,10 @@ const double _ghostFontSize = 100;
 const double _ghostBlur = 7.5;
 const double _coverDiameter = 300;
 
+// Delay between successive titles' blur-in start. Each card waits
+// `index * _staggerMs` after agenda mount before it animates.
+const int _staggerMs = 300;
+
 class AgendaScreen extends ConsumerStatefulWidget {
   const AgendaScreen({super.key});
 
@@ -207,8 +211,10 @@ class _AgendaList extends StatelessWidget {
     }
 
     final List<_MonthGroup> months = _groupByMonth(rows);
-    // Cumulative count of events before each month — lets every card
-    // know its global index for the blur-in stagger.
+    // Cumulative event count before each month — lets each card know
+    // its global index for the blur-in stagger (each card adds another
+    // _staggerMs of delay so titles cascade rather than blur in
+    // together).
     final List<int> startEventIndices = <int>[];
     int running = 0;
     for (final _MonthGroup g in months) {
@@ -261,6 +267,9 @@ class _MonthSection extends StatelessWidget {
   const _MonthSection({required this.group, required this.startEventIndex});
 
   final _MonthGroup group;
+  // Global position of this month's first event across the whole
+  // agenda — drives the blur-in stagger so card N starts blurring in
+  // N × _staggerMs after the cards above it.
   final int startEventIndex;
 
   @override
@@ -416,7 +425,9 @@ class _EventCard extends StatelessWidget {
                           key: ValueKey<String>('title-${event.id}'),
                           text: event.title,
                           restartTrigger: _ReplayScope.of(context),
-                          startDelay: Duration(milliseconds: index * 300),
+                          startDelay: Duration(
+                            milliseconds: index * _staggerMs,
+                          ),
                           style: const TextStyle(
                             fontFamily: 'Gloock',
                             fontSize: 50,

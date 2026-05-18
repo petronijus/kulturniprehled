@@ -551,6 +551,30 @@ void _showRowMenu(BuildContext context, WidgetRef ref, _WatchlistEntry entry) {
                     _showAddDialog(context, ref, parentId: entry.row.id);
                   },
                 ),
+              if (!isRoot)
+                ListTile(
+                  leading: const Icon(Icons.arrow_upward),
+                  title: const Text('Vyndat na root'),
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    try {
+                      await ref
+                          .read(watchlistRepositoryProvider)
+                          .moveItem(
+                            id: entry.row.id,
+                            version: entry.row.version,
+                            setParent: true,
+                            toEnd: true,
+                          );
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Přesun selhal: $e')),
+                        );
+                      }
+                    }
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.delete_outline),
                 title: const Text('Smazat'),

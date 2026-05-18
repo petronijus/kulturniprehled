@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -6,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:sensors_plus/sensors_plus.dart';
 
+import 'package:kp_mobile/core/sensors/tilt_provider.dart';
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
 
@@ -30,8 +29,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   late final PageController _pageCtrl;
   late int _focusedIndex;
   DateTime? _selected;
-  final ValueNotifier<Offset> _tilt = ValueNotifier<Offset>(Offset.zero);
-  StreamSubscription<AccelerometerEvent>? _accelSub;
 
   @override
   void initState() {
@@ -40,26 +37,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     _focusedIndex = _indexFor(DateTime(now.year, now.month));
     _selected = DateTime(now.year, now.month, now.day);
     _pageCtrl = PageController(initialPage: _focusedIndex);
-    // Accelerometer drives a subtle parallax on the ghost year, the
-    // banner, the title slider, and the grid. Smoothed exponentially
-    // so the layers don't twitch on every micro hand movement.
-    _accelSub =
-        accelerometerEventStream(
-          samplingPeriod: SensorInterval.uiInterval,
-        ).listen((AccelerometerEvent event) {
-          final Offset raw = Offset(
-            (event.x / 3.0).clamp(-1.0, 1.0),
-            ((event.y - 9.81) / 3.0).clamp(-1.0, 1.0),
-          );
-          const double alpha = 0.15;
-          _tilt.value = _tilt.value * (1 - alpha) + raw * alpha;
-        });
   }
 
   @override
   void dispose() {
-    _accelSub?.cancel();
-    _tilt.dispose();
     _pageCtrl.dispose();
     super.dispose();
   }
@@ -129,7 +110,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               : (buckets[_dayKey(sel)] ?? const <CachedEventRow>[]);
           final double topPad = MediaQuery.of(context).padding.top + 96;
           return _TiltScope(
-            tilt: _tilt,
+            tilt: ref.read(tiltListenableProvider),
             child: Stack(
               children: <Widget>[
                 // Ghost year — blurred grey number sitting behind the

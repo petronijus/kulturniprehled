@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -6,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:sensors_plus/sensors_plus.dart';
 
+import 'package:kp_mobile/core/sensors/tilt_provider.dart';
 import 'package:kp_mobile/core/widgets/blur_in_text.dart';
 import 'package:kp_mobile/core/widgets/date_row.dart';
 import 'package:kp_mobile/core/widgets/morphing_hero_cover.dart';
@@ -30,11 +29,9 @@ class AgendaScreen extends ConsumerStatefulWidget {
 
 class _AgendaScreenState extends ConsumerState<AgendaScreen> {
   final ScrollController _scrollCtrl = ScrollController();
-  final ValueNotifier<Offset> _tilt = ValueNotifier<Offset>(Offset.zero);
   // Per-frame replay signal — every notify causes BlurInText to reset
   // and play through. Bumped by agendaReplayProvider listener below.
   final ValueNotifier<int> _replayTick = ValueNotifier<int>(0);
-  StreamSubscription<AccelerometerEvent>? _accelSub;
 
   @override
   void initState() {
@@ -42,28 +39,10 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
     Future<void>.microtask(
       () => ref.read(syncControllerProvider.notifier).pullChanges(),
     );
-    // Accelerometer drives the tilt parallax. UI-rate sampling, plus a
-    // simple exponential smoother so layers don't jitter on every micro
-    // movement of the user's hand.
-    _accelSub =
-        accelerometerEventStream(
-          samplingPeriod: SensorInterval.uiInterval,
-        ).listen((event) {
-          // Normalise: x is left/right tilt, (y - 9.81) is forward/back from
-          // a phone-held-vertical reference. Clamp to ±1.
-          final Offset raw = Offset(
-            (event.x / 3.0).clamp(-1.0, 1.0),
-            ((event.y - 9.81) / 3.0).clamp(-1.0, 1.0),
-          );
-          const double alpha = 0.15;
-          _tilt.value = _tilt.value * (1 - alpha) + raw * alpha;
-        });
   }
 
   @override
   void dispose() {
-    _accelSub?.cancel();
-    _tilt.dispose();
     _replayTick.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -88,7 +67,7 @@ class _AgendaScreenState extends ConsumerState<AgendaScreen> {
       backgroundColor: Colors.white,
       body: _ParallaxScope(
         scrollCtrl: _scrollCtrl,
-        tilt: _tilt,
+        tilt: ref.read(tiltListenableProvider),
         child: _ReplayScope(
           tick: _replayTick,
           child: RefreshIndicator(

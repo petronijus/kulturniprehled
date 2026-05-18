@@ -124,21 +124,37 @@ class _HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<_HomeShell>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   static const Duration _pollInterval = Duration(seconds: 10);
+  static const Duration _slideDuration = Duration(milliseconds: 280);
 
   Timer? _pollTimer;
+
+  // Drives the slide-in Transform on `widget.navigationShell`. Starts
+  // at value 1.0 (rest, fully on-screen) so the first frame at app
+  // launch doesn't animate; every subsequent tab tap fires `forward
+  // (from: 0)` and the new branch slides in from `_slideFrom`.
+  late final AnimationController _slideCtrl;
+  // Sign of the slide offset: +1 means new tab is to the right of the
+  // old one (slide-in from the right), −1 means it's to the left.
+  double _slideFrom = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _slideCtrl = AnimationController(
+      vsync: this,
+      duration: _slideDuration,
+      value: 1.0,
+    );
     _startPolling();
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _slideCtrl.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -165,10 +181,19 @@ class _HomeShellState extends ConsumerState<_HomeShell>
   }
 
   void _goBranch(int index) {
+    final int previousIndex = widget.navigationShell.currentIndex;
     widget.navigationShell.goBranch(
       index,
-      initialLocation: index == widget.navigationShell.currentIndex,
+      initialLocation: index == previousIndex,
     );
+    // Trigger the slide on every tab change. Direction follows the
+    // nav order — taps to the right slide the new content in from
+    // the right, taps to the left slide it in from the left. Tapping
+    // the current tab (no index change) skips the animation.
+    if (index != previousIndex) {
+      _slideFrom = index > previousIndex ? 1.0 : -1.0;
+      _slideCtrl.forward(from: 0);
+    }
     // Pulling on every tab switch keeps each feature's cache fresh
     // without each screen having to know to sync in initState.
     ref.read(syncControllerProvider.notifier).pullChanges();
@@ -216,17 +241,28 @@ class _HomeShellState extends ConsumerState<_HomeShell>
       backgroundColor: Colors.white,
       body: Stack(
         children: <Widget>[
-          // The navigationShell's IndexedStack keeps every branch in the
-          // tree and wraps offstage ones in TickerMode(enabled: false) —
-          // BlurInText controllers sit paused at value 0 until that
-          // branch becomes visible and play naturally on first reveal.
-          // Wrapping this in an AnimatedSwitcher+KeyedSubtree would
-          // remount all four branches per tap (re-subscribing the
-          // accelerometer streams in agenda/calendar, resetting drift
-          // queries, re-priming every animation controller) — that's
-          // the path that introduced the stutter and the missed first-
-          // visit animations.
-          Positioned.fill(child: widget.navigationShell),
+          // Slide the navigationShell on every tab switch via a
+          // Transform on the same widget instance — no AnimatedSwitcher,
+          // no KeyedSubtree, no remount. The IndexedStack inside keeps
+          // every branch alive and offstage ones in TickerMode(disabled),
+          // so BlurInText animations sit paused at 0 until their branch
+          // becomes current and play naturally on first reveal.
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _slideCtrl,
+              builder: (BuildContext context, Widget? child) {
+                final double dx =
+                    _slideFrom *
+                    MediaQuery.of(context).size.width *
+                    (1 - Curves.easeOutCubic.transform(_slideCtrl.value));
+                return Transform.translate(
+                  offset: Offset(dx, 0),
+                  child: child,
+                );
+              },
+              child: widget.navigationShell,
+            ),
+          ),
           // Floating Kp logo (tap → logout confirm). Sits on every screen.
           Positioned(
             top: 0,

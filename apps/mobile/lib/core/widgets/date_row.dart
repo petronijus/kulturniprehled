@@ -19,7 +19,7 @@ class DateRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final TextStyle style = TextStyle(
-      fontFamily: 'StackSansNotch',
+      fontFamily: 'StackSansHeadline',
       fontWeight: FontWeight.w600,
       fontSize: 12,
       color: color,

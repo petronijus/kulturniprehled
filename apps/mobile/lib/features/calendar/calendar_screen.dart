@@ -146,7 +146,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         child: Text(
                           '${focused.year}',
                           style: const TextStyle(
-                            fontFamily: 'StackSansNotch',
+                            fontFamily: 'StackSansHeadline',
                             fontWeight: FontWeight.w700,
                             fontSize: 100,
                             height: 1.0,
@@ -276,7 +276,7 @@ class _NextBanner extends StatelessWidget {
                   Text(
                     fmt.format(event.startsAt.toLocal()),
                     style: TextStyle(
-                      fontFamily: 'StackSansNotch',
+                      fontFamily: 'StackSansHeadline',
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                       letterSpacing: 0.48,
@@ -289,7 +289,7 @@ class _NextBanner extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontFamily: 'StackSansNotch',
+                      fontFamily: 'StackSansHeadline',
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                       color: Colors.black,
@@ -465,7 +465,7 @@ class _DayOfWeekRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const TextStyle style = TextStyle(
-      fontFamily: 'StackSansNotch',
+      fontFamily: 'StackSansHeadline',
       fontWeight: FontWeight.w600,
       fontSize: 11,
       letterSpacing: 0.4,
@@ -574,7 +574,7 @@ class _DayCell extends StatelessWidget {
           child: Text(
             '${day.day}',
             style: TextStyle(
-              fontFamily: 'StackSansNotch',
+              fontFamily: 'StackSansHeadline',
               fontWeight: filled ? FontWeight.w600 : FontWeight.w400,
               fontSize: 14,
               color: textColor,
@@ -614,7 +614,7 @@ class _SelectedDayEvents extends StatelessWidget {
           child: Text(
             header,
             style: TextStyle(
-              fontFamily: 'StackSansNotch',
+              fontFamily: 'StackSansHeadline',
               fontWeight: FontWeight.w600,
               fontSize: 11,
               letterSpacing: 0.4,
@@ -669,7 +669,7 @@ class _EventRow extends StatelessWidget {
                   Text(
                     event.title,
                     style: const TextStyle(
-                      fontFamily: 'StackSansNotch',
+                      fontFamily: 'StackSansHeadline',
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                       color: Colors.black,
@@ -681,7 +681,7 @@ class _EventRow extends StatelessWidget {
                   Text(
                     '$time · ${_categoryLabel(event.category)}',
                     style: TextStyle(
-                      fontFamily: 'StackSansNotch',
+                      fontFamily: 'StackSansHeadline',
                       fontWeight: FontWeight.w400,
                       fontSize: 12,
                       color: Colors.black.withValues(alpha: 0.6),

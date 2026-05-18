@@ -286,7 +286,7 @@ class _EventDetailBody extends StatelessWidget {
   }
 }
 
-/// Notes block. Plain styled text in StackSansNotch 12 / 16 / tracking 0.64.
+/// Notes block. Plain styled text in StackSansHeadline 12 / 16 / tracking 0.64.
 /// "Word:" subheaders at the start of lines render in SemiBold to match the
 /// Figma reference. No card chrome.
 class _NotesText extends StatelessWidget {
@@ -297,7 +297,7 @@ class _NotesText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const TextStyle baseStyle = TextStyle(
-      fontFamily: 'StackSansNotch',
+      fontFamily: 'StackSansHeadline',
       fontWeight: FontWeight.w400,
       fontSize: 12,
       height: 16 / 12,
@@ -352,7 +352,7 @@ class _TicketsSection extends StatelessWidget {
         Text(
           'Lístky (${tickets.length})',
           style: const TextStyle(
-            fontFamily: 'StackSansNotch',
+            fontFamily: 'StackSansHeadline',
             fontWeight: FontWeight.w600,
             fontSize: 12,
             letterSpacing: 0.48,
@@ -387,7 +387,7 @@ class _TicketRow extends StatelessWidget {
               child: Text(
                 ticket.originalFilename ?? ticket.id,
                 style: const TextStyle(
-                  fontFamily: 'StackSansNotch',
+                  fontFamily: 'StackSansHeadline',
                   fontSize: 13,
                   color: Colors.black,
                 ),
@@ -451,7 +451,7 @@ class _VenueSection extends StatelessWidget {
                 child: Text(
                   address,
                   style: const TextStyle(
-                    fontFamily: 'StackSansNotch',
+                    fontFamily: 'StackSansHeadline',
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
                     height: 16 / 12,
@@ -468,7 +468,7 @@ class _VenueSection extends StatelessWidget {
                   child: Text(
                     'Mapa',
                     style: TextStyle(
-                      fontFamily: 'StackSansNotch',
+                      fontFamily: 'StackSansHeadline',
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                       letterSpacing: 0.48,

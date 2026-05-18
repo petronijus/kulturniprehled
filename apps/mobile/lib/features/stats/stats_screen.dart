@@ -110,16 +110,18 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           children: <Widget>[
             // Ghost year (last two digits) — blurred grey behind the
             // header, same pattern as the calendar's year ghost.
+            // Top offset = title-top (22, see _StatsHeader) + 32 keeps
+            // the ghost's relative position to the title intact.
             Positioned(
               left: 4,
-              top: topPad + 32,
+              top: topPad + 54,
               child: IgnorePointer(
                 child: ImageFiltered(
                   imageFilter: ImageFilter.blur(sigmaX: 7.5, sigmaY: 7.5),
                   child: Text(
                     (_year % 100).toString().padLeft(2, '0'),
                     style: const TextStyle(
-                      fontFamily: 'StackSansNotch',
+                      fontFamily: 'StackSansHeadline',
                       fontWeight: FontWeight.w700,
                       fontSize: 100,
                       height: 1.0,
@@ -238,17 +240,27 @@ class _StatsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Mirror the Watchlist header geometry: 120 px tall (matches that
+    // screen's plus-icon row) with a 22 px top inset so the title-top
+    // lands where Watchlist's title-top lands (its title+subtitle
+    // column is vertically centered inside the 120 px row).
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: BlurInText(
-        key: const ValueKey<String>('stats-title'),
-        text: 'Statistiky',
-        restartTrigger: replayTrigger,
-        style: const TextStyle(
-          fontFamily: 'Gloock',
-          fontSize: 50,
-          height: 1.0,
-          color: Colors.black,
+      padding: const EdgeInsets.fromLTRB(24, 0, 16, 0),
+      child: SizedBox(
+        height: 120,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 22),
+          child: BlurInText(
+            key: const ValueKey<String>('stats-title'),
+            text: 'Statistiky',
+            restartTrigger: replayTrigger,
+            style: const TextStyle(
+              fontFamily: 'Gloock',
+              fontSize: 50,
+              height: 1.0,
+              color: Colors.black,
+            ),
+          ),
         ),
       ),
     );
@@ -301,7 +313,7 @@ class _BubbleStat extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontFamily: 'StackSansNotch',
+            fontFamily: 'StackSansHeadline',
             fontWeight: FontWeight.w600,
             fontSize: 10,
             letterSpacing: 0.5,
@@ -340,7 +352,7 @@ class _CategorySection extends StatelessWidget {
           Text(
             'PODLE KATEGORIE',
             style: TextStyle(
-              fontFamily: 'StackSansNotch',
+              fontFamily: 'StackSansHeadline',
               fontWeight: FontWeight.w600,
               fontSize: 10,
               letterSpacing: 0.5,
@@ -357,7 +369,7 @@ class _CategorySection extends StatelessWidget {
                     child: Text(
                       label(row['category'] as String),
                       style: const TextStyle(
-                        fontFamily: 'StackSansNotch',
+                        fontFamily: 'StackSansHeadline',
                         fontWeight: FontWeight.w400,
                         fontSize: 14,
                         color: Colors.black,
@@ -367,7 +379,7 @@ class _CategorySection extends StatelessWidget {
                   Text(
                     '${row['count']}',
                     style: const TextStyle(
-                      fontFamily: 'StackSansNotch',
+                      fontFamily: 'StackSansHeadline',
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                       color: Colors.black,
@@ -407,7 +419,7 @@ class _MonthSection extends StatelessWidget {
           Text(
             'PODLE MĚSÍCE',
             style: TextStyle(
-              fontFamily: 'StackSansNotch',
+              fontFamily: 'StackSansHeadline',
               fontWeight: FontWeight.w600,
               fontSize: 10,
               letterSpacing: 0.5,
@@ -450,7 +462,7 @@ class _MonthBar extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                fontFamily: 'StackSansNotch',
+                fontFamily: 'StackSansHeadline',
                 fontWeight: FontWeight.w400,
                 fontSize: 12,
                 color: Colors.black.withValues(alpha: 0.7),
@@ -490,7 +502,7 @@ class _MonthBar extends StatelessWidget {
               '$events',
               textAlign: TextAlign.right,
               style: const TextStyle(
-                fontFamily: 'StackSansNotch',
+                fontFamily: 'StackSansHeadline',
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
                 color: Colors.black,

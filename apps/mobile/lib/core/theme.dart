@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 const String _serif = 'Gloock';
-const String _sans = 'StackSansNotch';
+const String _sans = 'StackSansHeadline';
 
 // Monochrome theme — Material 3 generates tinted neutrals from any seed
 // colour, so we don't seed at all. Every accent slot is hand-set to

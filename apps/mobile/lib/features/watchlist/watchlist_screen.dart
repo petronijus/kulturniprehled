@@ -114,7 +114,7 @@ class _WatchlistHeader extends StatelessWidget {
                 Text(
                   'Filmy · Divadlo · Koncerty · Cokoliv',
                   style: TextStyle(
-                    fontFamily: 'StackSansNotch',
+                    fontFamily: 'StackSansHeadline',
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                     letterSpacing: 0.48,
@@ -218,7 +218,7 @@ class _WatchlistBody extends ConsumerWidget {
             child: Text(
               'Watchlist je prázdný — přidej první film, divadlo nebo koncert.',
               style: TextStyle(
-                fontFamily: 'StackSansNotch',
+                fontFamily: 'StackSansHeadline',
                 fontWeight: FontWeight.w400,
                 fontSize: 13,
                 color: Colors.black,
@@ -385,7 +385,7 @@ class _WatchlistRow extends ConsumerWidget {
                         Text(
                           row.title,
                           style: TextStyle(
-                            fontFamily: 'StackSansNotch',
+                            fontFamily: 'StackSansHeadline',
                             fontWeight: FontWeight.w600,
                             fontSize: 15,
                             color: row.done
@@ -400,7 +400,7 @@ class _WatchlistRow extends ConsumerWidget {
                         Text(
                           _kindLabel(row.kind),
                           style: TextStyle(
-                            fontFamily: 'StackSansNotch',
+                            fontFamily: 'StackSansHeadline',
                             fontWeight: FontWeight.w600,
                             fontSize: 10,
                             letterSpacing: 0.4,
@@ -413,7 +413,7 @@ class _WatchlistRow extends ConsumerWidget {
                           Text(
                             row.note!,
                             style: TextStyle(
-                              fontFamily: 'StackSansNotch',
+                              fontFamily: 'StackSansHeadline',
                               fontWeight: FontWeight.w400,
                               fontSize: 12,
                               color: Colors.black.withValues(alpha: 0.55),

@@ -383,7 +383,7 @@ class _NavLabel extends StatelessWidget {
           duration: const Duration(milliseconds: 240),
           curve: Curves.easeOutCubic,
           style: TextStyle(
-            fontFamily: 'StackSansNotch',
+            fontFamily: 'StackSansHeadline',
             fontWeight: FontWeight.w600,
             fontSize: 12,
             letterSpacing: 0.48,

@@ -303,7 +303,7 @@ class _MonthSection extends StatelessWidget {
                 child: Text(
                   label,
                   style: const TextStyle(
-                    fontFamily: 'StackSansNotch',
+                    fontFamily: 'StackSansHeadline',
                     fontWeight: FontWeight.w700,
                     fontSize: _ghostFontSize,
                     color: _ghostColor,

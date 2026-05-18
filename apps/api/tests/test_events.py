@@ -38,6 +38,29 @@ async def test_create_and_get_event(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_persists_image_urls_and_venue_address(client: AsyncClient) -> None:
+    # Regression: the ingest skill was reporting these fields silently
+    # disappearing from /v1/events POST responses — the schema accepted
+    # them but the create handler wasn't passing them through to the ORM.
+    pair = await login_as(client, "petr@example.com")
+    headers = auth_header(pair["access_token"])
+    create = await client.post(
+        "/v1/events",
+        json=_event_payload(
+            cover_image_url="https://example.com/cover.jpg",
+            venue_image_url="https://example.com/venue.jpg",
+            venue_address="Rudolfinum, Alšovo nábřeží 12, Praha 1",
+        ),
+        headers=headers,
+    )
+    assert create.status_code == 201, create.text
+    body = create.json()
+    assert body["cover_image_url"] == "https://example.com/cover.jpg"
+    assert body["venue_image_url"] == "https://example.com/venue.jpg"
+    assert body["venue_address"] == "Rudolfinum, Alšovo nábřeží 12, Praha 1"
+
+
+@pytest.mark.asyncio
 async def test_list_filters_by_date_and_category(client: AsyncClient) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])

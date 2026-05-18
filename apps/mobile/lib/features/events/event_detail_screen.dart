@@ -198,6 +198,7 @@ class _EventDetailBody extends StatelessWidget {
                         tag: 'cover-${event.id}',
                         imageUrl: event.coverImageUrl,
                         borderRadius: BorderRadius.zero,
+                        revealOnLoad: false,
                         fallback: Container(
                           color: const Color(0xFFEFEFEF),
                           alignment: Alignment.center,

@@ -182,10 +182,11 @@ class _HomeShellState extends ConsumerState<_HomeShell>
 
   void _goBranch(int index) {
     final int previousIndex = widget.navigationShell.currentIndex;
-    widget.navigationShell.goBranch(
-      index,
-      initialLocation: index == previousIndex,
-    );
+    // Bottom-nav tap = always go to the branch root. So tapping Agenda
+    // from inside the detail screen (or after switching tabs and
+    // coming back) pops the stack to /agenda; tapping the other tabs
+    // is unaffected because they don't have sub-routes.
+    widget.navigationShell.goBranch(index, initialLocation: true);
     // Trigger the slide on every tab change. Direction follows the
     // nav order — taps to the right slide the new content in from
     // the right, taps to the left slide it in from the left. Tapping
@@ -255,10 +256,7 @@ class _HomeShellState extends ConsumerState<_HomeShell>
                     _slideFrom *
                     MediaQuery.of(context).size.width *
                     (1 - Curves.easeOutCubic.transform(_slideCtrl.value));
-                return Transform.translate(
-                  offset: Offset(dx, 0),
-                  child: child,
-                );
+                return Transform.translate(offset: Offset(dx, 0), child: child);
               },
               child: widget.navigationShell,
             ),

@@ -27,6 +27,12 @@ import 'package:flutter/material.dart';
 /// Clipping is always a single [ClipRRect] so the swipe-back gesture's
 /// value wiggle across a phase boundary can't blink between two clip
 /// widget types.
+/// URLs that have already played the reveal scale-in this session.
+/// Lookups in here let [_CoverEndpoint] skip the animation on every
+/// subsequent mount (list scroll, hero pop, push-notification → detail)
+/// so the reveal only fires once per image per app launch.
+final Set<String> _revealedImageUrls = <String>{};
+
 class MorphingHeroCover extends StatelessWidget {
   const MorphingHeroCover({
     super.key,
@@ -35,6 +41,7 @@ class MorphingHeroCover extends StatelessWidget {
     required this.borderRadius,
     required this.fallback,
     this.fit = BoxFit.cover,
+    this.revealOnLoad = true,
   });
 
   final Object tag;
@@ -42,6 +49,13 @@ class MorphingHeroCover extends StatelessWidget {
   final BorderRadius borderRadius;
   final Widget fallback;
   final BoxFit fit;
+
+  /// When true (default), the agenda-style scale-in plays the first
+  /// time this image URL is loaded in the session. Detail screens pass
+  /// `false` — they receive the cover via the Hero flight, which is
+  /// already an entrance animation; an extra scale-in on arrival looks
+  /// double-animated.
+  final bool revealOnLoad;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +69,7 @@ class MorphingHeroCover extends StatelessWidget {
         imageUrl: imageUrl,
         fallback: fallback,
         fit: fit,
+        revealOnLoad: revealOnLoad,
       ),
     );
   }
@@ -178,12 +193,14 @@ class _CoverEndpoint extends StatefulWidget {
     required this.imageUrl,
     required this.fallback,
     required this.fit,
+    required this.revealOnLoad,
   });
 
   final BorderRadius borderRadius;
   final String? imageUrl;
   final Widget fallback;
   final BoxFit fit;
+  final bool revealOnLoad;
 
   @override
   State<_CoverEndpoint> createState() => _CoverEndpointState();
@@ -194,28 +211,36 @@ class _CoverEndpointState extends State<_CoverEndpoint>
   late final AnimationController _revealCtrl;
   bool _revealStarted = false;
 
-  bool get _hasImage =>
-      widget.imageUrl != null && widget.imageUrl!.isNotEmpty;
+  bool get _hasImage => widget.imageUrl != null && widget.imageUrl!.isNotEmpty;
+
+  /// True when we should start at scale 0 and animate in once the
+  /// image is ready. False means we render at full size from frame 0
+  /// — either because reveal is disabled, there's no URL to wait for,
+  /// or this URL already played its reveal earlier in the session.
+  bool get _shouldReveal {
+    if (!widget.revealOnLoad) return false;
+    if (!_hasImage) return false;
+    if (_revealedImageUrls.contains(widget.imageUrl)) return false;
+    return true;
+  }
 
   @override
   void initState() {
     super.initState();
-    // Reveal scales the whole clipped cover from 0 → 1 once the image
-    // is ready. With no image URL, the fallback shows immediately at
-    // full size — there's nothing to wait for.
     _revealCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 360),
-      value: _hasImage ? 0.0 : 1.0,
+      value: _shouldReveal ? 0.0 : 1.0,
     );
   }
 
   @override
   void didUpdateWidget(covariant _CoverEndpoint oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrl != widget.imageUrl) {
+    if (oldWidget.imageUrl != widget.imageUrl ||
+        oldWidget.revealOnLoad != widget.revealOnLoad) {
       _revealStarted = false;
-      _revealCtrl.value = _hasImage ? 0.0 : 1.0;
+      _revealCtrl.value = _shouldReveal ? 0.0 : 1.0;
     }
   }
 
@@ -228,7 +253,14 @@ class _CoverEndpointState extends State<_CoverEndpoint>
   void _onImageReady() {
     if (_revealStarted || !mounted) return;
     _revealStarted = true;
-    _revealCtrl.forward();
+    // Remember this URL so future mounts (list scroll, hero pop) skip
+    // the scale-in. New URLs in the same session still animate once.
+    if (_hasImage) {
+      _revealedImageUrls.add(widget.imageUrl!);
+    }
+    if (_revealCtrl.value < 1.0) {
+      _revealCtrl.forward();
+    }
   }
 
   @override

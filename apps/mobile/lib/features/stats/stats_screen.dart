@@ -175,10 +175,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
               const SizedBox(height: 16),
               Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _load,
-                child: const Text('Zkusit znovu'),
-              ),
+              FilledButton(onPressed: _load, child: const Text('Zkusit znovu')),
             ],
           ),
         ),

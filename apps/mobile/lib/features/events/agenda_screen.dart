@@ -310,10 +310,7 @@ class _MonthSection extends StatelessWidget {
           children: <Widget>[
             const SizedBox(height: 80),
             for (int i = 0; i < group.events.length; i++)
-              _EventCard(
-                event: group.events[i],
-                index: startEventIndex + i,
-              ),
+              _EventCard(event: group.events[i], index: startEventIndex + i),
             const SizedBox(height: 16),
           ],
         ),

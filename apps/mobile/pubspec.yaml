@@ -44,22 +44,17 @@ flutter:
     - family: Gloock
       fonts:
         - asset: assets/fonts/Gloock-Regular.ttf
-    # StackSansHeadline is the sans we use for all body / UI text.
-    # The TTFs still live at the StackSansNotch-* paths because that's
-    # what shipped first — once the Headline TTFs land in assets/fonts/
-    # (StackSansHeadline-{ExtraLight,Light,Regular,Medium,SemiBold,Bold}.ttf)
-    # swap the asset paths below to point at them.
     - family: StackSansHeadline
       fonts:
-        - asset: assets/fonts/StackSansNotch-ExtraLight.ttf
+        - asset: assets/fonts/StackSansHeadline-ExtraLight.ttf
           weight: 200
-        - asset: assets/fonts/StackSansNotch-Light.ttf
+        - asset: assets/fonts/StackSansHeadline-Light.ttf
           weight: 300
-        - asset: assets/fonts/StackSansNotch-Regular.ttf
+        - asset: assets/fonts/StackSansHeadline-Regular.ttf
           weight: 400
-        - asset: assets/fonts/StackSansNotch-Medium.ttf
+        - asset: assets/fonts/StackSansHeadline-Medium.ttf
           weight: 500
-        - asset: assets/fonts/StackSansNotch-SemiBold.ttf
+        - asset: assets/fonts/StackSansHeadline-SemiBold.ttf
           weight: 600
-        - asset: assets/fonts/StackSansNotch-Bold.ttf
+        - asset: assets/fonts/StackSansHeadline-Bold.ttf
           weight: 700

@@ -533,16 +533,29 @@ class _DayCell extends StatelessWidget {
     // shares the same fill (only one day is ever selected at once,
     // and the events list below makes which one obvious).
     final bool filled = isInMonth && (hasEvent || isSelected);
+    final DateTime now = DateTime.now();
+    final bool isToday =
+        day.year == now.year && day.month == now.month && day.day == now.day;
     final Color textColor;
     if (filled) {
       textColor = Colors.white;
     } else if (!isInMonth) {
       textColor = Colors.black.withValues(alpha: 0.25);
+    } else if (isToday) {
+      // Today gets a softer grey so the user can still tell which day
+      // it is without making it look as important as days that
+      // actually have something scheduled.
+      textColor = Colors.black.withValues(alpha: 0.4);
     } else {
       textColor = Colors.black;
     }
+    // Days without an event aren't tappable — there's nothing to focus
+    // and tapping just shuffled the "Vyber den / Nic v ten den" empty
+    // states. The currently-selected day still accepts taps so the
+    // user can clear selection if we ever wire that up.
+    final bool tappable = isInMonth && (hasEvent || isSelected);
     return InkResponse(
-      onTap: onTap,
+      onTap: tappable ? onTap : null,
       radius: 24,
       child: Center(
         child: Container(

@@ -53,13 +53,27 @@ before giving up.
   performer / ensemble / play / film. Prefer Wikipedia infobox image
   (Wikimedia Commons CDN, always a `https://upload.wikimedia.org/...`
   URL), the organizer's event page hero image, or the artist's
-  official site. Direct image URL, **not the HTML page**. Bump
-  Wikimedia thumb sizes to `800px` so the cover doesn't go fuzzy on
-  the detail screen (`/250px-Foo.jpg` → `/800px-Foo.jpg`).
+  official site. Direct image URL, **not the HTML page**.
+
+  Wikimedia thumb URLs (`/wikipedia/commons/thumb/<h1>/<h2>/<Name>.jpg/<N>px-<Name>.jpg`)
+  only work for pre-cached widths — `800px` returns HTTP 400 when the
+  source is smaller. **Use the original instead**:
+  `/wikipedia/commons/<h1>/<h2>/<Name>.jpg` (just drop `/thumb/` and
+  the size segment). The original always returns 200 and the mobile
+  app downscales to the cover diameter on render anyway.
 - **`venue_image_url`** — a photo of the venue building. Wikipedia
   Commons is the easiest source for the established venues (Rudolfinum,
   Forum Karlín, Lucerna, Fórum, …); for festival sites use the
-  organizer page hero. Same `800px` thumb trick applies.
+  organizer page hero. Same "use the original, drop `/thumb/`" rule
+  applies.
+
+After picking each URL, sanity-check it actually returns image bytes
+before posting to KP — otherwise the mobile app gets stuck on the
+fallback icon and you won't notice until Petr opens the screen:
+
+```bash
+curl -sSI -A 'Mozilla/5.0' "$URL" | head -1   # expect HTTP/2 200
+```
 - **Program / line-up** — try the organizer's event detail page first,
   then any festival schedule. Capture conductor, soloists, work names,
   opening act. If genuinely not published, say so in the notes — do

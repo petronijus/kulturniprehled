@@ -331,7 +331,10 @@ class _CulturalNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 110,
+      // 130 px (= original 110 + 20) raises the gradient's top edge so
+      // there's more vertical room for the transparent → white fade
+      // before the labels sit on solid white.
+      height: 130,
       child: Stack(
         children: <Widget>[
           // Transparent→white gradient so the cards above fade out under

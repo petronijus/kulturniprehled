@@ -651,12 +651,12 @@ void _showRowMenu(
     context: context,
     builder: (BuildContext context) {
       final bool isRoot = entry.row.parentId == null;
-      // Lift the sheet's last item ~100 px above the bottom edge so it
-      // clears the floating _CulturalNav (110 px tall, sits over the
+      // Lift the sheet's last item ~120 px above the bottom edge so it
+      // clears the floating _CulturalNav (130 px tall, sits over the
       // bottom of every screen).
       return SafeArea(
         child: Padding(
-          padding: const EdgeInsets.only(bottom: 100),
+          padding: const EdgeInsets.only(bottom: 120),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[

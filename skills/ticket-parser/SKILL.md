@@ -55,12 +55,28 @@ before giving up.
   URL), the organizer's event page hero image, or the artist's
   official site. Direct image URL, **not the HTML page**.
 
-  Wikimedia thumb URLs (`/wikipedia/commons/thumb/<h1>/<h2>/<Name>.jpg/<N>px-<Name>.jpg`)
-  only work for pre-cached widths — `800px` returns HTTP 400 when the
-  source is smaller. **Use the original instead**:
-  `/wikipedia/commons/<h1>/<h2>/<Name>.jpg` (just drop `/thumb/` and
-  the size segment). The original always returns 200 and the mobile
-  app downscales to the cover diameter on render anyway.
+  **Use the right Wikimedia URL form**, otherwise the mobile detail
+  screen spends 5+ seconds downloading a 5-10 MB original just to
+  paint a 300 px circle:
+
+  - **Preferred**: `https://commons.wikimedia.org/wiki/Special:FilePath/<Name>.<ext>?width=800`
+    — auto-redirects to the nearest pre-cached thumb. Always 200.
+    Store the **resolved** URL (after the redirect) so the mobile app
+    doesn't pay the redirect cost on every load:
+    ```bash
+    curl -sIL -A 'Mozilla/5.0' "$URL" | awk '/^[Ll]ocation: /{print $2}' \
+      | tail -1 | sed 's/?utm_.*//'
+    ```
+  - **Direct thumb**, if you know a width that exists:
+    `/wikipedia/commons/thumb/<h1>/<h2>/<Name>.jpg/960px-<Name>.jpg`.
+    Empirically the "always-works" widths are `500`, `960`, and
+    `1280` — every other number (320, 640, 800, 1024) often 400s.
+    `960` is the sweet spot for mobile: ~200-350 KB JPG, sharp at the
+    300 px agenda circle on a 3x DPR phone and on the wider detail
+    cover.
+  - **Never use the original** (`/wikipedia/commons/<h1>/<h2>/<Name>.jpg`
+    without `/thumb/`). It returns the source upload — Anoushka
+    Shankar's was 8.4 MB and stalled the cover for ~5 s on the agenda.
 - **`venue_image_url`** — a photo of the venue building. Wikipedia
   Commons is the easiest source for the established venues (Rudolfinum,
   Forum Karlín, Lucerna, Fórum, …); for festival sites use the
@@ -68,11 +84,17 @@ before giving up.
   applies.
 
 After picking each URL, sanity-check it actually returns image bytes
-before posting to KP — otherwise the mobile app gets stuck on the
-fallback icon and you won't notice until Petr opens the screen:
+**and isn't oversized** before posting to KP — otherwise the mobile
+app either gets stuck on the fallback icon or spends seconds
+downloading a multi-MB original:
 
 ```bash
-curl -sSI -A 'Mozilla/5.0' "$URL" | head -1   # expect HTTP/2 200
+read -r status bytes < <(
+  curl -sS -A 'Mozilla/5.0' -o /dev/null -w "%{http_code} %{size_download}" "$URL"
+)
+[ "$status" = "200" ] || { echo "  bad URL ($status): $URL"; }
+[ "$bytes" -lt 500000 ] || \
+  echo "  warning: $((bytes / 1024)) KB — consider a smaller thumb"
 ```
 - **Program / line-up** — try the organizer's event detail page first,
   then any festival schedule. Capture conductor, soloists, work names,

@@ -355,20 +355,28 @@ class _CulturalNav extends StatelessWidget {
           ),
           SafeArea(
             top: false,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: <Widget>[
-                    for (int i = 0; i < _labels.length; i++)
-                      _NavLabel(
-                        label: _labels[i],
-                        selected: i == selectedIndex,
-                        onTap: () => onTap(i),
-                      ),
-                  ],
+            child: Transform.translate(
+              // Drop the labels 20 px lower in their slot so the
+              // gradient has more visual room above the row. Negative
+              // bottom padding isn't a thing, so a translate is the
+              // simplest way to shift in-place without changing the
+              // SizedBox geometry.
+              offset: const Offset(0, 20),
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: <Widget>[
+                      for (int i = 0; i < _labels.length; i++)
+                        _NavLabel(
+                          label: _labels[i],
+                          selected: i == selectedIndex,
+                          onTap: () => onTap(i),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),

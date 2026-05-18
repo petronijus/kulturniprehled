@@ -35,7 +35,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     super.initState();
     final DateTime now = DateTime.now();
     _focusedIndex = _indexFor(DateTime(now.year, now.month));
-    _selected = DateTime(now.year, now.month, now.day);
+    // Start with nothing selected — today would otherwise render with
+    // the black-filled pill (same look as event days) which fights the
+    // intent that today should sit grey in the grid until the user
+    // taps an actual event day.
+    _selected = null;
     _pageCtrl = PageController(initialPage: _focusedIndex);
   }
 

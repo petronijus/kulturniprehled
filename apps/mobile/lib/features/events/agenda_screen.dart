@@ -207,6 +207,14 @@ class _AgendaList extends StatelessWidget {
     }
 
     final List<_MonthGroup> months = _groupByMonth(rows);
+    // Cumulative count of events before each month — lets every card
+    // know its global index for the blur-in stagger.
+    final List<int> startEventIndices = <int>[];
+    int running = 0;
+    for (final _MonthGroup g in months) {
+      startEventIndices.add(running);
+      running += g.events.length;
+    }
 
     final MediaQueryData mq = MediaQuery.of(context);
     return ListView.builder(
@@ -217,7 +225,10 @@ class _AgendaList extends StatelessWidget {
         bottom: mq.size.height * 0.5,
       ),
       itemCount: months.length,
-      itemBuilder: (context, index) => _MonthSection(group: months[index]),
+      itemBuilder: (context, index) => _MonthSection(
+        group: months[index],
+        startEventIndex: startEventIndices[index],
+      ),
     );
   }
 
@@ -247,9 +258,10 @@ class _MonthGroup {
 }
 
 class _MonthSection extends StatelessWidget {
-  const _MonthSection({required this.group});
+  const _MonthSection({required this.group, required this.startEventIndex});
 
   final _MonthGroup group;
+  final int startEventIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -297,7 +309,11 @@ class _MonthSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             const SizedBox(height: 80),
-            for (final CachedEventRow e in group.events) _EventCard(event: e),
+            for (int i = 0; i < group.events.length; i++)
+              _EventCard(
+                event: group.events[i],
+                index: startEventIndex + i,
+              ),
             const SizedBox(height: 16),
           ],
         ),
@@ -307,9 +323,13 @@ class _MonthSection extends StatelessWidget {
 }
 
 class _EventCard extends StatelessWidget {
-  const _EventCard({required this.event});
+  const _EventCard({required this.event, required this.index});
 
   final CachedEventRow event;
+
+  /// Global position of this card in the agenda. Drives the per-card
+  /// blur-in stagger so titles cascade rather than blur in together.
+  final int index;
 
   IconData _iconFor(String category) {
     switch (category) {
@@ -399,6 +419,7 @@ class _EventCard extends StatelessWidget {
                           key: ValueKey<String>('title-${event.id}'),
                           text: event.title,
                           restartTrigger: _ReplayScope.of(context),
+                          startDelay: Duration(milliseconds: index * 300),
                           style: const TextStyle(
                             fontFamily: 'Gloock',
                             fontSize: 50,

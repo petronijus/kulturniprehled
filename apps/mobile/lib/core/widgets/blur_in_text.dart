@@ -24,6 +24,7 @@ class BlurInText extends StatefulWidget {
     this.overflow,
     this.textAlign,
     this.restartTrigger,
+    this.startDelay = Duration.zero,
   });
 
   final String text;
@@ -40,6 +41,11 @@ class BlurInText extends StatefulWidget {
   /// animation when a screen comes back into view, without having to
   /// rebuild this widget.
   final Listenable? restartTrigger;
+
+  /// Delay before the animation starts playing on first mount / on each
+  /// replay. Useful for staggering a list of titles so they cascade
+  /// in instead of all blurring in together.
+  final Duration startDelay;
 
   @override
   State<BlurInText> createState() => _BlurInTextState();
@@ -64,15 +70,26 @@ class _BlurInTextState extends State<BlurInText>
     _ctrl = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: _totalMs),
-    )..forward();
+    );
+    _startWithDelay();
+  }
+
+  void _startWithDelay() {
+    if (widget.startDelay == Duration.zero) {
+      _ctrl.forward();
+      return;
+    }
+    Future<void>.delayed(widget.startDelay, () {
+      if (mounted) _ctrl.forward();
+    });
   }
 
   void _replay() {
     if (!mounted) return;
     _ctrl
       ..stop()
-      ..reset()
-      ..forward();
+      ..reset();
+    _startWithDelay();
   }
 
   @override

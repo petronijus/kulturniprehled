@@ -172,7 +172,7 @@ class _CoverHeroTween extends RectTween {
   }
 }
 
-class _CoverEndpoint extends StatelessWidget {
+class _CoverEndpoint extends StatefulWidget {
   const _CoverEndpoint({
     required this.borderRadius,
     required this.imageUrl,
@@ -186,10 +186,69 @@ class _CoverEndpoint extends StatelessWidget {
   final BoxFit fit;
 
   @override
+  State<_CoverEndpoint> createState() => _CoverEndpointState();
+}
+
+class _CoverEndpointState extends State<_CoverEndpoint>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _revealCtrl;
+  bool _revealStarted = false;
+
+  bool get _hasImage =>
+      widget.imageUrl != null && widget.imageUrl!.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    // Reveal scales the whole clipped cover from 0 → 1 once the image
+    // is ready. With no image URL, the fallback shows immediately at
+    // full size — there's nothing to wait for.
+    _revealCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 360),
+      value: _hasImage ? 0.0 : 1.0,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _CoverEndpoint oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _revealStarted = false;
+      _revealCtrl.value = _hasImage ? 0.0 : 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _revealCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onImageReady() {
+    if (_revealStarted || !mounted) return;
+    _revealStarted = true;
+    _revealCtrl.forward();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: borderRadius,
-      child: _CoverContent(imageUrl: imageUrl, fallback: fallback, fit: fit),
+    final Widget child = ClipRRect(
+      borderRadius: widget.borderRadius,
+      child: _CoverContent(
+        imageUrl: widget.imageUrl,
+        fallback: widget.fallback,
+        fit: widget.fit,
+        onImageReady: _onImageReady,
+      ),
+    );
+    return AnimatedBuilder(
+      animation: _revealCtrl,
+      builder: (BuildContext context, Widget? c) {
+        final double scale = Curves.easeOutCubic.transform(_revealCtrl.value);
+        return Transform.scale(scale: scale, child: c);
+      },
+      child: child,
     );
   }
 }
@@ -202,11 +261,18 @@ class _CoverContent extends StatelessWidget {
     required this.imageUrl,
     required this.fallback,
     required this.fit,
+    this.onImageReady,
   });
 
   final String? imageUrl;
   final Widget fallback;
   final BoxFit fit;
+
+  /// Fires once the underlying [Image.network] has its first decoded
+  /// frame ready. Used by [_CoverEndpointState] to drive the reveal
+  /// scale-in. The flight shuttle passes `null` here — its scale stays
+  /// at 1 throughout the hero animation.
+  final VoidCallback? onImageReady;
 
   @override
   Widget build(BuildContext context) {
@@ -217,6 +283,23 @@ class _CoverContent extends StatelessWidget {
           ? Image.network(
               imageUrl!,
               fit: fit,
+              frameBuilder:
+                  (
+                    BuildContext context,
+                    Widget child,
+                    int? frame,
+                    bool wasSynchronouslyLoaded,
+                  ) {
+                    if (onImageReady != null &&
+                        (wasSynchronouslyLoaded || frame != null)) {
+                      // Defer to next frame so the parent's setState /
+                      // controller.forward() doesn't fire mid-build.
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        onImageReady!();
+                      });
+                    }
+                    return child;
+                  },
               loadingBuilder: (context, child, progress) =>
                   progress == null ? child : const SizedBox.shrink(),
               errorBuilder: (context, _, _) => fallback,

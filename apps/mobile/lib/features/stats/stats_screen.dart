@@ -139,53 +139,57 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   }
 
   Widget _build(double topPad) {
+    // Single ListView shape across loading / error / empty / data so
+    // the header sits at the same widget-tree position regardless of
+    // state. That keeps _StatsHeader's State (and its BlurInText
+    // animation controller) intact when data arrives — no remount,
+    // no jump, no replay flicker.
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.only(top: topPad, bottom: 160),
+      children: <Widget>[
+        _StatsHeader(
+          key: const ValueKey<String>('stats-header'),
+          replayTrigger: _replayTick,
+        ),
+        ..._buildBody(),
+      ],
+    );
+  }
+
+  List<Widget> _buildBody() {
     if (_loading) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: <Widget>[
-          SizedBox(height: topPad),
-          _StatsHeader(replayTrigger: _replayTick),
-          const SizedBox(height: 96),
-          const Center(child: CircularProgressIndicator()),
-        ],
-      );
+      return const <Widget>[
+        SizedBox(height: 96),
+        Center(child: CircularProgressIndicator()),
+      ];
     }
     if (_error != null) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: <Widget>[
-          SizedBox(height: topPad),
-          _StatsHeader(replayTrigger: _replayTick),
-          const SizedBox(height: 80),
-          Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              children: <Widget>[
-                const Icon(Icons.cloud_off, size: 64),
-                const SizedBox(height: 16),
-                Text(_error!, textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _load,
-                  child: const Text('Zkusit znovu'),
-                ),
-              ],
-            ),
+      return <Widget>[
+        const SizedBox(height: 80),
+        Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            children: <Widget>[
+              const Icon(Icons.cloud_off, size: 64),
+              const SizedBox(height: 16),
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _load,
+                child: const Text('Zkusit znovu'),
+              ),
+            ],
           ),
-        ],
-      );
+        ),
+      ];
     }
     final Map<String, dynamic>? data = _data;
     if (data == null) {
-      return ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: <Widget>[
-          SizedBox(height: topPad),
-          _StatsHeader(replayTrigger: _replayTick),
-          const SizedBox(height: 80),
-          const Center(child: Text('Žádná data.')),
-        ],
-      );
+      return const <Widget>[
+        SizedBox(height: 80),
+        Center(child: Text('Žádná data.')),
+      ];
     }
     final int totalEvents = data['total_events'] as int? ?? 0;
     final int totalCostCents = data['total_cost_cents'] as int? ?? 0;
@@ -195,46 +199,41 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
     final List<Map<String, dynamic>> byMonth =
         ((data['by_month'] as List<dynamic>?) ?? const <dynamic>[])
             .cast<Map<String, dynamic>>();
-
     final bool empty = totalEvents == 0 && totalCostCents == 0;
-
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.only(top: topPad, bottom: 160),
-      children: <Widget>[
-        _StatsHeader(replayTrigger: _replayTick),
-        const SizedBox(height: 24),
-        if (empty)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 32, vertical: 48),
-            child: Column(
-              children: <Widget>[
-                Icon(Icons.bar_chart, size: 80),
-                SizedBox(height: 16),
-                Text(
-                  'Pro tenhle rok zatím nic není.',
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          )
-        else ...<Widget>[
-          _HighlightBubble(
-            events: totalEvents,
-            spendCzk: _formatCzk(totalCostCents),
+    if (empty) {
+      return const <Widget>[
+        SizedBox(height: 24),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+          child: Column(
+            children: <Widget>[
+              Icon(Icons.bar_chart, size: 80),
+              SizedBox(height: 16),
+              Text(
+                'Pro tenhle rok zatím nic není.',
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
-          const SizedBox(height: 48),
-          _CategorySection(rows: byCategory, label: _categoryLabel),
-          const SizedBox(height: 32),
-          _MonthSection(rows: byMonth, monthNames: _monthShort),
-        ],
-      ],
-    );
+        ),
+      ];
+    }
+    return <Widget>[
+      const SizedBox(height: 24),
+      _HighlightBubble(
+        events: totalEvents,
+        spendCzk: _formatCzk(totalCostCents),
+      ),
+      const SizedBox(height: 48),
+      _CategorySection(rows: byCategory, label: _categoryLabel),
+      const SizedBox(height: 32),
+      _MonthSection(rows: byMonth, monthNames: _monthShort),
+    ];
   }
 }
 
 class _StatsHeader extends StatelessWidget {
-  const _StatsHeader({required this.replayTrigger});
+  const _StatsHeader({super.key, required this.replayTrigger});
 
   final Listenable replayTrigger;
 

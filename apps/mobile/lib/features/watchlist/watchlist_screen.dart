@@ -525,70 +525,76 @@ void _showRowMenu(BuildContext context, WidgetRef ref, _WatchlistEntry entry) {
     context: context,
     builder: (BuildContext context) {
       final bool isRoot = entry.row.parentId == null;
+      // Lift the sheet's last item ~100 px above the bottom edge so it
+      // clears the floating _CulturalNav (110 px tall, sits over the
+      // bottom of every screen).
       return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Upravit'),
-              onTap: () {
-                Navigator.of(context).pop();
-                _showEditDialog(context, ref, entry.row);
-              },
-            ),
-            if (isRoot)
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 100),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
               ListTile(
-                leading: const Icon(Icons.add_outlined),
-                title: const Text('Přidat podpoložku'),
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Upravit'),
                 onTap: () {
                   Navigator.of(context).pop();
-                  _showAddDialog(context, ref, parentId: entry.row.id);
+                  _showEditDialog(context, ref, entry.row);
                 },
               ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('Smazat'),
-              onTap: () async {
-                Navigator.of(context).pop();
-                final bool? confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (BuildContext context) {
-                    return AlertDialog(
-                      title: const Text('Smazat položku?'),
-                      content: Text(
-                        isRoot
-                            ? 'Pokud má položka podpoložky, smažou se s ní.'
-                            : 'Položka bude smazána.',
-                      ),
-                      actions: <Widget>[
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('Zrušit'),
-                        ),
-                        FilledButton(
-                          onPressed: () => Navigator.of(context).pop(true),
-                          child: const Text('Smazat'),
-                        ),
-                      ],
-                    );
+              if (isRoot)
+                ListTile(
+                  leading: const Icon(Icons.add_outlined),
+                  title: const Text('Přidat podpoložku'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showAddDialog(context, ref, parentId: entry.row.id);
                   },
-                );
-                if (confirmed != true) return;
-                try {
-                  await ref
-                      .read(watchlistRepositoryProvider)
-                      .deleteItem(entry.row.id);
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Smazání selhalo: $e')),
-                    );
+                ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Smazat'),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  final bool? confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: const Text('Smazat položku?'),
+                        content: Text(
+                          isRoot
+                              ? 'Pokud má položka podpoložky, smažou se s ní.'
+                              : 'Položka bude smazána.',
+                        ),
+                        actions: <Widget>[
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Zrušit'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: const Text('Smazat'),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                  if (confirmed != true) return;
+                  try {
+                    await ref
+                        .read(watchlistRepositoryProvider)
+                        .deleteItem(entry.row.id);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Smazání selhalo: $e')),
+                      );
+                    }
                   }
-                }
-              },
-            ),
-          ],
+                },
+              ),
+            ],
+          ),
         ),
       );
     },

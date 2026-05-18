@@ -141,11 +141,15 @@ class _WatchlistHeader extends StatelessWidget {
   }
 }
 
-/// Render an alternating tree of roots and their children. Each entry knows
-/// its `scopeId` (== parent_id or `null` for root scope) so we can constrain
-/// drag-reorders to one scope at a time.
-class _WatchlistEntry {
-  const _WatchlistEntry({
+/// Render an alternating tree of roots and their children, plus a
+/// non-interactive "Hotovo" divider that sits between the active and
+/// completed root sections.
+sealed class _WatchlistEntry {
+  const _WatchlistEntry();
+}
+
+class _WatchlistItemEntry extends _WatchlistEntry {
+  const _WatchlistItemEntry({
     required this.row,
     required this.depth,
     required this.scopeId,
@@ -154,6 +158,10 @@ class _WatchlistEntry {
   final CachedWatchlistItemRow row;
   final int depth; // 0 = root, 1 = child
   final String? scopeId; // null = root scope, else the parent id
+}
+
+class _HotovoHeaderEntry extends _WatchlistEntry {
+  const _HotovoHeaderEntry();
 }
 
 class _WatchlistBody extends ConsumerWidget {
@@ -168,12 +176,22 @@ class _WatchlistBody extends ConsumerWidget {
   final Listenable replayTrigger;
 
   List<_WatchlistEntry> _layoutEntries() {
-    final List<CachedWatchlistItemRow> roots =
-        items.where((CachedWatchlistItemRow r) => r.parentId == null).toList()
-          ..sort(
-            (CachedWatchlistItemRow a, CachedWatchlistItemRow b) =>
-                a.position.compareTo(b.position),
-          );
+    // Split roots into active (top) and completed (under the Hotovo
+    // divider). Active roots keep manual position order; completed
+    // roots sort newest-checked first so the just-checked row pops to
+    // the top of the Hotovo section.
+    final List<CachedWatchlistItemRow> allRoots = items
+        .where((CachedWatchlistItemRow r) => r.parentId == null)
+        .toList();
+    final List<CachedWatchlistItemRow> activeRoots =
+        allRoots.where((CachedWatchlistItemRow r) => !r.done).toList()..sort(
+          (CachedWatchlistItemRow a, CachedWatchlistItemRow b) =>
+              a.position.compareTo(b.position),
+        );
+    final List<CachedWatchlistItemRow> doneRoots =
+        allRoots.where((CachedWatchlistItemRow r) => r.done).toList()
+          ..sort(_doneNewestFirst);
+
     final Map<String, List<CachedWatchlistItemRow>> childrenByParent =
         <String, List<CachedWatchlistItemRow>>{};
     for (final CachedWatchlistItemRow row in items) {
@@ -181,23 +199,70 @@ class _WatchlistBody extends ConsumerWidget {
       if (pid == null) continue;
       (childrenByParent[pid] ??= <CachedWatchlistItemRow>[]).add(row);
     }
-    for (final List<CachedWatchlistItemRow> bucket in childrenByParent.values) {
-      bucket.sort(
-        (CachedWatchlistItemRow a, CachedWatchlistItemRow b) =>
-            a.position.compareTo(b.position),
-      );
+
+    Iterable<_WatchlistItemEntry> rootWithChildren(
+      CachedWatchlistItemRow root,
+    ) sync* {
+      yield _WatchlistItemEntry(row: root, depth: 0, scopeId: null);
+      final List<CachedWatchlistItemRow>? bucket = childrenByParent[root.id];
+      if (bucket == null) return;
+      // Children: active first (by position), completed at the end
+      // (oldest-checked first → just-checked sits at the very bottom).
+      final List<CachedWatchlistItemRow> activeKids =
+          bucket.where((CachedWatchlistItemRow c) => !c.done).toList()..sort(
+            (CachedWatchlistItemRow a, CachedWatchlistItemRow b) =>
+                a.position.compareTo(b.position),
+          );
+      final List<CachedWatchlistItemRow> doneKids =
+          bucket.where((CachedWatchlistItemRow c) => c.done).toList()
+            ..sort(_doneOldestFirst);
+      for (final CachedWatchlistItemRow c in activeKids) {
+        yield _WatchlistItemEntry(row: c, depth: 1, scopeId: root.id);
+      }
+      for (final CachedWatchlistItemRow c in doneKids) {
+        yield _WatchlistItemEntry(row: c, depth: 1, scopeId: root.id);
+      }
     }
 
     final List<_WatchlistEntry> out = <_WatchlistEntry>[];
-    for (final CachedWatchlistItemRow root in roots) {
-      out.add(_WatchlistEntry(row: root, depth: 0, scopeId: null));
-      final List<CachedWatchlistItemRow>? children = childrenByParent[root.id];
-      if (children == null) continue;
-      for (final CachedWatchlistItemRow child in children) {
-        out.add(_WatchlistEntry(row: child, depth: 1, scopeId: root.id));
+    for (final CachedWatchlistItemRow root in activeRoots) {
+      out.addAll(rootWithChildren(root));
+    }
+    if (doneRoots.isNotEmpty) {
+      out.add(const _HotovoHeaderEntry());
+      for (final CachedWatchlistItemRow root in doneRoots) {
+        out.addAll(rootWithChildren(root));
       }
     }
     return out;
+  }
+
+  static int _doneNewestFirst(
+    CachedWatchlistItemRow a,
+    CachedWatchlistItemRow b,
+  ) {
+    // Newest checked first. Rows without done_at (e.g. legacy data)
+    // sink to the bottom of the section.
+    final DateTime? ad = a.doneAt;
+    final DateTime? bd = b.doneAt;
+    if (ad == null && bd == null) return a.position.compareTo(b.position);
+    if (ad == null) return 1;
+    if (bd == null) return -1;
+    return bd.compareTo(ad);
+  }
+
+  static int _doneOldestFirst(
+    CachedWatchlistItemRow a,
+    CachedWatchlistItemRow b,
+  ) {
+    // Oldest checked first → just-checked sits at the very bottom of
+    // the parent's children list, matching the "move to end" rule.
+    final DateTime? ad = a.doneAt;
+    final DateTime? bd = b.doneAt;
+    if (ad == null && bd == null) return a.position.compareTo(b.position);
+    if (ad == null) return -1;
+    if (bd == null) return 1;
+    return ad.compareTo(bd);
   }
 
   @override
@@ -244,11 +309,16 @@ class _WatchlistBody extends ConsumerWidget {
       ),
       itemBuilder: (BuildContext context, int index) {
         final _WatchlistEntry entry = entries[index];
-        return _WatchlistRow(
-          key: ValueKey<String>(entry.row.id),
-          entry: entry,
-          index: index,
-        );
+        return switch (entry) {
+          _WatchlistItemEntry() => _WatchlistRow(
+            key: ValueKey<String>(entry.row.id),
+            entry: entry,
+            index: index,
+          ),
+          _HotovoHeaderEntry() => const _HotovoHeader(
+            key: ValueKey<String>('hotovo-header'),
+          ),
+        };
       },
       onReorder: (int oldIndex, int newIndex) async {
         await _reorder(context, ref, entries, oldIndex, newIndex);
@@ -265,9 +335,15 @@ class _WatchlistBody extends ConsumerWidget {
   ) async {
     if (newIndex > oldIndex) newIndex -= 1;
     if (oldIndex == newIndex) return;
-    final _WatchlistEntry moving = entries[oldIndex];
-    final _WatchlistEntry target = entries[newIndex];
-    if (moving.scopeId != target.scopeId) {
+    final _WatchlistEntry movingEntry = entries[oldIndex];
+    final _WatchlistEntry targetEntry = entries[newIndex];
+    // The Hotovo header has no drag handle so movingEntry can't be it,
+    // but a drop *onto* the header position needs to be rejected.
+    if (movingEntry is! _WatchlistItemEntry ||
+        targetEntry is! _WatchlistItemEntry) {
+      return;
+    }
+    if (movingEntry.scopeId != targetEntry.scopeId) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -277,20 +353,26 @@ class _WatchlistBody extends ConsumerWidget {
       );
       return;
     }
+    // Active and completed live in two visual sections; manual sort
+    // doesn't make sense across them — the checkbox is the only way
+    // to flip between sections.
+    if (movingEntry.row.done != targetEntry.row.done) {
+      return;
+    }
 
     final WatchlistRepository repo = ref.read(watchlistRepositoryProvider);
     try {
       if (newIndex > oldIndex) {
         await repo.moveItem(
-          id: moving.row.id,
-          version: moving.row.version,
-          afterId: target.row.id,
+          id: movingEntry.row.id,
+          version: movingEntry.row.version,
+          afterId: targetEntry.row.id,
         );
       } else {
         await repo.moveItem(
-          id: moving.row.id,
-          version: moving.row.version,
-          beforeId: target.row.id,
+          id: movingEntry.row.id,
+          version: movingEntry.row.version,
+          beforeId: targetEntry.row.id,
         );
       }
     } catch (e) {
@@ -303,10 +385,50 @@ class _WatchlistBody extends ConsumerWidget {
   }
 }
 
+class _HotovoHeader extends StatelessWidget {
+  const _HotovoHeader({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Container(
+              height: 1,
+              color: Colors.black.withValues(alpha: 0.15),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              'HOTOVO',
+              style: TextStyle(
+                fontFamily: 'StackSansHeadline',
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
+                letterSpacing: 0.5,
+                color: Colors.black.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Container(
+              height: 1,
+              color: Colors.black.withValues(alpha: 0.15),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WatchlistRow extends ConsumerWidget {
   const _WatchlistRow({super.key, required this.entry, required this.index});
 
-  final _WatchlistEntry entry;
+  final _WatchlistItemEntry entry;
   final int index;
 
   String _kindLabel(String kind) {
@@ -520,7 +642,11 @@ class _SquareCheckbox extends StatelessWidget {
   }
 }
 
-void _showRowMenu(BuildContext context, WidgetRef ref, _WatchlistEntry entry) {
+void _showRowMenu(
+  BuildContext context,
+  WidgetRef ref,
+  _WatchlistItemEntry entry,
+) {
   showModalBottomSheet<void>(
     context: context,
     builder: (BuildContext context) {
@@ -553,7 +679,7 @@ void _showRowMenu(BuildContext context, WidgetRef ref, _WatchlistEntry entry) {
                 ),
               if (!isRoot)
                 ListTile(
-                  leading: const Icon(Icons.arrow_upward),
+                  leading: const Icon(Icons.arrow_back),
                   title: const Text('Vyndat na root'),
                   onTap: () async {
                     Navigator.of(context).pop();

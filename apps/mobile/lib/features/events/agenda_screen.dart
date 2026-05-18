@@ -210,7 +210,18 @@ class _AgendaList extends StatelessWidget {
       );
     }
 
-    final List<_MonthGroup> months = _groupByMonth(rows);
+    final DateTime now = DateTime.now();
+    final List<CachedEventRow> future = <CachedEventRow>[];
+    final List<CachedEventRow> past = <CachedEventRow>[];
+    for (final CachedEventRow row in rows) {
+      if (row.startsAt.toLocal().isBefore(now)) {
+        past.add(row);
+      } else {
+        future.add(row);
+      }
+    }
+
+    final List<_MonthGroup> months = _groupByMonth(future);
     // Cumulative event count before each month — lets each card know
     // its global index for the blur-in stagger (each card adds another
     // _staggerMs of delay so titles cascade rather than blur in
@@ -221,6 +232,8 @@ class _AgendaList extends StatelessWidget {
       startEventIndices.add(running);
       running += g.events.length;
     }
+    final bool showPastTile = past.isNotEmpty;
+    final int itemCount = months.length + (showPastTile ? 1 : 0);
 
     final MediaQueryData mq = MediaQuery.of(context);
     return ListView.builder(
@@ -230,11 +243,16 @@ class _AgendaList extends StatelessWidget {
         top: mq.padding.top + 64,
         bottom: mq.size.height * 0.5,
       ),
-      itemCount: months.length,
-      itemBuilder: (context, index) => _MonthSection(
-        group: months[index],
-        startEventIndex: startEventIndices[index],
-      ),
+      itemCount: itemCount,
+      itemBuilder: (context, index) {
+        if (index < months.length) {
+          return _MonthSection(
+            group: months[index],
+            startEventIndex: startEventIndices[index],
+          );
+        }
+        return _PastTile(count: past.length);
+      },
     );
   }
 
@@ -461,6 +479,56 @@ class _EventCard extends StatelessWidget {
 
   String _capitalize(String s) =>
       s.isEmpty ? s : (s[0].toUpperCase() + s.substring(1));
+}
+
+class _PastTile extends StatelessWidget {
+  const _PastTile({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => context.go('/agenda/past'),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 64, 24, 64),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: <Widget>[
+            const Text(
+              'Minulé',
+              style: TextStyle(
+                fontFamily: 'Gloock',
+                fontSize: 60,
+                height: 1.0,
+                color: Colors.black,
+              ),
+            ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    '$count',
+                    style: const TextStyle(
+                      fontFamily: 'StackSansHeadline',
+                      fontWeight: FontWeight.w300,
+                      fontSize: 18,
+                      color: Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right, size: 28, color: Colors.black),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ErrorList extends StatelessWidget {

@@ -13,6 +13,7 @@ import 'package:kp_mobile/features/events/agenda_replay_provider.dart';
 import 'package:kp_mobile/features/events/agenda_screen.dart';
 import 'package:kp_mobile/features/events/edit_event_screen.dart';
 import 'package:kp_mobile/features/events/event_detail_screen.dart';
+import 'package:kp_mobile/features/events/past_agenda_screen.dart';
 import 'package:kp_mobile/features/stats/stats_replay_provider.dart';
 import 'package:kp_mobile/features/stats/stats_screen.dart';
 import 'package:kp_mobile/features/sync/sync_controller.dart';
@@ -54,6 +55,10 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
                 path: '/agenda',
                 builder: (context, state) => const AgendaScreen(),
                 routes: <RouteBase>[
+                  GoRoute(
+                    path: 'past',
+                    builder: (context, state) => const PastAgendaScreen(),
+                  ),
                   GoRoute(
                     path: 'events/:eventId',
                     builder: (context, state) => EventDetailScreen(

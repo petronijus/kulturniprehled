@@ -43,6 +43,25 @@ Read each PDF and extract:
   to cents (`1690 * 100 = 169000`) for step 8. If the ticket shows the
   total only (festival packs), divide evenly by ticket count.
 
+  **Foreign currency.** If the PDF only quotes a non-CZK price (e.g.
+  Elbphilharmonie Hamburg tickets in EUR), convert at the **current
+  ČNB daily fixing** before writing the cost row. Don't store the
+  foreign amount as if it were Kč — it'd lie to the Stats screen.
+
+  ```bash
+  # ČNB daily fixing JSON. EUR row's `rate` is per 1 EUR (amount=1).
+  # If the currency you need has amount=100 (e.g. JPY), divide rate/100.
+  RATE=$(curl -fsS 'https://api.cnb.cz/cnbapi/exrates/daily?lang=EN' \
+    | jq -r '.rates[] | select(.currencyCode=="EUR") | .rate / .amount')
+  PRICE_EUR=98               # from the PDF
+  PRICE_CZK=$(python3 -c "print(round($PRICE_EUR * $RATE))")
+  PRICE_CENTS=$(( PRICE_CZK * 100 ))
+  ```
+
+  Mention the original amount + the rate in the cost-row `note`
+  ("`2× 98 EUR @ CNB 24.325 CZK/EUR`") so the conversion stays
+  auditable later.
+
 ### 3. Find the program + images (mandatory)
 
 The mobile detail screen always wants three things populated. Treat all

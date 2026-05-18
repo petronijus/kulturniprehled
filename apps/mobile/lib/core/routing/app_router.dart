@@ -185,8 +185,6 @@ class _HomeShellState extends ConsumerState<_HomeShell>
     }
   }
 
-  int _previousIndex = 0;
-
   Future<void> _confirmSignOut(BuildContext context) async {
     final bool? ok = await showDialog<bool>(
       context: context,
@@ -213,39 +211,22 @@ class _HomeShellState extends ConsumerState<_HomeShell>
   @override
   Widget build(BuildContext context) {
     final int current = widget.navigationShell.currentIndex;
-    final bool forward = current >= _previousIndex;
-    _previousIndex = current;
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: <Widget>[
-          // Branches with a horizontal slide between them. Right→left when
-          // the user taps a tab to the right; left→right going back.
-          Positioned.fill(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, animation) {
-                final bool isIncoming = child.key == ValueKey<int>(current);
-                final Offset begin = isIncoming
-                    ? (forward ? const Offset(1, 0) : const Offset(-1, 0))
-                    : (forward ? const Offset(-1, 0) : const Offset(1, 0));
-                return SlideTransition(
-                  position: Tween<Offset>(
-                    begin: begin,
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: FadeTransition(opacity: animation, child: child),
-                );
-              },
-              child: KeyedSubtree(
-                key: ValueKey<int>(current),
-                child: widget.navigationShell,
-              ),
-            ),
-          ),
+          // The navigationShell's IndexedStack keeps every branch in the
+          // tree and wraps offstage ones in TickerMode(enabled: false) —
+          // BlurInText controllers sit paused at value 0 until that
+          // branch becomes visible and play naturally on first reveal.
+          // Wrapping this in an AnimatedSwitcher+KeyedSubtree would
+          // remount all four branches per tap (re-subscribing the
+          // accelerometer streams in agenda/calendar, resetting drift
+          // queries, re-priming every animation controller) — that's
+          // the path that introduced the stutter and the missed first-
+          // visit animations.
+          Positioned.fill(child: widget.navigationShell),
           // Floating Kp logo (tap → logout confirm). Sits on every screen.
           Positioned(
             top: 0,

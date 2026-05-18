@@ -533,31 +533,41 @@ class _DayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Event days get the prominent black-filled pill. Selected day
-    // shares the same fill (only one day is ever selected at once,
-    // and the events list below makes which one obvious).
-    final bool filled = isInMonth && (hasEvent || isSelected);
+    // Two flavours of filled pill, layered by priority so an event
+    // happening today still reads as an event (black) — today's grey
+    // pill is the fallback for the otherwise-empty current day.
     final DateTime now = DateTime.now();
     final bool isToday =
         day.year == now.year && day.month == now.month && day.day == now.day;
+    final bool filledBlack = isInMonth && (hasEvent || isSelected);
+    final bool filledGrey = isInMonth && isToday && !filledBlack;
     final Color textColor;
-    if (filled) {
+    if (filledBlack) {
       textColor = Colors.white;
     } else if (!isInMonth) {
       textColor = Colors.black.withValues(alpha: 0.25);
-    } else if (isToday) {
-      // Today gets a softer grey so the user can still tell which day
-      // it is without making it look as important as days that
-      // actually have something scheduled.
-      textColor = Colors.black.withValues(alpha: 0.4);
     } else {
       textColor = Colors.black;
     }
-    // Days without an event aren't tappable — there's nothing to focus
-    // and tapping just shuffled the "Vyber den / Nic v ten den" empty
-    // states. The currently-selected day still accepts taps so the
-    // user can clear selection if we ever wire that up.
+    // Empty days aren't tappable — there's nothing to focus and the
+    // "Vyber den / Nic v ten den" empty states just shuffled. Today
+    // still isn't tappable when it has no event (the grey pill is
+    // pure indication, not a control).
     final bool tappable = isInMonth && (hasEvent || isSelected);
+    final BoxDecoration? decoration;
+    if (filledBlack) {
+      decoration = const BoxDecoration(
+        color: Colors.black,
+        shape: BoxShape.circle,
+      );
+    } else if (filledGrey) {
+      decoration = const BoxDecoration(
+        color: Color(0xFFE0E0E0),
+        shape: BoxShape.circle,
+      );
+    } else {
+      decoration = null;
+    }
     return InkResponse(
       onTap: tappable ? onTap : null,
       radius: 24,
@@ -566,14 +576,14 @@ class _DayCell extends StatelessWidget {
           width: 38,
           height: 38,
           alignment: Alignment.center,
-          decoration: filled
-              ? const BoxDecoration(color: Colors.black, shape: BoxShape.circle)
-              : null,
+          decoration: decoration,
           child: Text(
             '${day.day}',
             style: TextStyle(
               fontFamily: 'StackSansHeadline',
-              fontWeight: filled ? FontWeight.w600 : FontWeight.w400,
+              fontWeight: filledBlack || filledGrey
+                  ? FontWeight.w600
+                  : FontWeight.w400,
               fontSize: 14,
               color: textColor,
             ),

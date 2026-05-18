@@ -356,12 +356,12 @@ class _CulturalNav extends StatelessWidget {
           SafeArea(
             top: false,
             child: Transform.translate(
-              // Drop the labels 20 px lower in their slot so the
-              // gradient has more visual room above the row. Negative
-              // bottom padding isn't a thing, so a translate is the
-              // simplest way to shift in-place without changing the
-              // SizedBox geometry.
-              offset: const Offset(0, 20),
+              // Shift labels 10 px down in their slot so the gradient
+              // has more visual room above the row. Negative bottom
+              // padding isn't a thing, so a translate is the simplest
+              // way to shift in-place without changing the SizedBox
+              // geometry.
+              offset: const Offset(0, 10),
               child: Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: Align(

@@ -49,61 +49,65 @@ The mobile detail screen always wants three things populated. Treat all
 three as required — if a search comes up empty, try one more angle
 before giving up.
 
-- **`cover_image_url`** — a press / promo / album photo of the
-  performer / ensemble / play / film. Prefer Wikipedia infobox image
-  (Wikimedia Commons CDN, always a `https://upload.wikimedia.org/...`
-  URL), the organizer's event page hero image, or the artist's
-  official site. Direct image URL, **not the HTML page**.
+**Images are downloaded, resized, and re-hosted in our MinIO**
+(`event-images` bucket, anonymous-read) — not hot-linked from
+external sources. That gives:
 
-  **Use the right Wikimedia URL form**, otherwise the mobile detail
-  screen spends 5+ seconds downloading a 5-10 MB original just to
-  paint a 300 px circle:
+- One canonical size + format regardless of the source (no Wikimedia
+  thumb roulette, no broken links if a festival rotates posters);
+- Festival-specific posters that beat a generic Wikipedia portrait
+  (the artist is "Anoushka Shankar" but the visual that belongs on
+  the agenda is the *Prague Sounds Anoushka Shankar* poster, not her
+  press headshot);
+- Predictable load times on the agenda.
 
-  - **Preferred**: `https://commons.wikimedia.org/wiki/Special:FilePath/<Name>.<ext>?width=800`
-    — auto-redirects to the nearest pre-cached thumb. Always 200.
-    Store the **resolved** URL (after the redirect) so the mobile app
-    doesn't pay the redirect cost on every load:
-    ```bash
-    curl -sIL -A 'Mozilla/5.0' "$URL" | awk '/^[Ll]ocation: /{print $2}' \
-      | tail -1 | sed 's/?utm_.*//'
-    ```
-  - **Direct thumb**, if you know a width that exists:
-    `/wikipedia/commons/thumb/<h1>/<h2>/<Name>.jpg/960px-<Name>.jpg`.
-    Empirically the "always-works" widths are `500`, `960`, and
-    `1280` — every other number (320, 640, 800, 1024) often 400s.
-    `960` is the sweet spot for mobile: ~200-350 KB JPG, sharp at the
-    300 px agenda circle on a 3x DPR phone and on the wider detail
-    cover.
-  - **Never use the original** (`/wikipedia/commons/<h1>/<h2>/<Name>.jpg`
-    without `/thumb/`). It returns the source upload — Anoushka
-    Shankar's was 8.4 MB and stalled the cover for ~5 s on the agenda.
-- **`venue_image_url`** — a photo of the venue building. Wikipedia
-  Commons is the easiest source for the established venues (Rudolfinum,
-  Forum Karlín, Lucerna, Fórum, …); for festival sites use the
-  organizer page hero. Same "use the original, drop `/thumb/`" rule
-  applies.
+The picker order for what to download:
 
-After picking each URL, sanity-check it actually returns image bytes
-**and isn't oversized** before posting to KP — otherwise the mobile
-app either gets stuck on the fallback icon or spends seconds
-downloading a multi-MB original:
+- **`cover_image_url` source**
+  1. Organizer event detail page — `<meta property="og:image">`,
+     hero banner, large landscape photo of the performer. Right-click
+     ↦ copy-image-link or scrape via WebFetch ("list every
+     `https://` image URL on this page, especially the main hero").
+  2. Artist official site (press / EPK / tour page).
+  3. Wikipedia infobox photo (fallback, often less specific).
+- **`venue_image_url` source**
+  1. Venue's own site — header photo of the building.
+  2. Wikipedia / Wikimedia Commons (Rudolfinum, Forum Karlín,
+     Lucerna, etc.).
+  3. Organizer page hero for festival sites (Letní Letná) without a
+     single venue building.
+- **Program / line-up** — organizer event page first, then any
+  festival schedule. Capture conductor, soloists, work names, opening
+  act. If genuinely not published, say so in the notes — do not
+  invent.
+
+Avoid image-search result pages, Google Image hotlinks, and JS-loaded
+placeholders. The URL must return raw image bytes:
 
 ```bash
-read -r status bytes < <(
-  curl -sS -A 'Mozilla/5.0' -o /dev/null -w "%{http_code} %{size_download}" "$URL"
-)
-[ "$status" = "200" ] || { echo "  bad URL ($status): $URL"; }
-[ "$bytes" -lt 500000 ] || \
-  echo "  warning: $((bytes / 1024)) KB — consider a smaller thumb"
+curl -fsS -A 'Mozilla/5.0' -o /tmp/cover_raw "$SOURCE_URL"
+file /tmp/cover_raw   # expect "JPEG image data" or "PNG image data"
 ```
-- **Program / line-up** — try the organizer's event detail page first,
-  then any festival schedule. Capture conductor, soloists, work names,
-  opening act. If genuinely not published, say so in the notes — do
-  not invent.
 
-Do not link image-search result pages or Google Image hotlinks. If you
-can only find an image embedded on a JS-heavy page, fetch that page
-and copy the rendered `<img src>` URL, not the page URL.
+Then resize with Python Pillow (available on this machine; ImageMagick
+isn't, don't shell out to `magick` / `convert`):
+
+```bash
+python3 - <<'PY'
+from PIL import Image
+src = Image.open("/tmp/cover_raw")
+src.thumbnail((960, 960))                              # long-edge cap
+src.convert("RGB").save(
+    "/tmp/cover_960.jpg",
+    "JPEG", quality=82, optimize=True, progressive=True,
+)
+PY
+```
+
+Target: long edge 960 px, JPEG quality 82, progressive. Usually
+~80-300 KB. Larger source files shrink to fit; smaller files keep
+their original dimensions. Then upload via the KP presigned PUT and
+PATCH the event with the public URL — see step 6.5 below.
 
 ### 4. Journey time from home (Svatovítská 16, Praha)
 
@@ -144,6 +148,10 @@ non-curl UA) on every request below.
 
 ### 6. Create the event in KP
 
+The cover / venue image URLs are PATCH-ed in step 6.5 after we have
+an `EVENT_ID` to upload under, so the POST below only sends the
+address + notes; the URL fields stay null for one frame.
+
 ```bash
 EVENT_RESPONSE=$(curl -fsS -A 'kp-skill/1.0' \
   -H "Authorization: Bearer $KP_TOKEN" \
@@ -155,22 +163,13 @@ EVENT_RESPONSE=$(curl -fsS -A 'kp-skill/1.0' \
     --arg tz "$EVENT_TIMEZONE" \
     --arg notes "$EVENT_NOTES" \
     --arg venue_address "$EVENT_VENUE_ADDRESS" \
-    --arg venue_image_url "$EVENT_VENUE_IMAGE_URL" \
-    --arg cover_image_url "$EVENT_COVER_IMAGE_URL" \
     '{title:$title, category:$cat, starts_at:$start, venue_timezone:$tz,
       source:"skill", notes:$notes,
-      venue_address:(if $venue_address=="" then null else $venue_address end),
-      venue_image_url:(if $venue_image_url=="" then null else $venue_image_url end),
-      cover_image_url:(if $cover_image_url=="" then null else $cover_image_url end)}')" \
+      venue_address:(if $venue_address=="" then null else $venue_address end)}')" \
   "$KP_API_BASE/v1/events")
 EVENT_ID=$(echo "$EVENT_RESPONSE" | jq -r '.id')
 [ -n "$EVENT_ID" ] && [ "$EVENT_ID" != "null" ] \
   || { echo "event creation failed: $EVENT_RESPONSE"; exit 1; }
-
-# Sanity-check the response actually persisted the URLs + address —
-# silently dropped fields are how the skill produced events without
-# covers / maps before (regression-tested in test_events.py).
-echo "$EVENT_RESPONSE" | jq '{cover_image_url, venue_image_url, venue_address}'
 ```
 
 Fields:
@@ -188,24 +187,46 @@ Fields:
 - `EVENT_VENUE_ADDRESS` — full venue address as a single string,
   e.g. `Rudolfinum, Alšovo nábřeží 12, 110 00 Praha 1`. **Required**
   for the "Mapa" button to work.
-- `EVENT_VENUE_IMAGE_URL` — direct URL to a venue building photo
-  (step 3). **Required.**
-- `EVENT_COVER_IMAGE_URL` — direct URL to the cover image (step 3).
-  **Required.**
 
-If the sanity-check echo prints any of the three as `null`, fix the
-input (typo, missing variable, server-side validation rejecting the
-URL) and PATCH the event before moving on:
+### 6.5. Upload resized cover + venue → PATCH event
+
+For each of the two images (`cover` from step 3, `venue` from step 3):
+
+```bash
+# 1. Ask KP for a presigned PUT into the public images bucket.
+RESP=$(curl -fsS -A 'kp-skill/1.0' \
+  -H "Authorization: Bearer $KP_TOKEN" -H 'Content-Type: application/json' \
+  -d "$(jq -n --arg kind "$KIND" --arg ext jpg \
+    '{kind:$kind, extension:$ext}')" \
+  "$KP_API_BASE/v1/events/$EVENT_ID/images/upload-url")
+PUT_URL=$(echo "$RESP" | jq -r '.upload_url')
+PUBLIC_URL=$(echo "$RESP" | jq -r '.public_url')
+
+# 2. PUT the resized 960 px JPEG. -A is required (CF WAF) and -g lets
+# brackets through in the (presigned) URL.
+curl -fsS -g -A 'kp-skill/1.0' --upload-file "$RESIZED_PATH" "$PUT_URL"
+
+# 3. Sanity-check the object is now publicly fetchable.
+curl -sSI -A 'kp-skill/1.0' "$PUBLIC_URL" | head -1   # expect 200
+```
+
+Once both `COVER_PUBLIC_URL` and `VENUE_PUBLIC_URL` exist, PATCH the
+event with both URLs in one shot (version starts at 1 from the POST
+above; bump per PATCH):
 
 ```bash
 curl -fsS -A 'kp-skill/1.0' -X PATCH \
   -H "Authorization: Bearer $KP_TOKEN" -H 'Content-Type: application/json' \
-  -d "$(jq -n --argjson version 1 --arg cover "$EVENT_COVER_IMAGE_URL" \
-    --arg venue_img "$EVENT_VENUE_IMAGE_URL" --arg venue_addr "$EVENT_VENUE_ADDRESS" \
-    '{version:$version, cover_image_url:$cover,
-      venue_image_url:$venue_img, venue_address:$venue_addr}')" \
-  "$KP_API_BASE/v1/events/$EVENT_ID"
+  -d "$(jq -n --argjson v 1 \
+    --arg cover "$COVER_PUBLIC_URL" --arg venue_img "$VENUE_PUBLIC_URL" \
+    '{version:$v, cover_image_url:$cover, venue_image_url:$venue_img}')" \
+  "$KP_API_BASE/v1/events/$EVENT_ID" \
+  | jq '{cover_image_url, venue_image_url, version}'
 ```
+
+The PATCH response should echo both URLs back — if either field
+shows `null`, the backend silently dropped it (see test
+`test_create_persists_image_urls_and_venue_address`).
 
 ### 7. Upload each ticket PDF to KP MinIO
 

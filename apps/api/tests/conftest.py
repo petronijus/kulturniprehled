@@ -88,11 +88,21 @@ def settings(postgres: PostgresContainer, minio: MinioContainer) -> Iterator[Set
         "API_JWT_SECRET": "test-secret-test-secret-test-secret",
         "GOOGLE_OAUTH_CLIENT_ID": "test-client-id",
         "ALLOWED_EMAILS": "petr@example.com,bela@example.com",
+        # Tests hit endpoints in tight loops — disable IP rate limiting
+        # so they don't trip slowapi's per-route caps.
+        "RATE_LIMIT_ENABLED": "false",
     }
     with patch.dict(os.environ, env, clear=False):
         get_settings.cache_clear()
         storage.reset_cached_clients()
         storage.ensure_bucket()
+        # main.py builds `app` at import time, which runs configure_limiter
+        # with the pre-patch settings (rate limit enabled). Re-apply now
+        # that the test env (RATE_LIMIT_ENABLED=false) is live so the
+        # shared module-level limiter doesn't trip during tests.
+        from kp_api.observability import configure_limiter
+
+        configure_limiter(get_settings())
         yield get_settings()
     get_settings.cache_clear()
     storage.reset_cached_clients()

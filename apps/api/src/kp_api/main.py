@@ -4,10 +4,19 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from kp_api import __version__
 from kp_api.adapters.storage import minio as storage
 from kp_api.api.v1 import auth, costs, events, healthz, stats, sync, tickets, watchlist
+from kp_api.config import get_settings
+from kp_api.observability import (
+    SecurityHeadersMiddleware,
+    configure_limiter,
+    configure_logging,
+    limiter,
+)
 
 
 @asynccontextmanager
@@ -24,11 +33,23 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app() -> FastAPI:
+    settings = get_settings()
+    configure_logging(settings)
     app = FastAPI(
         title="Kulturní Přehled API",
         version=__version__,
         lifespan=lifespan,
     )
+    # IP-based rate limiter — module-level singleton (see observability.py)
+    # so route decorators in auth.py bind to it at import time. We just
+    # toggle `enabled` here from runtime settings.
+    configure_limiter(settings)
+    app.state.limiter = limiter
+    app.add_exception_handler(
+        RateLimitExceeded,
+        _rate_limit_exceeded_handler,  # type: ignore[arg-type]
+    )
+    app.add_middleware(SecurityHeadersMiddleware)
     app.include_router(healthz.router)
     app.include_router(auth.router)
     app.include_router(events.router)

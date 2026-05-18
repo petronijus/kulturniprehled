@@ -68,6 +68,13 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    # Rate limiting — IP-based via slowapi. Tests turn this off so they
+    # can hammer endpoints without tripping the limiter.
+    rate_limit_enabled: bool = True
+    rate_limit_default: str = "120/minute"
+    rate_limit_auth_login: str = "10/minute"
+    rate_limit_auth_refresh: str = "30/minute"
+
     # Derived
     @property
     def database_url(self) -> str:

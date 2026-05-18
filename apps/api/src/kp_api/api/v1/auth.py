@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +21,7 @@ from kp_api.adapters.oauth import GoogleIdTokenVerifier, IdTokenVerifier, OAuthE
 from kp_api.config import Settings, get_settings
 from kp_api.domain.enums import UserRole
 from kp_api.domain.models import User, Workspace, WorkspaceMember
+from kp_api.observability import auth_logger, limiter, real_client_ip
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
@@ -96,19 +97,27 @@ async def _ensure_user(session: AsyncSession, settings: Settings, email: str, na
     response_model=TokenResponse,
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit("10/minute")
 async def google_login(
+    request: Request,
     body: GoogleLoginRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],
     verifier: Annotated[IdTokenVerifier, Depends(get_verifier)],
 ) -> TokenResponse:
+    ip = real_client_ip(request)
     try:
         identity = verifier.verify(body.id_token)
     except OAuthError as exc:
+        # Reason includes "email not allowed", "audience mismatch", or
+        # plain "invalid token" — useful when grep-ing for break-in
+        # attempts in the docker logs.
+        auth_logger.warning("login_reject", reason=str(exc), ip=ip)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
     user = await _ensure_user(session, settings, identity.email, identity.name)
     pair = await issue_tokens_for_user(session, user, settings)
     await session.commit()
+    auth_logger.info("login_success", email=identity.email, ip=ip)
     return _to_response(pair)
 
 
@@ -117,28 +126,37 @@ async def google_login(
     response_model=TokenResponse,
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit("30/minute")
 async def refresh(
+    request: Request,
     body: RefreshRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> TokenResponse:
+    ip = real_client_ip(request)
     try:
         pair = await rotate_refresh(session, body.refresh_token, settings)
     except AuthError as exc:
         await session.commit()  # persist any revocations we triggered
+        auth_logger.warning("refresh_reject", reason=str(exc), ip=ip)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
     await session.commit()
+    auth_logger.info("refresh_success", ip=ip)
     return _to_response(pair)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
+    request: Request,
     body: LogoutRequest,
     session: Annotated[AsyncSession, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> None:
+    ip = real_client_ip(request)
     try:
         await revoke_family(session, body.refresh_token, settings)
     except AuthError as exc:
+        auth_logger.warning("logout_reject", reason=str(exc), ip=ip)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
     await session.commit()
+    auth_logger.info("logout_success", ip=ip)

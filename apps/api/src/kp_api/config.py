@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     minio_access_key: str = "kp-minio"
     minio_secret_key: str = "changeme-changeme"  # noqa: S105 (dev default, prod overrides)
     minio_bucket_tickets: str = "tickets"
+    # Event hero / venue photos uploaded by the ingest skill. Public
+    # read so the mobile app can fetch URLs without round-tripping the
+    # API for a presigned GET — covers aren't sensitive, the bucket
+    # only ever sees what the skill or a logged-in user uploads.
+    minio_bucket_images: str = "event-images"
     minio_region: str = "eu-central-1"
     minio_use_ssl: bool = False
     minio_presigned_url_ttl_seconds: int = 900

@@ -95,7 +95,7 @@ def settings(postgres: PostgresContainer, minio: MinioContainer) -> Iterator[Set
     with patch.dict(os.environ, env, clear=False):
         get_settings.cache_clear()
         storage.reset_cached_clients()
-        storage.ensure_bucket()
+        storage.ensure_all_buckets()
         # main.py builds `app` at import time, which runs configure_limiter
         # with the pre-patch settings (rate limit enabled). Re-apply now
         # that the test env (RATE_LIMIT_ENABLED=false) is live so the

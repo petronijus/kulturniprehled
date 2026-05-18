@@ -19,6 +19,7 @@ endpoint, which is fine for tests and local development.
 
 from __future__ import annotations
 
+import json
 import secrets
 from dataclasses import dataclass
 from datetime import timedelta
@@ -86,14 +87,49 @@ def _public_client() -> Minio:
     return _public_client_cached()
 
 
-def ensure_bucket(bucket: str | None = None) -> None:
-    """Best-effort bucket creation. Safe to call at startup."""
+def ensure_bucket(bucket: str | None = None, *, public: bool = False) -> None:
+    """Best-effort bucket creation. Safe to call at startup.
+
+    `public=True` attaches an anonymous-read S3 policy — used for
+    [minio_bucket_images] so the mobile app can hot-link covers
+    without paying for a presigned GET on every render.
+    """
 
     settings = get_settings()
     bucket = bucket or settings.minio_bucket_tickets
     client = _internal_client()
     if not client.bucket_exists(bucket):
         client.make_bucket(bucket, location=settings.minio_region)
+    if public:
+        client.set_bucket_policy(bucket, _public_read_policy(bucket))
+
+
+def ensure_all_buckets() -> None:
+    """Create every bucket the API needs (tickets, images). Tickets stays
+    private (presigned-only); event images are public so the mobile app
+    can fetch covers without round-tripping the API.
+    """
+
+    settings = get_settings()
+    ensure_bucket(settings.minio_bucket_tickets)
+    ensure_bucket(settings.minio_bucket_images, public=True)
+
+
+def _public_read_policy(bucket: str) -> str:
+    return json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "PublicRead",
+                    "Effect": "Allow",
+                    "Principal": {"AWS": ["*"]},
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"arn:aws:s3:::{bucket}/*"],
+                }
+            ],
+        }
+    )
 
 
 def _object_key_for_ticket(event_id: UUID) -> str:
@@ -114,6 +150,60 @@ def make_upload_url(event_id: UUID, mime_type: str) -> PresignedUpload:
     )
     _ = mime_type  # Reserved for future Content-Type binding via headers.
     return PresignedUpload(object_key=key, url=url, expires_in_seconds=ttl)
+
+
+@dataclass(frozen=True)
+class PresignedImageUpload:
+    """Presigned PUT plus the eventual public GET URL.
+
+    The skill PUTs the resized cover to `upload_url`, then PATCHes the
+    event with `public_url` so the mobile app fetches covers directly
+    from MinIO without involving the API on every render.
+    """
+
+    upload_url: str
+    public_url: str
+    expires_in_seconds: int
+
+
+def make_image_upload_url(event_id: UUID, kind: str, extension: str) -> PresignedImageUpload:
+    """Presign a PUT into the public images bucket.
+
+    `kind` ⊆ {"cover", "venue"} and is baked into the object key so the
+    upload can't accidentally overwrite a ticket; `extension` is the
+    file extension without the leading dot (`jpg`, `webp`, ...).
+    """
+
+    settings = get_settings()
+    if kind not in {"cover", "venue"}:
+        raise ValueError(f"unknown image kind: {kind!r}")
+    key = f"events/{event_id}/{kind}.{extension.lstrip('.')}"
+    ttl = settings.minio_presigned_url_ttl_seconds
+    upload_url = _public_client().presigned_put_object(
+        settings.minio_bucket_images,
+        key,
+        expires=timedelta(seconds=ttl),
+    )
+    public_url = _public_object_url(settings, key)
+    return PresignedImageUpload(
+        upload_url=upload_url,
+        public_url=public_url,
+        expires_in_seconds=ttl,
+    )
+
+
+def _public_object_url(settings: Settings, key: str) -> str:
+    endpoint = settings.minio_public_endpoint or settings.minio_endpoint
+    secure = (
+        settings.minio_public_use_ssl
+        if settings.minio_public_use_ssl is not None
+        else settings.minio_use_ssl
+    )
+    scheme = "https" if secure else "http"
+    # MinIO defaults to path-style URLs and the Cloudflare-tunnel host
+    # `kulturniprehled-tickets.example.com` forwards everything verbatim,
+    # so `<scheme>://<endpoint>/<bucket>/<key>` resolves to the object.
+    return f"{scheme}://{endpoint}/{settings.minio_bucket_images}/{key}"
 
 
 def make_download_url(object_key: str) -> PresignedDownload:

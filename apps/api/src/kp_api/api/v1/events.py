@@ -13,9 +13,11 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from kp_api.adapters.storage import minio as storage
 from kp_api.api.deps import CurrentUser, SessionDep
 from kp_api.domain.enums import ChangeOp, EventCategory, EventSource, EventStatus
 from kp_api.domain.models import Event, User, Workspace, WorkspaceMember
@@ -171,6 +173,48 @@ async def delete_event(
     await record_event_change(session, event, user.id, ChangeOp.DELETE)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class EventImageUploadRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str = Field(pattern="^(cover|venue)$")
+    extension: str = Field(min_length=1, max_length=5, pattern="^[a-z0-9]+$")
+
+
+class EventImageUploadResponse(BaseModel):
+    upload_url: str
+    public_url: str
+    expires_in_seconds: int
+
+
+@router.post(
+    "/{event_id}/images/upload-url",
+    response_model=EventImageUploadResponse,
+)
+async def request_event_image_upload(
+    event_id: UUID,
+    body: EventImageUploadRequest,
+    session: SessionDep,
+    user: CurrentUser,
+) -> EventImageUploadResponse:
+    """Hand back a presigned PUT URL into the public images bucket.
+
+    The skill resizes the cover/venue photo locally (target ≤ 500 KB,
+    960 px on the long edge), PUTs into `upload_url`, and PATCHes the
+    event with `public_url`. Because the images bucket is anonymous-
+    read, the mobile app fetches `public_url` directly with no API
+    round-trip per render.
+    """
+
+    workspace = await _user_workspace(session, user)
+    await _get_active_event(session, workspace, event_id)
+    presigned = storage.make_image_upload_url(event_id, body.kind, body.extension)
+    return EventImageUploadResponse(
+        upload_url=presigned.upload_url,
+        public_url=presigned.public_url,
+        expires_in_seconds=presigned.expires_in_seconds,
+    )
 
 
 # Re-export to make the router list explicit in main.

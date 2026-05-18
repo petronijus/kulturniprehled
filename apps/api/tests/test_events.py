@@ -38,6 +38,42 @@ async def test_create_and_get_event(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_request_image_upload_url_returns_presigned_put_and_public_get(
+    client: AsyncClient,
+) -> None:
+    pair = await login_as(client, "petr@example.com")
+    headers = auth_header(pair["access_token"])
+    create = await client.post("/v1/events", json=_event_payload(), headers=headers)
+    event_id = create.json()["id"]
+    response = await client.post(
+        f"/v1/events/{event_id}/images/upload-url",
+        json={"kind": "cover", "extension": "jpg"},
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["upload_url"].startswith("http")
+    # Public URL is path-style + lives under the images bucket so the
+    # mobile app can fetch it without involving the API.
+    assert f"/event-images/events/{event_id}/cover.jpg" in body["public_url"]
+    assert body["expires_in_seconds"] > 0
+
+
+@pytest.mark.asyncio
+async def test_request_image_upload_url_rejects_unknown_kind(client: AsyncClient) -> None:
+    pair = await login_as(client, "petr@example.com")
+    headers = auth_header(pair["access_token"])
+    create = await client.post("/v1/events", json=_event_payload(), headers=headers)
+    event_id = create.json()["id"]
+    response = await client.post(
+        f"/v1/events/{event_id}/images/upload-url",
+        json={"kind": "ticket", "extension": "jpg"},
+        headers=headers,
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_create_persists_image_urls_and_venue_address(client: AsyncClient) -> None:
     # Regression: the ingest skill was reporting these fields silently
     # disappearing from /v1/events POST responses — the schema accepted

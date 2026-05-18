@@ -23,10 +23,10 @@ from kp_api.observability import (
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Idempotent bucket bootstrap so a fresh MinIO comes up ready to use.
     # We do not crash startup if MinIO is unreachable — the API still serves
-    # /healthz and Postgres-only endpoints — but tickets endpoints will 5xx
-    # until the bucket exists.
+    # /healthz and Postgres-only endpoints — but ticket / image endpoints
+    # will 5xx until the bucket exists.
     try:
-        storage.ensure_bucket()
+        storage.ensure_all_buckets()
     except Exception:  # noqa: S110 (bootstrap is best-effort; healthz still serves)
         pass
     yield

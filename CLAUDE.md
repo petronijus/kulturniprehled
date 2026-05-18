@@ -319,7 +319,7 @@ flutter build ipa --release \
   --dart-define=KP_GOOGLE_OAUTH_SERVER_CLIENT_ID="$GOOG_CLIENT_ID"
 
 xcrun altool --upload-app \
-  -f build/ios/ipa/kp_mobile.ipa \
+  -f "build/ios/ipa/Kulturni Prehled.ipa" \
   -t ios \
   -u petronijus@example.com \
   -p "$ALTOOL_PW"

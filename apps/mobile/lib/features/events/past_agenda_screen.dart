@@ -3,31 +3,60 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:kp_mobile/core/widgets/blur_in_text.dart';
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
 
-class PastAgendaScreen extends ConsumerWidget {
+class PastAgendaScreen extends ConsumerStatefulWidget {
   const PastAgendaScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PastAgendaScreen> createState() => _PastAgendaScreenState();
+}
+
+class _PastAgendaScreenState extends ConsumerState<PastAgendaScreen> {
+  // Fresh tick each mount so the BlurInText title plays through once
+  // when the user opens the Minulé screen.
+  final ValueNotifier<int> _replayTick = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    _replayTick.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final AsyncValue<List<CachedEventRow>> agendaAsync = ref.watch(
       agendaProvider,
     );
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        bottom: false,
-        child: agendaAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Text('Načítání selhalo: $error'),
+      body: Stack(
+        children: <Widget>[
+          agendaAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text('Načítání selhalo: $error'),
+              ),
+            ),
+            data: (rows) => _PastList(
+              rows: _filterAndSortPast(rows),
+              replayTrigger: _replayTick,
             ),
           ),
-          data: (rows) => _PastList(rows: _filterAndSortPast(rows)),
-        ),
+          // Floating back button above the list. Tap → bottom-nav Agenda root.
+          Positioned(
+            left: 4,
+            top: MediaQuery.of(context).padding.top + 8,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              onPressed: () => context.go('/agenda'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -42,35 +71,99 @@ class PastAgendaScreen extends ConsumerWidget {
   }
 }
 
-class _PastList extends StatelessWidget {
-  const _PastList({required this.rows});
+/// Figma 2040:37 — small label + thin horizontal rule + tiny right arrow.
+/// Used as the agenda's "tap to see past" tile (agenda_screen) and as the
+/// section header inside the past list itself.
+class PastHeader extends StatelessWidget {
+  const PastHeader({required this.label, super.key});
 
-  final List<CachedEventRow> rows;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'StackSansHeadline',
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+            height: 1.0,
+            letterSpacing: 0.48,
+            color: Colors.black,
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(child: SizedBox(height: 12, child: _ArrowRule())),
+      ],
+    );
+  }
+}
+
+class _ArrowRule extends StatelessWidget {
+  const _ArrowRule();
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+        painter: _ArrowRulePainter(),
+        size: Size.infinite,
+      );
+}
+
+class _ArrowRulePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint paint = Paint()
+      ..color = Colors.black
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.square;
+    final double y = size.height / 2;
+    const double headLen = 5;
+    canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    canvas.drawLine(
+      Offset(size.width, y),
+      Offset(size.width - headLen, y - headLen),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(size.width, y),
+      Offset(size.width - headLen, y + headLen),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+class _PastList extends StatelessWidget {
+  const _PastList({required this.rows, required this.replayTrigger});
+
+  final List<CachedEventRow> rows;
+  final Listenable replayTrigger;
+
+  @override
+  Widget build(BuildContext context) {
+    // Mirrors the WatchlistScreen header geometry so the two parent screens
+    // sit at the same vertical rhythm: status-bar inset + 96 px.
+    final double topPad = MediaQuery.of(context).padding.top + 96;
     return CustomScrollView(
       slivers: <Widget>[
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-            child: Row(
-              children: <Widget>[
-                IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.black),
-                  onPressed: () => context.go('/agenda'),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Minulé',
-                  style: TextStyle(
-                    fontFamily: 'Gloock',
-                    fontSize: 60,
-                    height: 1.0,
-                    color: Colors.black,
-                  ),
-                ),
-              ],
+            padding: EdgeInsets.fromLTRB(24, topPad, 24, 24),
+            child: BlurInText(
+              key: const ValueKey<String>('minule-title'),
+              text: 'Minulé',
+              restartTrigger: replayTrigger,
+              style: const TextStyle(
+                fontFamily: 'Gloock',
+                fontSize: 50,
+                height: 1.0,
+                color: Colors.black,
+              ),
             ),
           ),
         ),

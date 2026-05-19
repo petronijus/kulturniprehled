@@ -13,6 +13,7 @@ import 'package:kp_mobile/core/widgets/morphing_hero_cover.dart';
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/agenda_replay_provider.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
+import 'package:kp_mobile/features/events/past_agenda_screen.dart' show PastHeader;
 import 'package:kp_mobile/features/sync/sync_controller.dart';
 
 const Color _ghostColor = Color(0xFFB1B1B1);
@@ -241,7 +242,10 @@ class _AgendaList extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.only(
         top: mq.padding.top + 64,
-        bottom: mq.size.height * 0.5,
+        // Cap scroll so the last item (Minulé tile) ends up in the bottom
+        // third of the viewport at max scroll instead of being pullable
+        // all the way to the middle of the screen.
+        bottom: mq.size.height * 0.2,
       ),
       itemCount: itemCount,
       itemBuilder: (context, index) {
@@ -311,8 +315,8 @@ class _MonthSection extends StatelessWidget {
           right: 0,
           child: IgnorePointer(
             child: _ParallaxLayer(
-              scrollFactor: 0.35,
-              tiltAmplitude: const Offset(4, 4),
+              scrollFactor: 0.12,
+              tiltAmplitude: const Offset(2, 2),
               child: ImageFiltered(
                 imageFilter: ImageFilter.blur(
                   sigmaX: _ghostBlur,
@@ -401,13 +405,16 @@ class _EventCard extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.none,
             children: <Widget>[
-              // Mid-depth: cover image, modest scroll lag, medium tilt drift.
+              // Mid-depth: cover image. Mild scroll lag — both cover and
+              // title carry a scrollFactor so they lag together; the small
+              // delta between them keeps the depth illusion without
+              // throwing the title off the cover on later cards.
               Positioned(
                 right: -16,
                 top: 0,
                 child: _ParallaxLayer(
-                  scrollFactor: 0.18,
-                  tiltAmplitude: const Offset(8, 8),
+                  scrollFactor: 0.10,
+                  tiltAmplitude: const Offset(3, 3),
                   child: SizedBox(
                     width: _coverDiameter,
                     height: _coverDiameter,
@@ -428,12 +435,14 @@ class _EventCard extends StatelessWidget {
                   ),
                 ),
               ),
-              // Foreground: title + date row. No scroll lag (moves with the
-              // viewport at full speed), largest tilt drift.
+              // Foreground: title + date row. Modest tilt drift — title
+              // shouldn't fly around vs cover. Top inset pushes the title
+              // below the cover's visual centre.
               _ParallaxLayer(
-                tiltAmplitude: const Offset(12, 12),
+                scrollFactor: -0.02,
+                tiltAmplitude: const Offset(6, 6),
                 child: Padding(
-                  padding: const EdgeInsets.only(right: 24),
+                  padding: const EdgeInsets.only(top: 80, right: 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
@@ -481,51 +490,27 @@ class _EventCard extends StatelessWidget {
       s.isEmpty ? s : (s[0].toUpperCase() + s.substring(1));
 }
 
+/// Slim divider tile that ends the agenda — small "Minulé" label followed
+/// by a thin rule and a right-pointing chevron at the end. Whole row is
+/// the tap target into /agenda/past.
 class _PastTile extends StatelessWidget {
   const _PastTile({required this.count});
 
+  // Kept for future surfacing (e.g. badge); intentionally unused in the
+  // current Figma 2040:37 style which doesn't show a count.
   final int count;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () => context.go('/agenda/past'),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 64, 24, 64),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: <Widget>[
-            const Text(
-              'Minulé',
-              style: TextStyle(
-                fontFamily: 'Gloock',
-                fontSize: 60,
-                height: 1.0,
-                color: Colors.black,
-              ),
-            ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Text(
-                    '$count',
-                    style: const TextStyle(
-                      fontFamily: 'StackSansHeadline',
-                      fontWeight: FontWeight.w300,
-                      fontSize: 18,
-                      color: Colors.black54,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.chevron_right, size: 28, color: Colors.black),
-                ],
-              ),
-            ),
-          ],
-        ),
+      child: const Padding(
+        // Match the event card's DateRow horizontal bounds: outer card
+        // padding 24-left/0-right combined with the foreground's 24-right
+        // inner padding gives 24/24 — so "Minulé" sits under "Koncert"
+        // and the arrow sits under the event time.
+        padding: EdgeInsets.fromLTRB(24, 82, 24, 64),
+        child: PastHeader(label: 'Minulé'),
       ),
     );
   }

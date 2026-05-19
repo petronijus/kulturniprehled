@@ -129,10 +129,13 @@ class _WatchlistHeader extends StatelessWidget {
           InkResponse(
             onTap: onAdd,
             radius: 64,
-            child: const SizedBox(
-              width: 120,
-              height: 120,
-              child: Icon(Icons.add, size: 110, color: Colors.black),
+            child: Transform.translate(
+              offset: const Offset(0, -10),
+              child: const SizedBox(
+                width: 120,
+                height: 120,
+                child: Icon(Icons.add, size: 110, color: Colors.black),
+              ),
             ),
           ),
         ],

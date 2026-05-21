@@ -35,29 +35,105 @@ class OfflineCacheService {
   Future<void> refresh() async {
     final KpDatabase db = _ref.read(kpDatabaseProvider);
     final List<CachedEventRow> upcoming = await db.watchUpcomingEvents();
-    if (upcoming.isEmpty) {
-      return;
-    }
 
-    final Set<String> imageUrls = <String>{};
+    final Set<String> upcomingImageUrls = <String>{};
     for (final CachedEventRow event in upcoming) {
       final String? cover = event.coverImageUrl;
-      if (cover != null && cover.isNotEmpty) imageUrls.add(cover);
+      if (cover != null && cover.isNotEmpty) upcomingImageUrls.add(cover);
       final String? venue = event.venueImageUrl;
-      if (venue != null && venue.isNotEmpty) imageUrls.add(venue);
+      if (venue != null && venue.isNotEmpty) upcomingImageUrls.add(venue);
     }
-    for (final String url in imageUrls) {
+    for (final String url in upcomingImageUrls) {
       await _ensureImageCached(url);
     }
 
-    final List<String> upcomingIds = upcoming
+    if (upcoming.isNotEmpty) {
+      final List<String> upcomingIds = upcoming
+          .map((CachedEventRow e) => e.id)
+          .toList();
+      final List<CachedTicketRow> tickets = await db.ticketsForEventIds(
+        upcomingIds,
+      );
+      for (final CachedTicketRow ticket in tickets) {
+        await _ensureTicketCached(ticket);
+      }
+    }
+
+    await _gcPastEvents(stillNeededImageUrls: upcomingImageUrls);
+  }
+
+  /// Removes images + ticket binaries that belong only to past events. An
+  /// image that's still referenced by an upcoming event (e.g. a venue
+  /// photo reused across concerts) stays cached. Drift rows for the
+  /// events / tickets themselves are kept — stats and past_agenda still
+  /// read from them.
+  Future<void> _gcPastEvents({
+    required Set<String> stillNeededImageUrls,
+  }) async {
+    final KpDatabase db = _ref.read(kpDatabaseProvider);
+    // One-day grace: keep the event of the day on disk so the user can
+    // still pull up the ticket at the venue with no network.
+    final DateTime cutoff = DateTime.now().subtract(const Duration(days: 1));
+    final List<CachedEventRow> past = await db.pastEventsBefore(cutoff);
+    if (past.isEmpty) {
+      return;
+    }
+
+    final Set<String> upcomingHashes = stillNeededImageUrls
+        .map(urlHash)
+        .toSet();
+    final Set<String> pastHashes = <String>{};
+    for (final CachedEventRow event in past) {
+      final String? cover = event.coverImageUrl;
+      if (cover != null && cover.isNotEmpty) pastHashes.add(urlHash(cover));
+      final String? venue = event.venueImageUrl;
+      if (venue != null && venue.isNotEmpty) pastHashes.add(urlHash(venue));
+    }
+    final List<String> hashesToDrop = pastHashes
+        .difference(upcomingHashes)
+        .toList();
+
+    if (hashesToDrop.isNotEmpty) {
+      final List<CachedImageRow> rows = await db.findCachedImagesByHashes(
+        hashesToDrop,
+      );
+      for (final CachedImageRow row in rows) {
+        try {
+          final File file = File(row.localPath);
+          if (await file.exists()) {
+            await file.delete();
+          }
+        } catch (_) {
+          // Best-effort — DB row will be dropped regardless.
+        }
+      }
+      await db.deleteCachedImagesByHashes(hashesToDrop);
+    }
+
+    final List<String> pastEventIds = past
         .map((CachedEventRow e) => e.id)
         .toList();
-    final List<CachedTicketRow> tickets = await db.ticketsForEventIds(
-      upcomingIds,
+    final List<CachedTicketRow> pastTickets = await db.ticketsForEventIds(
+      pastEventIds,
     );
-    for (final CachedTicketRow ticket in tickets) {
-      await _ensureTicketCached(ticket);
+    final List<String> ticketIdsToDrop = <String>[];
+    for (final CachedTicketRow ticket in pastTickets) {
+      final CachedTicketFileRow? file = await db.findTicketFile(ticket.id);
+      if (file == null) {
+        continue;
+      }
+      try {
+        final File f = File(file.localPath);
+        if (await f.exists()) {
+          await f.delete();
+        }
+      } catch (_) {
+        // ignore
+      }
+      ticketIdsToDrop.add(ticket.id);
+    }
+    if (ticketIdsToDrop.isNotEmpty) {
+      await db.deleteTicketFiles(ticketIdsToDrop);
     }
   }
 

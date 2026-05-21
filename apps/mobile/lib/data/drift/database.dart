@@ -273,6 +273,14 @@ class KpDatabase extends _$KpDatabase {
         .get();
   }
 
+  Future<List<CachedEventRow>> pastEventsBefore(DateTime cutoff) {
+    return (select(cachedEvents)..where(
+          (tbl) =>
+              tbl.deletedAt.isNull() & tbl.startsAt.isSmallerThanValue(cutoff),
+        ))
+        .get();
+  }
+
   Future<void> upsertEvent(CachedEventsCompanion row) =>
       into(cachedEvents).insertOnConflictUpdate(row);
 
@@ -366,6 +374,15 @@ class KpDatabase extends _$KpDatabase {
 
   Future<void> upsertTicketFile(CachedTicketFilesCompanion row) =>
       into(cachedTicketFiles).insertOnConflictUpdate(row);
+
+  Future<void> deleteTicketFiles(List<String> ticketIds) async {
+    if (ticketIds.isEmpty) {
+      return;
+    }
+    await (delete(
+      cachedTicketFiles,
+    )..where((tbl) => tbl.ticketId.isIn(ticketIds))).go();
+  }
 
   // ===== Costs =====
 

@@ -8,6 +8,7 @@ import 'package:kp_mobile/core/config.dart';
 import 'package:kp_mobile/core/routing/app_router.dart';
 import 'package:kp_mobile/core/theme.dart';
 import 'package:kp_mobile/features/notifications/notification_service.dart';
+import 'package:kp_mobile/features/sync/background_sync.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,9 @@ Future<void> main() async {
   );
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   await initializeDateFormatting('cs');
+  // Wires up WorkManager (Android) / BGTaskScheduler (iOS) so the local
+  // cache catches new server changes even when the app isn't open.
+  await BackgroundSync.initializeAndSchedule();
 
   const String dsn = AppConfig.sentryDsn;
   if (dsn.isEmpty) {

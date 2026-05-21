@@ -182,9 +182,11 @@ EVENT_RESPONSE=$(curl -fsS -A 'kp-skill/1.0' \
     --arg tz "$EVENT_TIMEZONE" \
     --arg notes "$EVENT_NOTES" \
     --arg venue_address "$EVENT_VENUE_ADDRESS" \
+    --arg departure "$EVENT_DEPARTURE_AT_ISO" \
     '{title:$title, category:$cat, starts_at:$start, venue_timezone:$tz,
       source:"skill", notes:$notes,
-      venue_address:(if $venue_address=="" then null else $venue_address end)}')" \
+      venue_address:(if $venue_address=="" then null else $venue_address end),
+      departure_at:(if $departure=="" then null else $departure end)}')" \
   "$KP_API_BASE/v1/events")
 EVENT_ID=$(echo "$EVENT_RESPONSE" | jq -r '.id')
 [ -n "$EVENT_ID" ] && [ "$EVENT_ID" != "null" ] \
@@ -206,6 +208,11 @@ Fields:
 - `EVENT_VENUE_ADDRESS` — full venue address as a single string,
   e.g. `Rudolfinum, Alšovo nábřeží 12, 110 00 Praha 1`. **Required**
   for the "Mapa" button to work.
+- `EVENT_DEPARTURE_AT_ISO` — ISO 8601 of when the user needs to
+  leave home to arrive 15 min before the show, computed in step 4
+  from journey time. The mobile app fires a "leave in 10 min"
+  local notification 10 minutes before this timestamp. Leave empty
+  if journey lookup failed; the notification just gets skipped.
 
 ### 6.5. Upload resized cover + venue → PATCH event
 

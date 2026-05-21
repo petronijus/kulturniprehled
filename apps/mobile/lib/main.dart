@@ -7,6 +7,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:kp_mobile/core/config.dart';
 import 'package:kp_mobile/core/routing/app_router.dart';
 import 'package:kp_mobile/core/theme.dart';
+import 'package:kp_mobile/features/notifications/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,6 +49,9 @@ class KpApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Boot the notification scheduler so it (re)plans local notifications
+    // every time the agenda cache changes. No-op until the first sync.
+    ref.watch(notificationSchedulerProvider);
     return MaterialApp.router(
       title: 'Kulturní Přehled',
       debugShowCheckedModeBanner: false,

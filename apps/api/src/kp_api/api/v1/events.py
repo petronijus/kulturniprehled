@@ -99,6 +99,7 @@ async def create_event(
         cover_image_url=body.cover_image_url,
         venue_image_url=body.venue_image_url,
         venue_address=body.venue_address,
+        departure_at=body.departure_at,
         created_by=user.id,
         version=1,
     )

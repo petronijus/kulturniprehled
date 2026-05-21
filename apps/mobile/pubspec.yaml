@@ -1,7 +1,7 @@
 name: kp_mobile
 description: "Kulturní Přehled — shared cultural-event tracker (Android + iOS)."
 publish_to: "none"
-version: 1.0.8+9
+version: 1.0.9+10
 
 environment:
   sdk: ^3.11.5
@@ -27,6 +27,9 @@ dependencies:
   uuid: ^4.5.1
   cupertino_icons: ^1.0.8
   sensors_plus: ^7.0.0
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
+  flutter_timezone: ^4.1.0
 
 dev_dependencies:
   flutter_test:

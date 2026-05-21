@@ -97,6 +97,33 @@ async def test_create_persists_image_urls_and_venue_address(client: AsyncClient)
 
 
 @pytest.mark.asyncio
+async def test_create_persists_departure_at(client: AsyncClient) -> None:
+    # The mobile app schedules a "leave in 10 min" local notification off
+    # `departure_at`. Make sure the field round-trips through POST + PATCH
+    # so the skill's computed departure time actually lands in the DB.
+    pair = await login_as(client, "petr@example.com")
+    headers = auth_header(pair["access_token"])
+    departure = "2026-06-04T16:15:00Z"
+    create = await client.post(
+        "/v1/events",
+        json=_event_payload(departure_at=departure),
+        headers=headers,
+    )
+    assert create.status_code == 201, create.text
+    assert create.json()["departure_at"] == departure
+
+    later = "2026-06-04T16:45:00Z"
+    event_id = create.json()["id"]
+    patch = await client.patch(
+        f"/v1/events/{event_id}",
+        json={"version": 1, "departure_at": later},
+        headers=headers,
+    )
+    assert patch.status_code == 200, patch.text
+    assert patch.json()["departure_at"] == later
+
+
+@pytest.mark.asyncio
 async def test_list_filters_by_date_and_category(client: AsyncClient) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])

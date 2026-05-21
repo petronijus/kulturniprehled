@@ -37,6 +37,7 @@ class EventCreate(BaseModel):
     cover_image_url: str | None = Field(default=None, max_length=1024)
     venue_image_url: str | None = Field(default=None, max_length=1024)
     venue_address: str | None = None
+    departure_at: datetime | None = None
 
 
 class EventUpdate(BaseModel):
@@ -54,6 +55,7 @@ class EventUpdate(BaseModel):
     cover_image_url: str | None = Field(default=None, max_length=1024)
     venue_image_url: str | None = Field(default=None, max_length=1024)
     venue_address: str | None = None
+    departure_at: datetime | None = None
 
 
 class EventResponse(BaseModel):
@@ -73,6 +75,7 @@ class EventResponse(BaseModel):
     cover_image_url: str | None
     venue_image_url: str | None
     venue_address: str | None
+    departure_at: datetime | None
     created_by: UUID
     version: int
     created_at: datetime

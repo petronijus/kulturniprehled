@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -24,7 +23,6 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin;
   bool _initialized = false;
-  bool _previewSent = false;
 
   // Notification IDs are stable-by-hash so re-scheduling overwrites the
   // same slot. We collapse the event id (UUID) to a 31-bit int via
@@ -40,8 +38,9 @@ class NotificationService {
     final String localTzName = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(localTzName));
 
-    const AndroidInitializationSettings android =
-        AndroidInitializationSettings('ic_stat_notify');
+    const AndroidInitializationSettings android = AndroidInitializationSettings(
+      'ic_stat_notify',
+    );
     const DarwinInitializationSettings ios = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -78,21 +77,15 @@ class NotificationService {
     await initialize();
     await _plugin.cancelAll();
 
-    // First-launch preview: fire one of each notification type so the
-    // user can see what they look like without waiting for the real
-    // trigger times. Gated to once per process lifetime.
-    if (!_previewSent) {
-      _previewSent = true;
-      // Don't await — let it fan out in the background so the rescheduling
-      // below isn't blocked.
-      unawaited(_firePreviewSlate(rows));
-    }
-
     final DateTime now = DateTime.now();
     final List<CachedEventRow> upcoming = rows
-        .where((r) =>
-            r.deletedAt == null &&
-            r.startsAt.toLocal().isAfter(now.subtract(const Duration(hours: 2))))
+        .where(
+          (r) =>
+              r.deletedAt == null &&
+              r.startsAt.toLocal().isAfter(
+                now.subtract(const Duration(hours: 2)),
+              ),
+        )
         .toList();
     upcoming.sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
@@ -101,14 +94,19 @@ class NotificationService {
     final DateTime nextMonday9 = _nextWeekday(now, DateTime.monday, 9);
     final DateTime weekEnd = nextMonday9.add(const Duration(days: 7));
     final List<CachedEventRow> weekEvents = upcoming
-        .where((r) =>
-            r.startsAt.toLocal().isAfter(nextMonday9.subtract(const Duration(minutes: 1))) &&
-            r.startsAt.toLocal().isBefore(weekEnd))
+        .where(
+          (r) =>
+              r.startsAt.toLocal().isAfter(
+                nextMonday9.subtract(const Duration(minutes: 1)),
+              ) &&
+              r.startsAt.toLocal().isBefore(weekEnd),
+        )
         .toList();
     if (weekEvents.isNotEmpty) {
       final String body = _digestBody(weekEvents);
-      final String? cover =
-          await _fetchCoverToFile(weekEvents.first.coverImageUrl);
+      final String? cover = await _fetchCoverToFile(
+        weekEvents.first.coverImageUrl,
+      );
       await _scheduleAt(
         id: _weeklyDigestId,
         when: nextMonday9,
@@ -150,7 +148,9 @@ class NotificationService {
 
       final DateTime? departure = event.departureAt?.toLocal();
       if (departure != null) {
-        final DateTime tenBefore = departure.subtract(const Duration(minutes: 10));
+        final DateTime tenBefore = departure.subtract(
+          const Duration(minutes: 10),
+        );
         if (tenBefore.isAfter(now)) {
           await _scheduleAt(
             id: _idForEvent(event.id, 'pre-departure'),
@@ -166,101 +166,6 @@ class NotificationService {
         }
       }
     }
-  }
-
-  /// Fires one notification of each kind back-to-back so the user can
-  /// preview what they'll look like at the real trigger times. Picks the
-  /// soonest upcoming event for venue/title; falls back to a sample.
-  Future<void> _firePreviewSlate(List<CachedEventRow> rows) async {
-    final DateTime now = DateTime.now();
-    final List<CachedEventRow> upcoming = rows
-        .where((r) =>
-            r.deletedAt == null && r.startsAt.toLocal().isAfter(now))
-        .toList()
-      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
-    final CachedEventRow? sample = upcoming.isEmpty ? null : upcoming.first;
-
-    final String sampleTitle = sample?.title ?? 'Anoushka Shankar';
-    final String sampleVenue =
-        sample?.venueAddress ?? 'Rudolfinum, Alšovo nábřeží 12';
-    final DateTime sampleStart =
-        sample?.startsAt.toLocal() ?? DateTime(now.year, now.month, now.day, 20);
-    final DateTime sampleDeparture = sample?.departureAt?.toLocal() ??
-        sampleStart.subtract(const Duration(minutes: 45));
-    final String? sampleCover =
-        await _fetchCoverToFile(sample?.coverImageUrl);
-
-    // Stagger by 3 s so each notification slides in separately on the
-    // lock screen / notification shade.
-    await Future<void>.delayed(const Duration(seconds: 3));
-    final List<CachedEventRow> digestSample = upcoming.take(3).toList();
-    await _plugin.show(
-      _weeklyDigestId,
-      'Tento týden v Kulturním přehledu (náhled)',
-      digestSample.isEmpty
-          ? '• Pondělí 25.5. — Bella Adamova\n• Středa 27.5. — Macbeth\n• Sobota 30.5. — Anoushka Shankar'
-          : _digestBody(digestSample),
-      _detailsWithCover(
-        channelId: 'weekly_digest',
-        channelName: 'Týdenní přehled',
-        coverPath: sampleCover,
-        bigSummary:
-            digestSample.isEmpty ? '3 akce' : '${digestSample.length} akcí',
-      ),
-    );
-
-    await Future<void>.delayed(const Duration(seconds: 3));
-    final String dayOfBody = _dayOfBody(
-      _previewEvent(sampleTitle, sampleStart, sampleVenue),
-    );
-    await _plugin.show(
-      _idForEvent(sampleTitle, 'day-of-preview'),
-      'Dnes (náhled): $sampleTitle',
-      dayOfBody,
-      _detailsWithCover(
-        channelId: 'event_day_of',
-        channelName: 'Den události',
-        coverPath: sampleCover,
-      ),
-    );
-
-    await Future<void>.delayed(const Duration(seconds: 3));
-    await _plugin.show(
-      _idForEvent(sampleTitle, 'pre-departure-preview'),
-      'Za 10 min vyraz (náhled) — $sampleTitle',
-      _departureBody(
-        _previewEvent(sampleTitle, sampleStart, sampleVenue),
-        sampleDeparture,
-      ),
-      _detailsWithCover(
-        channelId: 'event_departure',
-        channelName: 'Čas vyrazit',
-        coverPath: sampleCover,
-      ),
-    );
-  }
-
-  /// Builds a throwaway `CachedEventRow`-shaped record for the preview
-  /// body helpers without poking the DB.
-  CachedEventRow _previewEvent(
-    String title,
-    DateTime startsAtLocal,
-    String venueAddress,
-  ) {
-    return CachedEventRow(
-      id: 'preview',
-      workspaceId: 'preview',
-      title: title,
-      category: 'concert',
-      startsAt: startsAtLocal.toUtc(),
-      venueTimezone: 'Europe/Prague',
-      status: 'planned',
-      source: 'preview',
-      venueAddress: venueAddress,
-      version: 1,
-      updatedAt: DateTime.now().toUtc(),
-      cachedAt: DateTime.now().toUtc(),
-    );
   }
 
   Future<void> _scheduleAt({
@@ -350,8 +255,7 @@ class NotificationService {
   /// local time. If today already matches and the hour is in the past,
   /// rolls forward by a week so we never schedule retroactively.
   DateTime _nextWeekday(DateTime from, int weekday, int hour) {
-    DateTime candidate =
-        DateTime(from.year, from.month, from.day, hour);
+    DateTime candidate = DateTime(from.year, from.month, from.day, hour);
     final int delta = (weekday - candidate.weekday) % 7;
     candidate = candidate.add(Duration(days: delta));
     if (!candidate.isAfter(from)) {
@@ -393,8 +297,8 @@ class NotificationService {
 
 final Provider<NotificationService> notificationServiceProvider =
     Provider<NotificationService>(
-  (ref) => NotificationService(FlutterLocalNotificationsPlugin()),
-);
+      (ref) => NotificationService(FlutterLocalNotificationsPlugin()),
+    );
 
 /// Watches the agenda cache and re-plans notifications whenever it changes.
 /// Initialised at app start in main.dart via [ref.read].

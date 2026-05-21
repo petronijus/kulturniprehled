@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import 'package:kp_mobile/core/widgets/local_first_image.dart';
+
 /// Hero that morphs the cover image's clip shape between endpoints —
 /// circle on the agenda tile, full-bleed rectangle on the detail
 /// screen.
@@ -312,8 +314,8 @@ class _CoverContent extends StatelessWidget {
     return Container(
       color: const Color(0xFFEFEFEF),
       child: has
-          ? Image.network(
-              imageUrl!,
+          ? LocalFirstImage(
+              imageUrl: imageUrl!,
               fit: fit,
               frameBuilder:
                   (

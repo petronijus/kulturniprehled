@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kp_mobile/core/widgets/blur_in_text.dart';
 import 'package:kp_mobile/core/widgets/date_row.dart';
+import 'package:kp_mobile/core/widgets/local_first_image.dart';
 import 'package:kp_mobile/core/widgets/morphing_hero_cover.dart';
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/agenda_replay_provider.dart';
@@ -426,9 +427,8 @@ class _VenueSection extends StatelessWidget {
         if (imageUrl != null && imageUrl!.isNotEmpty)
           AspectRatio(
             aspectRatio: 16 / 9,
-            child: Image.network(
-              imageUrl!,
-              fit: BoxFit.cover,
+            child: LocalFirstImage(
+              imageUrl: imageUrl!,
               loadingBuilder: (context, child, progress) =>
                   progress == null ? child : const SizedBox.shrink(),
               errorBuilder: (context, _, _) => Container(

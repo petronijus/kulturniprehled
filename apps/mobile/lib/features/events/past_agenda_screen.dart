@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:kp_mobile/core/widgets/blur_in_text.dart';
+import 'package:kp_mobile/core/widgets/local_first_image.dart';
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
 
@@ -105,10 +106,8 @@ class _ArrowRule extends StatelessWidget {
   const _ArrowRule();
 
   @override
-  Widget build(BuildContext context) => CustomPaint(
-        painter: _ArrowRulePainter(),
-        size: Size.infinite,
-      );
+  Widget build(BuildContext context) =>
+      CustomPaint(painter: _ArrowRulePainter(), size: Size.infinite);
 }
 
 class _ArrowRulePainter extends CustomPainter {
@@ -272,9 +271,8 @@ class _PastEventTile extends StatelessWidget {
   Widget _coverOrIcon() {
     final String? url = event.coverImageUrl;
     if (url != null && url.isNotEmpty) {
-      return Image.network(
-        url,
-        fit: BoxFit.cover,
+      return LocalFirstImage(
+        imageUrl: url,
         errorBuilder: (_, e, s) => _iconWidget(),
       );
     }

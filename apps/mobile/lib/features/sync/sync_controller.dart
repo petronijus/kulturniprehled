@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +7,7 @@ import 'package:kp_mobile/data/api_client/kp_client.dart';
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/costs/cost_dto.dart';
 import 'package:kp_mobile/features/events/event_dto.dart';
+import 'package:kp_mobile/features/sync/offline_cache_service.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_dto.dart';
 
 // Pulls /v1/sync since the last cursor and feeds change_log entries into
@@ -69,6 +72,10 @@ class SyncController extends Notifier<SyncState> {
         }
       }
       state = SyncState(lastSyncedAt: DateTime.now());
+      // Cache images + ticket binaries off the UI thread. We don't await
+      // so a slow download (or a sticky MinIO) doesn't keep the agenda
+      // spinner up; the next render will see whichever files have landed.
+      unawaited(ref.read(offlineCacheServiceProvider).refresh());
     } on DioException catch (e) {
       state = state.copyWith(
         isSyncing: false,

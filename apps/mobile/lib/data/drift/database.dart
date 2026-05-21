@@ -128,6 +128,21 @@ class CachedWatchlistItems extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{id};
 }
 
+@DataClassName('CachedImageRow')
+class CachedImages extends Table {
+  // Keyed by the SHA-1 of the source URL, so different MinIO objects get
+  // their own file, and the same image reused across events (e.g. a venue
+  // photo) shares one local file.
+  TextColumn get urlHash => text()();
+  TextColumn get sourceUrl => text()();
+  TextColumn get localPath => text()();
+  IntColumn get sizeBytes => integer().nullable()();
+  DateTimeColumn get downloadedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{urlHash};
+}
+
 @DataClassName('CachedCostRow')
 class CachedCosts extends Table {
   // All amounts are CZK haléře. Multi-currency was dropped before v1.0.
@@ -158,6 +173,7 @@ class CachedCosts extends Table {
     CachedTicketFiles,
     CachedCosts,
     CachedWatchlistItems,
+    CachedImages,
   ],
 )
 class KpDatabase extends _$KpDatabase {
@@ -165,7 +181,7 @@ class KpDatabase extends _$KpDatabase {
   KpDatabase.test(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -198,6 +214,9 @@ class KpDatabase extends _$KpDatabase {
       }
       if (from < 8) {
         await m.addColumn(cachedEvents, cachedEvents.departureAt);
+      }
+      if (from < 9) {
+        await m.createTable(cachedImages);
       }
     },
   );
@@ -243,6 +262,15 @@ class KpDatabase extends _$KpDatabase {
     return (select(
       cachedTickets,
     )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+  }
+
+  Future<List<CachedTicketRow>> ticketsForEventIds(List<String> eventIds) {
+    if (eventIds.isEmpty) {
+      return Future<List<CachedTicketRow>>.value(<CachedTicketRow>[]);
+    }
+    return (select(cachedTickets)
+          ..where((tbl) => tbl.deletedAt.isNull() & tbl.eventId.isIn(eventIds)))
+        .get();
   }
 
   Future<void> upsertEvent(CachedEventsCompanion row) =>
@@ -381,6 +409,33 @@ class KpDatabase extends _$KpDatabase {
 
   Future<void> upsertWatchlistItem(CachedWatchlistItemsCompanion row) =>
       into(cachedWatchlistItems).insertOnConflictUpdate(row);
+
+  // ===== Image cache =====
+
+  Future<CachedImageRow?> findCachedImage(String urlHash) {
+    return (select(
+      cachedImages,
+    )..where((tbl) => tbl.urlHash.equals(urlHash))).getSingleOrNull();
+  }
+
+  Future<List<CachedImageRow>> findCachedImagesByHashes(List<String> hashes) {
+    if (hashes.isEmpty) {
+      return Future<List<CachedImageRow>>.value(<CachedImageRow>[]);
+    }
+    return (select(
+      cachedImages,
+    )..where((tbl) => tbl.urlHash.isIn(hashes))).get();
+  }
+
+  Future<void> upsertCachedImage(CachedImagesCompanion row) =>
+      into(cachedImages).insertOnConflictUpdate(row);
+
+  Future<void> deleteCachedImagesByHashes(List<String> hashes) async {
+    if (hashes.isEmpty) {
+      return;
+    }
+    await (delete(cachedImages)..where((tbl) => tbl.urlHash.isIn(hashes))).go();
+  }
 
   /// Returns any cached row's `workspace_id`. Used to stamp optimistic local
   /// writes before the server-assigned identifier arrives via /v1/sync.

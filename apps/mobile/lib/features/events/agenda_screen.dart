@@ -13,7 +13,8 @@ import 'package:kp_mobile/core/widgets/morphing_hero_cover.dart';
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/agenda_replay_provider.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
-import 'package:kp_mobile/features/events/past_agenda_screen.dart' show PastHeader;
+import 'package:kp_mobile/features/events/past_agenda_screen.dart'
+    show PastHeader;
 import 'package:kp_mobile/features/sync/sync_controller.dart';
 
 const Color _ghostColor = Color(0xFFB1B1B1);

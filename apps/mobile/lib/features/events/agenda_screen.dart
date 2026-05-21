@@ -400,8 +400,8 @@ class _EventCard extends StatelessWidget {
       onTap: () => context.go('/agenda/events/${event.id}', extra: event),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 16, 0, 24),
-        child: SizedBox(
-          height: _coverDiameter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: _coverDiameter),
           child: Stack(
             clipBehavior: Clip.none,
             children: <Widget>[

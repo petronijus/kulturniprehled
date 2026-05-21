@@ -24,6 +24,9 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // Core library desugaring lets flutter_local_notifications use the
+        // java.time / java.util.concurrent APIs on older Android (< API 26).
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -60,10 +63,23 @@ android {
                 // for devs without the release keystore on disk.
                 signingConfigs.getByName("debug")
             }
+            // Disable R8 minification / resource shrinking. The
+            // flutter_local_notifications plugin's Gson TypeToken stops
+            // working when generic signatures are stripped, and even with
+            // the keep-rules in proguard-rules.pro we couldn't get the
+            // plugin's internal serialization to round-trip cleanly.
+            // We accept the ~5 MB APK size penalty for now; revisit if we
+            // need to squeeze the size for Play Store / TestFlight.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -22,6 +24,7 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin;
   bool _initialized = false;
+  bool _previewSent = false;
 
   // Notification IDs are stable-by-hash so re-scheduling overwrites the
   // same slot. We collapse the event id (UUID) to a 31-bit int via
@@ -38,7 +41,7 @@ class NotificationService {
     tz.setLocalLocation(tz.getLocation(localTzName));
 
     const AndroidInitializationSettings android =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('ic_stat_notify');
     const DarwinInitializationSettings ios = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -75,6 +78,16 @@ class NotificationService {
     await initialize();
     await _plugin.cancelAll();
 
+    // First-launch preview: fire one of each notification type so the
+    // user can see what they look like without waiting for the real
+    // trigger times. Gated to once per process lifetime.
+    if (!_previewSent) {
+      _previewSent = true;
+      // Don't await — let it fan out in the background so the rescheduling
+      // below isn't blocked.
+      unawaited(_firePreviewSlate(rows));
+    }
+
     final DateTime now = DateTime.now();
     final List<CachedEventRow> upcoming = rows
         .where((r) =>
@@ -94,13 +107,19 @@ class NotificationService {
         .toList();
     if (weekEvents.isNotEmpty) {
       final String body = _digestBody(weekEvents);
+      final String? cover =
+          await _fetchCoverToFile(weekEvents.first.coverImageUrl);
       await _scheduleAt(
         id: _weeklyDigestId,
         when: nextMonday9,
         title: 'Tento týden v Kulturním přehledu',
         body: body,
-        channelId: 'weekly_digest',
-        channelName: 'Týdenní přehled',
+        details: _detailsWithCover(
+          channelId: 'weekly_digest',
+          channelName: 'Týdenní přehled',
+          coverPath: cover,
+          bigSummary: '${weekEvents.length} akcí',
+        ),
       );
     }
 
@@ -113,14 +132,19 @@ class NotificationService {
         startsLocal.day,
         9,
       );
+      final String? cover = await _fetchCoverToFile(event.coverImageUrl);
+
       if (dayOf9.isAfter(now)) {
         await _scheduleAt(
           id: _idForEvent(event.id, 'day-of'),
           when: dayOf9,
           title: 'Dnes: ${event.title}',
           body: _dayOfBody(event),
-          channelId: 'event_day_of',
-          channelName: 'Den události',
+          details: _detailsWithCover(
+            channelId: 'event_day_of',
+            channelName: 'Den události',
+            coverPath: cover,
+          ),
         );
       }
 
@@ -133,12 +157,110 @@ class NotificationService {
             when: tenBefore,
             title: 'Za 10 min vyraz — ${event.title}',
             body: _departureBody(event, departure),
-            channelId: 'event_departure',
-            channelName: 'Čas vyrazit',
+            details: _detailsWithCover(
+              channelId: 'event_departure',
+              channelName: 'Čas vyrazit',
+              coverPath: cover,
+            ),
           );
         }
       }
     }
+  }
+
+  /// Fires one notification of each kind back-to-back so the user can
+  /// preview what they'll look like at the real trigger times. Picks the
+  /// soonest upcoming event for venue/title; falls back to a sample.
+  Future<void> _firePreviewSlate(List<CachedEventRow> rows) async {
+    final DateTime now = DateTime.now();
+    final List<CachedEventRow> upcoming = rows
+        .where((r) =>
+            r.deletedAt == null && r.startsAt.toLocal().isAfter(now))
+        .toList()
+      ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+    final CachedEventRow? sample = upcoming.isEmpty ? null : upcoming.first;
+
+    final String sampleTitle = sample?.title ?? 'Anoushka Shankar';
+    final String sampleVenue =
+        sample?.venueAddress ?? 'Rudolfinum, Alšovo nábřeží 12';
+    final DateTime sampleStart =
+        sample?.startsAt.toLocal() ?? DateTime(now.year, now.month, now.day, 20);
+    final DateTime sampleDeparture = sample?.departureAt?.toLocal() ??
+        sampleStart.subtract(const Duration(minutes: 45));
+    final String? sampleCover =
+        await _fetchCoverToFile(sample?.coverImageUrl);
+
+    // Stagger by 3 s so each notification slides in separately on the
+    // lock screen / notification shade.
+    await Future<void>.delayed(const Duration(seconds: 3));
+    final List<CachedEventRow> digestSample = upcoming.take(3).toList();
+    await _plugin.show(
+      _weeklyDigestId,
+      'Tento týden v Kulturním přehledu (náhled)',
+      digestSample.isEmpty
+          ? '• Pondělí 25.5. — Bella Adamova\n• Středa 27.5. — Macbeth\n• Sobota 30.5. — Anoushka Shankar'
+          : _digestBody(digestSample),
+      _detailsWithCover(
+        channelId: 'weekly_digest',
+        channelName: 'Týdenní přehled',
+        coverPath: sampleCover,
+        bigSummary:
+            digestSample.isEmpty ? '3 akce' : '${digestSample.length} akcí',
+      ),
+    );
+
+    await Future<void>.delayed(const Duration(seconds: 3));
+    final String dayOfBody = _dayOfBody(
+      _previewEvent(sampleTitle, sampleStart, sampleVenue),
+    );
+    await _plugin.show(
+      _idForEvent(sampleTitle, 'day-of-preview'),
+      'Dnes (náhled): $sampleTitle',
+      dayOfBody,
+      _detailsWithCover(
+        channelId: 'event_day_of',
+        channelName: 'Den události',
+        coverPath: sampleCover,
+      ),
+    );
+
+    await Future<void>.delayed(const Duration(seconds: 3));
+    await _plugin.show(
+      _idForEvent(sampleTitle, 'pre-departure-preview'),
+      'Za 10 min vyraz (náhled) — $sampleTitle',
+      _departureBody(
+        _previewEvent(sampleTitle, sampleStart, sampleVenue),
+        sampleDeparture,
+      ),
+      _detailsWithCover(
+        channelId: 'event_departure',
+        channelName: 'Čas vyrazit',
+        coverPath: sampleCover,
+      ),
+    );
+  }
+
+  /// Builds a throwaway `CachedEventRow`-shaped record for the preview
+  /// body helpers without poking the DB.
+  CachedEventRow _previewEvent(
+    String title,
+    DateTime startsAtLocal,
+    String venueAddress,
+  ) {
+    return CachedEventRow(
+      id: 'preview',
+      workspaceId: 'preview',
+      title: title,
+      category: 'concert',
+      startsAt: startsAtLocal.toUtc(),
+      venueTimezone: 'Europe/Prague',
+      status: 'planned',
+      source: 'preview',
+      venueAddress: venueAddress,
+      version: 1,
+      updatedAt: DateTime.now().toUtc(),
+      cachedAt: DateTime.now().toUtc(),
+    );
   }
 
   Future<void> _scheduleAt({
@@ -146,8 +268,7 @@ class NotificationService {
     required DateTime when,
     required String title,
     required String body,
-    required String channelId,
-    required String channelName,
+    required NotificationDetails details,
   }) async {
     final tz.TZDateTime scheduledAt = tz.TZDateTime.from(when, tz.local);
     await _plugin.zonedSchedule(
@@ -155,23 +276,74 @@ class NotificationService {
       title,
       body,
       scheduledAt,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          channelId,
-          channelName,
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
+      details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
+  }
+
+  /// Downloads an image URL to the app's temp dir and returns the local
+  /// path. Cached by URL hash so repeated calls reuse the file on disk.
+  /// Returns null on any failure — caller must treat that as "no image,
+  /// fall back to text-only notification".
+  Future<String?> _fetchCoverToFile(String? url) async {
+    if (url == null || url.isEmpty) return null;
+    try {
+      final Directory tmp = await getTemporaryDirectory();
+      final String slug = url.hashCode.toRadixString(36);
+      final File file = File('${tmp.path}/kp_notif_cover_$slug.jpg');
+      if (await file.exists() && (await file.length()) > 0) {
+        return file.path;
+      }
+      final HttpClient client = HttpClient();
+      final HttpClientRequest req = await client.getUrl(Uri.parse(url));
+      final HttpClientResponse resp = await req.close();
+      if (resp.statusCode != 200) {
+        client.close();
+        return null;
+      }
+      final IOSink sink = file.openWrite();
+      await resp.pipe(sink);
+      await sink.close();
+      client.close();
+      return file.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  NotificationDetails _detailsWithCover({
+    required String channelId,
+    required String channelName,
+    required String? coverPath,
+    String? bigSummary,
+  }) {
+    final AndroidNotificationDetails android = AndroidNotificationDetails(
+      channelId,
+      channelName,
+      importance: Importance.high,
+      priority: Priority.high,
+      icon: 'ic_stat_notify',
+      styleInformation: coverPath == null
+          ? null
+          : BigPictureStyleInformation(
+              FilePathAndroidBitmap(coverPath),
+              summaryText: bigSummary,
+            ),
+      largeIcon: coverPath == null ? null : FilePathAndroidBitmap(coverPath),
+    );
+    final DarwinNotificationDetails ios = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      attachments: coverPath == null
+          ? null
+          : <DarwinNotificationAttachment>[
+              DarwinNotificationAttachment(coverPath),
+            ],
+    );
+    return NotificationDetails(android: android, iOS: ios);
   }
 
   /// Returns the next instance of [weekday] (1=Mon … 7=Sun) at [hour]:00

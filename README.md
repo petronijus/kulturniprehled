@@ -6,18 +6,34 @@ tickets and creates events automatically.
 
 ## Features
 
-- Shared agenda of concerts, theatre, cinema and other cultural events.
-- Shared watchlist (todo-style) of films, divadlo and concerts to catch later, with one level of nesting (e.g. "Godard" → individual films), drag-to-reorder, and 10-second polling so both devices stay in sync.
-- Mobile agenda view (chronological) and monthly calendar view.
-- One-way sync to a shared Google Calendar.
+- Shared agenda of concerts, theatre, cinema and other cultural events —
+  chronological list, monthly calendar, dedicated past-events view, and a
+  per-event detail screen with cover art, venue photos, ticket PDFs, costs
+  and notes.
+- Shared watchlist (todo-style) of films, theatre and concerts to catch
+  later, with 2-level nesting (e.g. "Godard" → individual films),
+  drag-to-reorder, and 10-second polling so both devices stay in sync.
+- Year-in-review statistics — total spend, visits by category, top venues,
+  monthly distribution.
 - LLM-powered ticket ingestion: drop a ticket file into Claude on the
   desktop and the event, metadata, transport details and the ticket itself
   appear on both phones — offline.
-- Offline-first mobile: tickets and event metadata cached locally so they
-  work at the venue without signal. Inline image and PDF viewer.
+- **Offline-first mobile**: after each sync the app proactively pre-caches
+  every upcoming event's cover image and ticket PDF onto the device, then
+  garbage-collects past events. The agenda, detail screen, ticket viewer
+  and calendar all read from disk first and fall back to the network only
+  on cache misses. Tickets stay readable at venues without signal.
+- **Background sync**: a 30-minute WorkManager (Android) / BGTaskScheduler
+  (iOS) task pulls server changes and re-primes the cache while the app is
+  closed, so the first launch on event day is already up-to-date. No FCM /
+  APNs dependency — simpler ops, no push tokens to manage.
+- One-way sync to a shared Google Calendar (idempotent via
+  `extendedProperties.kp_event_id`).
 - CZK cost tracking with year-in-review statistics.
-- Offline edits queue in an outbox and reconcile with the server when the
-  network returns; conflicts surface a "keep yours / use server" dialog.
+- Offline edit queue: writes go into an outbox table and reconcile with
+  the server when the network returns; version conflicts surface a
+  "keep yours / use server" dialog.
+- Local notifications for event start time, configurable per-event.
 - Optional self-hosted GlitchTip / Sentry error reporting.
 - Infrastructure prepared for a future proactive AI recommendations agent.
 
@@ -25,16 +41,22 @@ tickets and creates events automatically.
 
 - **Backend** — Python 3.12, FastAPI, SQLAlchemy 2.0 async, PostgreSQL 16,
   Alembic, MinIO (S3-compatible).
-- **Mobile** — Flutter (Android primary, iOS feature parity), drift (SQLite),
-  Riverpod, go_router, Material 3 dark theme, pdfrx.
+- **Mobile** — Flutter 3.44.0 (Android primary, iOS feature parity), drift
+  (SQLite), Riverpod, go_router, Material 3, pdfrx, workmanager
+  (federated), sensors_plus, flutter_local_notifications.
 - **LLM** — Anthropic Claude API behind a `LLMProvider` abstraction.
 - **Public access** — Cloudflare Tunnel, two subdomains
-  (`api.kp.*` for the API, `tickets.kp.*` for MinIO signed URLs).
+  (`kulturniprehled.example.com` for the API,
+  `kulturniprehled-tickets.example.com` for MinIO signed URLs).
 - **Auth** — Google OAuth2 (PKCE on mobile) + JWT (15 min) + refresh-token
   rotation with reuse detection. Personal access tokens for headless
   clients (the Claude skill).
+- **Mobile release** — signed APK from GitHub Releases for Android (Pixel
+  + Běla's phone sideload), TestFlight Internal Testing (group `Družina`)
+  for iOS.
 
-See [`CLAUDE.md`](./CLAUDE.md) for the development guide.
+See [`CLAUDE.md`](./CLAUDE.md) for the development guide, including the
+local pre-merge checklist, release procedure and iOS dev-sideload flow.
 
 ## Repository layout
 
@@ -43,6 +65,10 @@ apps/api/            FastAPI service
 apps/mobile/         Flutter app
 packages/            OpenAPI snapshot
 skills/ticket-parser Claude Code skill source
+assets-source/       master design assets — user-authored, repo of truth
+  brand/             logo + launcher + notification icon masters; the
+                     downstream PNG/AppIcon variants are regenerated from
+                     these only when the masters change
 infra/
   docker-compose.yml    dev stack (Postgres + MinIO + API)
   compose.prod.yml      prod overlay (cloudflared, hardened ports)
@@ -50,7 +76,7 @@ infra/
   cloudflared/          tunnel config example
   deploy/               setup-vm.sh + upgrade.sh + README
   backup/               pg_dump, mc_mirror, restore-test, cron.example
-docs/                Architecture, sync, deployment notes
+docs/                Architecture, API, sync, deployment, handover notes
 ```
 
 ## Quick start (development)
@@ -58,7 +84,7 @@ docs/                Architecture, sync, deployment notes
 Prerequisites:
 - Docker and Docker Compose v2
 - Python 3.12+ (only needed for running backend tests outside Docker)
-- Flutter 3.x (only needed for the mobile app)
+- Flutter 3.44.0 (only needed for the mobile app)
 
 ```bash
 cp .env.example .env
@@ -94,13 +120,17 @@ ln -sfn $(pwd)/skills/ticket-parser ~/.claude/skills/kulturni-prehled-ingest
 ```bash
 # Backend (testcontainers spins up Postgres + MinIO)
 cd apps/api
-pip install -e ".[dev]"
-pytest
+uv sync --dev
+uv run pytest
 
 # Mobile
 cd apps/mobile
+flutter pub get
 flutter test
 ```
+
+See [`CLAUDE.md`](./CLAUDE.md) for the full pre-merge checklist (ruff,
+black, mypy, dart format, flutter analyze).
 
 ## Production deployment
 
@@ -118,6 +148,20 @@ docker compose --env-file /opt/kp/.env \
 
 For routine releases: `ssh deploy@kp-vm /opt/kp/infra/deploy/upgrade.sh`.
 
+## Mobile release
+
+- **Android** — local signed APK build, published to GitHub Releases. Petr
+  + Běla install via browser from
+  `https://github.com/petronijus/kulturniprehled/releases`. Procedure in
+  [`CLAUDE.md`](./CLAUDE.md) under *Release procedure*.
+- **iOS** — TestFlight Internal Testing (group `Družina`,
+  auto-distribute on). Two release paths:
+  - Local Mac with Xcode + app-specific password — original recipe in
+    [`CLAUDE.md`](./CLAUDE.md) under *iOS release procedure (TestFlight)*.
+  - Headless from any SSH-capable workstation via the Proxmox MacOS VM
+    + App Store Connect API key. End-to-end recipe lives in
+    [`docs/handover.md`](./docs/handover.md) under the 2026-05-22 session.
+
 ## Milestones
 
 - **M0** Repo bootstrap.
@@ -129,8 +173,16 @@ For routine releases: `ssh deploy@kp-vm /opt/kp/infra/deploy/upgrade.sh`.
 - **M6** Monthly calendar, ticket viewer, outbox + conflict UI.
 - **M7** Costs + year-in-review stats + PDF viewer.
 - **M8** Backups, deploy scripts, error reporting, polish, **v1.0.0 GA**.
-- **M9** Watchlist — shared todo list with 2-level nesting, drag reorder, 10-second sync polling.
-- **M10+** AI recommendations agent (deferred — schema is in place).
+- **M9** Watchlist — shared todo list with 2-level nesting, drag reorder,
+  10-second sync polling.
+- **M10** UI polish round — Material 3 refresh of every screen per Figma
+  (agenda, detail, calendar, watchlist, stats), hero animations between
+  agenda and detail, parallax cover + device-tilt, bottom nav redesign.
+- **M11** Offline-first hardening + iOS TestFlight live —
+  proactive image + ticket cache after each sync, past-event GC,
+  WorkManager / BGTaskScheduler 30-min background refresh; **first iOS
+  TestFlight build delivered to Běla 2026-05-22**.
+- **M12+** AI recommendations agent (deferred — schema is in place).
 
 ## License
 

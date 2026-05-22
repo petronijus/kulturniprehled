@@ -9,12 +9,12 @@ extended Claude Code skill.
 | Layer        | Choice                                                                |
 | ------------ | --------------------------------------------------------------------- |
 | Backend      | Python 3.12, FastAPI, SQLAlchemy 2.0 async, PostgreSQL 16, Alembic    |
-| Mobile       | Flutter (Android primary, iOS parity), drift (SQLite), Riverpod       |
+| Mobile       | Flutter 3.44.0 (Android primary, iOS parity), drift (SQLite), Riverpod |
 | Object store | MinIO (S3-compatible), self-hosted                                    |
 | LLM          | Anthropic Claude API behind a `LLMProvider` abstraction               |
 | Hosting      | Proxmox VM, Docker Compose, Cloudflare Tunnel                         |
 | Auth         | Google OAuth2 (PKCE) → backend issues JWT + refresh-token rotation    |
-| Push         | APNs (iOS) + FCM (Android) behind `NotificationProvider` abstraction  |
+| Background   | WorkManager (Android) + BGTaskScheduler (iOS), 30-min periodic sync (no APNs / FCM — see `docs/architecture.md`) |
 | CI/CD        | None — solo dev, manual release flow documented below                 |
 
 ## Language policy
@@ -29,6 +29,33 @@ iOS keeps **full feature parity**, no Android-only features allowed. Every
 package choice must work identically on both. Material 3 design system avoids
 Cupertino-only widgets while still feeling native enough.
 
+## Toolchain pinning
+
+- **Flutter 3.44.0** across every dev machine (Linux dev box, MacBook,
+  Proxmox MacOS VM). The repo no longer builds on 3.41 — between 3.41
+  and 3.44 `CupertinoPageTransitionsBuilder` moved out of
+  `material.dart`, and `ReorderableSliverList.onReorder` was replaced by
+  `onReorderItem`. Pin via `cd $(flutter --version --machine | jq -r
+  .flutterRoot) && git checkout 3.44.0`.
+- **Swift Package Manager disabled** per machine —
+  `flutter config --no-enable-swift-package-manager`. Three of our
+  iOS-side plugins (`workmanager_apple`, `flutter_secure_storage`,
+  `flutter_local_notifications`) only ship CocoaPods specs; mixed-mode
+  builds fail with `Module 'flutter_timezone' not found` errors. This
+  is a per-machine flutter config flag, not a repo file, so each dev
+  workstation needs to set it once.
+
+## Brand assets pipeline
+
+Brand masters live under `assets-source/brand/` as 1024×1024 PNGs
+authored by Petr. **Never invent, regenerate, or "improve" them** — the
+contract is in `assets-source/brand/README.md`. Downstream artefacts
+(in-app logo, Android `mipmap-*/ic_launcher.png` +
+`drawable-*/ic_stat_notify.png`, iOS `AppIcon.appiconset`) are *resized
+only* from the masters; the generator never paints pixels. If you need
+a new brand asset, ask Petr to drop a new master and only then run the
+resize step.
+
 ## Repository layout
 
 ```
@@ -36,8 +63,9 @@ apps/api/          FastAPI service
 apps/mobile/       Flutter app (Android + iOS)
 packages/          Shared specs / generated clients
 skills/            Claude Code skill source (ticket parser)
+assets-source/     Brand masters (logo, launcher, notif), user-authored
 infra/             Docker Compose, Cloudflare Tunnel, backup scripts
-docs/              Architecture, API, sync, deployment docs
+docs/              Architecture, API, sync, deployment, handover docs
 ```
 
 ## Conventions
@@ -252,9 +280,23 @@ see the next section.
 
 ## iOS release procedure (TestFlight)
 
-iOS distribution lives on the **Mac** — Xcode + CocoaPods can't run on Linux.
-Petr's Mac (per the 2026-05-14 toolchain notes in `docs/handover.md`) already
-has Flutter 3.41.9, CocoaPods 1.16.2, and the iOS-26-5 Simulator runtime.
+iOS distribution needs a Mac because Xcode + CocoaPods can't run on
+Linux. Two paths now exist:
+
+- **Local Mac (MacBook).** Original recipe — kept here for the case
+  when you're sitting at the MacBook and just want to ship. Petr's
+  MacBook should be on Flutter 3.44.0 (the `assets-source/brand`
+  contract, the `import 'package:flutter/cupertino.dart'` change to
+  `theme.dart`, and the manual-signing pbxproj edits all depend on
+  3.44+; see [docs/handover.md](./docs/handover.md) 2026-05-22 entry
+  for the MacBook upgrade steps).
+- **Headless via Proxmox MacOS VM (`server-mac`, `192.0.2.154`).**
+  Documented end-to-end in [docs/handover.md](./docs/handover.md)
+  under the 2026-05-22 session — drives the build over SSH from any
+  workstation, authed by the App Store Connect API key in 1Password.
+  No GUI clicks. Preferred for routine releases.
+
+The section below is the **local Mac** recipe.
 
 ### One-time setup (done 2026-05-18 — do NOT redo unless rebuilding the account)
 

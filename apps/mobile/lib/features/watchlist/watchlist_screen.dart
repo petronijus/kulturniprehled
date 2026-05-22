@@ -323,7 +323,7 @@ class _WatchlistBody extends ConsumerWidget {
           ),
         };
       },
-      onReorder: (int oldIndex, int newIndex) async {
+      onReorderItem: (int oldIndex, int newIndex) async {
         await _reorder(context, ref, entries, oldIndex, newIndex);
       },
     );
@@ -336,7 +336,6 @@ class _WatchlistBody extends ConsumerWidget {
     int oldIndex,
     int newIndex,
   ) async {
-    if (newIndex > oldIndex) newIndex -= 1;
     if (oldIndex == newIndex) return;
     final _WatchlistEntry movingEntry = entries[oldIndex];
     final _WatchlistEntry targetEntry = entries[newIndex];

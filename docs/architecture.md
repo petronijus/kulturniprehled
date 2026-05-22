@@ -126,10 +126,50 @@ masters change. The generators never invent or paint pixels; they only
 resize and (for the iOS appicon) flatten alpha onto an opaque
 background. See `assets-source/brand/README.md` for the contract.
 
+## Proactive recommendations (M12)
+
+The M12 slot turned out **not** to be a server-side worker writing
+into the `recommendations` table. Instead it lives entirely in
+`skills/` as a Claude Code skill suite, scheduled via `/schedule`.
+The trade-off: server-side cron would have meant scrapers + LLM API
+calls + email composition all in Python; the skill approach reuses
+Claude Code's MCP servers (Spotify, google-workspace) and WebFetch
+for free, and Claude itself does the ranking step.
+
+Topology:
+
+```
+/schedule (Mon 08:00) ─→ /kulturni-prehled (aggregator)
+                            │
+                            ├─→ Skill /klasika-expert     → /tmp/kp-digest-CW<n>/klasika.json
+                            ├─→ Skill /elektronika-expert → elektronika.json
+                            ├─→ Skill /divadlo-expert     → divadlo.json (future)
+                            └─→ Skill /film-expert        → film.json (future)
+                                              │
+                                              ▼
+                            merge + balance + spacing + Gmail send
+```
+
+Per-expert candidate gathering is a **hybrid** — static bash
+scrapers for permanent sources (orchestras, theatre companies),
+LLM-driven WebFetch for dynamic sources (festivals, club programs).
+The aggregator owns cross-domain rules: balance signal from the KP
+API event history, ~1-event-per-week spacing with `season_event`
+exceptions, global cap of ~5 picks. Every expert is independently
+runnable (`/klasika-expert` in chat returns JSON without sending);
+the aggregator is the only skill that emails.
+
+The `recommendations` table in the DB schema is **unused** — the
+weekly digest goes straight to inbox; if Petr buys a ticket it
+flows back via the existing `kulturni-prehled-ingest` skill. No
+server-side recommendation storage needed.
+
+Implementation: `skills/kulturni-prehled/SKILL.md` + per-expert
+skills + `skills/<expert>/preferences.md` for hand-edited taste
+profiles. Operator docs in `skills/kulturni-prehled/README.md`.
+
 ## To be expanded
 
 - Sequence diagrams for: ticket ingestion via skill, offline edit +
-  reconcile, background sync wake.
+  reconcile, background sync wake, weekly recommendation digest.
 - Operational diagrams: backup, restore drill, tunnel topology.
-- AI-recommendations subsystem (M12, deferred). The schema is in place
-  (`recommendations` table); the worker is not.

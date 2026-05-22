@@ -182,7 +182,13 @@ For routine releases: `ssh deploy@kp-vm /opt/kp/infra/deploy/upgrade.sh`.
   proactive image + ticket cache after each sync, past-event GC,
   WorkManager / BGTaskScheduler 30-min background refresh; **first iOS
   TestFlight build delivered to Běla 2026-05-22**.
-- **M12+** AI recommendations agent (deferred — schema is in place).
+- **M12** Proactive recommendations — Claude Code skill suite under
+  `skills/`: `kulturni-prehled` aggregator (weekly via `/schedule`,
+  the only skill that emails) + per-domain expert skills that produce
+  ranked candidate JSON. **Phase 1 (2026-05-23)** ships
+  `klasika-expert` (5 ensemble scrapers + festival WebFetch + Spotify
+  + Discogs) and `elektronika-expert` (Spotify + venue WebFetch).
+  Phase 2 will add `divadlo-expert` + `film-expert`.
 
 ## License
 

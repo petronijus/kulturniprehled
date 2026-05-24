@@ -56,6 +56,21 @@ The JSON shape:
 Pick **8–12 candidates**, not 5 — the aggregator will trim down to ~2
 when it applies spacing rules across all lanes. Be generous.
 
+`date_human` MUST be computed programmatically from `starts_at` — never
+guess the day of week. Use:
+
+```python
+from datetime import datetime
+dt = datetime.fromisoformat(starts_at)
+DAYS_CS = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"]
+date_human = f"{DAYS_CS[dt.weekday()]} {dt.day}. {dt.month}. {dt.year}, {dt.strftime('%H:%M')}"
+```
+
+`tickets_available` must reflect the specific date, not the production
+in general. Multi-date productions (opera repertoire) sell per-date —
+one date can be sold out while another has seats. When WebFetch returns
+availability, ask about the specific date. If ambiguous, set `null`.
+
 `score` is 0.0–1.0. Don't agonise over absolute calibration; use it
 to express relative ranking within this lane.
 

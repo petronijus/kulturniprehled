@@ -80,16 +80,16 @@ done
 
 Re-run after `git pull` is a no-op.
 
-### 2. Create the Discogs PAT (once)
+### 2. Create the Discogs API key (once)
 
 The klasika expert augments its taste profile with the user's Discogs
-collection. 1Password item `Discogs PAT`, field `credential`.
+collection. 1Password item `Discogs API key`, field `credential`.
 
 1. <https://www.discogs.com/settings/developers> → Generate new token.
 2. Pipe straight into 1Password — never echo:
    ```bash
-   read -rs TOK && op item create --category=password --title='Discogs PAT' \
-     --vault=Personal credential="$TOK" && unset TOK
+   read -rs TOK && op item create --category="API Credential" --title='Discogs API key' \
+     --vault=API credential="$TOK" && unset TOK
    ```
 3. Confirm Discogs username (top-right → Profile). Edit
    `skills/klasika-expert/preferences.md` → `## Discogs username`

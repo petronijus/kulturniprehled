@@ -31,16 +31,21 @@ The JSON shape:
   "generated_at": "2026-05-22T19:00:00+02:00",
   "missing_sources": ["discogs"],
   "items": [
-    {"title": "Česká filharmonie / Bychkov / Mahler 5",
+    {"title": "Mahler 5 — Česká filharmonie / Bychkov",
      "ensemble": "Česká filharmonie",
      "venue": "Rudolfinum",
      "starts_at": "2026-06-12T19:30:00+02:00",
      "date_human": "Čt 12. 6. 2026, 19:30",
      "url": "https://...",
-     "price_czk": 1500,
+     "price_czk": "1 200–2 900",
+     "program": [
+       {"composer": "Gustav Mahler", "work": "Symfonie č. 5 cis moll"}
+     ],
+     "soloists": [],
+     "conductor": "Semyon Bychkov",
      "score": 0.92,
      "season_event": false,
-     "why_cs": "Máš Mahlera v kolekci (Sym 2 / Abbado) a Bychkov je jediný šéfdirigent ČF, kterého ještě nesahal jsi naživo."}
+     "why_cs": "Mahler 5 — Mahlera máš 6× v Discogs kolekci. ČF (36×) je tvůj nejzastoupenější orchestr; Bychkov je jediný šéfdirigent ČF, kterého ještě nesahal jsi naživo."}
   ]
 }
 ```
@@ -56,9 +61,15 @@ once-a-season material (Vienna Phil visiting, world premiere by a
 composer Petr loves, soloist near retirement). The aggregator will
 allow these to break the 1-event-per-week spacing rule.
 
-`why_cs` is mandatory and must be specific. Reference Discogs/Spotify
-artists by name where possible. Generic blurbs ("zajímavá hudba!")
-are forbidden.
+`why_cs` is mandatory and must be specific. **Lead with composers + works**, not
+conductors. Petr's primary signal is "I want to hear Shostakovich", not "I want
+to see Conductor X". Reference Discogs counts by composer where possible.
+Generic blurbs ("zajímavá hudba!") are forbidden.
+
+`program` is an array of `{composer, work}` pairs and is the most important
+ranking input. Fill it from the venue's event detail page (step 5d). If the
+detail page lookup failed, leave `program: []` and surface
+`MISSING_PROGRAM=<event_url>` in the run log.
 
 ### 1. Resolve KP API base + bearer token
 
@@ -75,10 +86,10 @@ fi
 **Cloudflare WAF gotcha** — every `curl` to `$KP_API_BASE` must pass
 `-A 'kp-skill/1.0'` (default curl UA returns 403 error 1010).
 
-### 2. Resolve Discogs PAT (optional)
+### 2. Resolve Discogs API key (optional)
 
 ```bash
-DISCOGS_TOKEN="$(op item get 'Discogs PAT' --fields label=credential --reveal 2>/dev/null || true)"
+DISCOGS_TOKEN="$(op item get 'Discogs API key' --fields label=credential --reveal 2>/dev/null || true)"
 ```
 
 Empty token is **not fatal** — the Discogs step (4b) skips itself and
@@ -95,8 +106,8 @@ ENSEMBLE_SCRAPERS=$(grep -A40 'Active ensemble scrapers' "$SKILL_DIR/preferences
   | sed -n 's/^- *//p' | awk '{print $1}')
 WEBFETCH_URLS=$(grep -A40 'Active festival WebFetch URLs' "$SKILL_DIR/preferences.md" \
   | sed -n 's/^- *\(https\?:\/\/[^ ]\+\).*/\1/p')
-DISCOGS_USERNAME=$(grep -A1 'Discogs username' "$SKILL_DIR/preferences.md" \
-  | tail -1 | tr -d ' ')
+DISCOGS_USERNAME=$(awk '/^## Discogs username/{flag=1; next} flag && NF{print; exit}' \
+  "$SKILL_DIR/preferences.md")
 ```
 
 ### 4. Gather taste inputs
@@ -168,19 +179,52 @@ Append the LLM's JSON to `$CANDIDATES`. On WebFetch failure: log
 
 #### 5c. Filter to the 4-week horizon
 
+Use Python for date math — BSD `date` on macOS lacks `-d` and `-Iseconds`,
+so `date -d '+28 days' -Iseconds` silently produces garbage there.
+
 ```bash
-NOW=$(date -Iseconds)
-HORIZON=$(date -d '+28 days' -Iseconds)
+NOW=$(python3 -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds'))")
+HORIZON=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc).astimezone()+timedelta(days=28)).isoformat(timespec='seconds'))")
 CANDIDATES=$(echo "$CANDIDATES" | jq --arg now "$NOW" --arg h "$HORIZON" \
   '[.[] | select(.starts_at >= $now and .starts_at <= $h)]')
 ```
 
+#### 5d. Enrich top candidates with program detail (composers + works)
+
+Petr ranks by composer + work, not conductor. The scraper / festival `title`
+is almost always a marketing string ("LSO • Pappano") that hides the actual
+program. Before ranking, fetch each candidate's detail page via WebFetch and
+extract the program into `{composer, work}` pairs.
+
+Cap at the top 30 candidates by simple pre-rank (ensemble bias + date
+proximity) to keep WebFetch usage bounded.
+
+For each surviving candidate, call WebFetch with this prompt:
+
+> "Extract the concert program as JSON: `{program: [{composer, work}],
+> soloists: [], conductor: '...' or null, price_range_czk: '...' or null}`.
+> List every composer + work that will be performed. Output JSON only."
+
+Merge the returned `program` / `soloists` / `conductor` / `price_range_czk`
+back onto the candidate. If WebFetch fails or the prompt returns no program,
+set `program: []` and log `MISSING_PROGRAM=<url>` — that candidate ranks
+lower because the LLM can't justify it via composer overlap.
+
 ### 6. Exclude already-booked
 
+Use UTC `Z` for the API datetime parameters and `--data-urlencode` — the
+KP backend strict-parses ISO8601, and the `+` in `+02:00` is silently turned
+into a space by curl's URL handling, which makes the validator reject it.
+
 ```bash
-HORIZON_PLUS=$(date -d '+60 days' -Iseconds)
+NOW_UTC=$(python3 -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))")
+HORIZON_PLUS=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc)+timedelta(days=60)).strftime('%Y-%m-%dT%H:%M:%SZ'))")
 BOOKED_TITLES=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
-  "$KP_API_BASE/v1/events?starts_from=$NOW&starts_to=$HORIZON_PLUS&category=concert&limit=200" \
+  --data-urlencode "starts_from=$NOW_UTC" \
+  --data-urlencode "starts_to=$HORIZON_PLUS" \
+  --data-urlencode "category=concert" \
+  --data-urlencode "limit=200" \
+  -G "$KP_API_BASE/v1/events" \
   | jq -r '.items[].title // empty')
 # Drop candidates whose title fuzzy-matches a booked one.
 # (The LLM does the fuzzy match in step 7; just pass $BOOKED_TITLES along.)
@@ -192,20 +236,30 @@ Reason over:
 
 - `$PREFS` — vetoes, weights, favourite ensembles, soloists
 - `$SPOTIFY_TASTE` — fresh artists/albums
-- `$DISCOGS_TASTE` — owned-record artists
-- `$CANDIDATES` — every upcoming event from scrapers + WebFetch
+- `$DISCOGS_TASTE` — owned-record artists, **counted by occurrence** (e.g.
+  "Beethoven 13×, Šostakovič 7×") — this is the primary composer signal
+- `$CANDIDATES` — every upcoming event, enriched by step 5d with `program`
 - `$BOOKED_TITLES` — exclude duplicates
 
 Pick **8–12** ranked candidates. Per item:
 
-- Match against Discogs/Spotify artists by name; assign higher score
-  when there's a concrete overlap
-- Apply genre weights from preferences
-- Apply venue/ensemble bias from preferences
-- Mark 1–2 items `season_event: true` if they're genuinely
-  once-a-season (Vienna Phil visiting, last tour of a soloist Petr
-  follows, world premiere by a composer in collection)
-- Write a Czech `why_cs` blurb that names a specific reason
+- **Composer overlap with Discogs is the PRIMARY signal.** Sum the Discogs
+  occurrence counts for every composer in `program[]`. A concert with two
+  composers Petr owns heavily (e.g. Šostakovič 7× + Bruckner 6× = 13) beats
+  a "prestige" name + ensemble combo with no composer match. Do not lead
+  with conductor fame; Petr wants to hear *the music*, not see *the maestro*.
+- Ensemble and conductor are SECONDARY (used as tiebreakers, e.g. ČF (36×)
+  vs. a touring orchestra he doesn't know).
+- Apply genre weights from preferences (symfonická 1.0, komorní 1.0,
+  vokální 0.9, soudobá 0.9, baroko 0.8, jazz s klasikou 0.7, world 0.4).
+- Apply venue/ensemble bias from preferences as a small multiplier
+  (~ +0.05 for a favourite ensemble).
+- Mark 1–2 items `season_event: true` if they're genuinely once-a-season
+  (Vienna Phil visiting, last tour of a soloist Petr follows, world premiere
+  by a composer in collection).
+- Write a Czech `why_cs` that **leads with composer + work**, then names the
+  specific Discogs count or genre weight that justifies it. Conductor goes
+  last, if at all.
 
 ### 8. Write output JSON
 

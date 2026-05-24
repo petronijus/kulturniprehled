@@ -294,6 +294,23 @@ LAST_YEAR_EVENTS=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKE
 
 ### 7. Rank candidates (LLM step — you, the skill runner, ARE the LLM)
 
+#### 7a. Year dramaturgy check
+
+Before ranking, classify this year's attended concerts by era:
+- Baroque/early (pre-1750)
+- Classical (1750–1820)
+- Romantic (1820–1910)
+- 20th century (1910–1970)
+- Contemporary (1970+)
+
+If one era overwhelmingly dominates (e.g. 8/10 concerts are Romantic),
+note it and give a soft boost to one strong candidate from an
+underrepresented era. Mention it naturally in `why_cs`:
+"Letos samý romantismus — tenhle Reich/Bach/Xenakis by byl osvěžující
+změna." This is a gentle nudge, not a forced quota.
+
+#### 7b. Scoring
+
 Reason over:
 
 - `$PREFS` — vetoes, weights, favourite ensembles, soloists

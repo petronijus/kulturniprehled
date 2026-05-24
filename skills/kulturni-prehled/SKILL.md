@@ -325,12 +325,23 @@ PY
 )
 ```
 
-### 6. Send what we have
+### 6. Send what we have + collect notable mentions
 
 Don't relax the rules if the pool ends up small — Petr asked for at
 most 2 per week, no back-to-back, and that's the contract. An email
 with 1–5 picks is fine; better short than a violation. With the
 6-month horizon this fallback rarely triggers.
+
+**Notable mentions:** Candidates that were strong (score ≥ 0.70) but
+got dropped by the calendar check (step 4b) or spacing rule (step 5)
+go into a `notable_mentions` array. Each entry carries:
+- `title`, `date_human` — what and when
+- `drop_reason` — short Czech explanation why it was dropped, e.g.
+  "Koliduje s UX Monday (17:30–21:00)" or "Příliš blízko Wien Phil
+  (2 dny)" or "Blokováno Krétou (10.–17. 6.)"
+
+Cap at 3 notable mentions — don't overwhelm. Pick the highest-scoring
+dropped ones.
 
 ### 7. Generate feedback tokens
 
@@ -406,9 +417,26 @@ HTML template (inline CSS, single-column, mobile-friendly):
   </div>
   {{/each}}
 
+  {{#if notable_mentions}}
+  <div style="border-top:2px solid #eee;margin-top:28px;padding-top:18px;">
+    <p style="margin:0 0 12px;color:#888;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">
+      Notable mentions
+    </p>
+    <p style="margin:0 0 12px;color:#999;font-size:12px;">
+      Zajímavé akce, co vypadly kvůli konfliktu nebo rozestupu:
+    </p>
+    {{#each notable_mentions}}
+    <p style="margin:0 0 8px;font-size:13px;color:#444;">
+      <strong>{{title}}</strong> · {{date_human}}
+      <br><span style="color:#888;font-size:12px;">{{drop_reason}}</span>
+    </p>
+    {{/each}}
+  </div>
+  {{/if}}
+
   {{#if dropped_count}}
   <p style="color:#999;font-size:12px;margin-top:24px;">
-    Z {{total_candidates}} kandidátů jsem vybral {{selected_count}}. {{dropped_count}} jsem zahodil kvůli rozestupu (snažím se o ~1 akci týdně, výjimka pro události sezóny).
+    Z {{total_candidates}} kandidátů jsem vybral {{selected_count}}.
   </p>
   {{/if}}
 </div>

@@ -70,8 +70,8 @@ the email still goes out with whatever lanes did succeed.
 ```bash
 KP_API_BASE="${KP_API_BASE:-https://kulturniprehled.example.com}"
 KP_TOKEN="$(op item get 'Kulturni Prehled API Token' --fields label=credential --reveal 2>/dev/null)"
-NOW=$(date -Iseconds)
-SINCE=$(date -d '6 months ago' -Iseconds)
+NOW=$(python3 -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds'))")
+SINCE=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc).astimezone()-timedelta(days=180)).isoformat(timespec='seconds'))")
 EVENTS=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
   "$KP_API_BASE/v1/events?starts_from=$SINCE&starts_to=$NOW&limit=500")
 
@@ -132,7 +132,7 @@ Pull events in the digest horizon and drop / flag conflicting candidates
 
 ```bash
 KP_CAL_ID='c_9a5bbccc4605dfbee65ff6ec08e3259596e8fc63bb131db50438b28e9cfece87@group.calendar.google.com'
-HORIZON_28D=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc)+timedelta(days=28)).isoformat(timespec='seconds'))")
+HORIZON_6M=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc)+timedelta(days=180)).isoformat(timespec='seconds'))")
 ```
 
 List events via the workspace MCP. The shared calendar is only visible
@@ -145,8 +145,8 @@ mcp__workspace-mcp__get_events(
   user_google_email = "petronijus@example.com",
   calendar_id       = KP_CAL_ID,
   time_min          = NOW,
-  time_max          = HORIZON_28D,
-  max_results       = 100,
+  time_max          = HORIZON_6M,
+  max_results       = 250,
   detailed          = true
 )
 ```
@@ -227,48 +227,82 @@ Log how many were dropped + the calendar titles that caused it so the
 final email's footer can mention it ("Pominul jsem 2 doporučení kvůli
 plánům v kalendáři: 'Dovolená Itálie 8–14. 6.'").
 
-### 5. Apply spacing rule (1 event ≈ 1 week)
+### 5. Apply spacing rule (≤ 2 picks / ISO week, ≥ 2-day gap)
 
-Build the calendar of already-booked + already-selected events; walk
-candidates in score order; accept each if it does **not** clash
-(±3 days from an existing pick), unless `season_event: true`.
+Petr's rule: in any given week, 1 — max 2 — cultural events, and they
+shouldn't be back to back. Enforced as two independent constraints over
+the union of BOOKED (existing KP events) + SELECTED (already accepted
+picks):
+
+- **Per ISO week cap = 2**, counts BOOKED + SELECTED. **No SEASON
+  override** — a busy week stays busy.
+- **Min gap ≥ 2 days** between any two events ("hned za sebou" = 1 day
+  apart, which is forbidden; 2 days means a Tue pick can sit next to a
+  Thu pick at the closest). `season_event: true` overrides this — a
+  Vienna Phil visit on a fixed date can break the gap rule, but never
+  the week-cap rule.
 
 ```bash
-HORIZON_PLUS=$(date -d '+60 days' -Iseconds)
+HORIZON_PLUS=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc).astimezone()+timedelta(days=180)).isoformat(timespec='seconds'))")
 BOOKED_DATES=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
-  "$KP_API_BASE/v1/events?starts_from=$NOW&starts_to=$HORIZON_PLUS&limit=200" \
+  --data-urlencode "starts_from=$NOW" \
+  --data-urlencode "starts_to=$HORIZON_PLUS" \
+  --data-urlencode "limit=500" \
+  -G "$KP_API_BASE/v1/events" \
   | jq -r '.items[].starts_at')
 
-SELECTED='[]'
-CAP=5                                         # global cap across all lanes
+SELECTED=$(echo "$ALL" | python3 - "$BOOKED_DATES" <<'PY'
+import json, sys
+from datetime import datetime
 
-while IFS= read -r ITEM; do
-  [ -z "$ITEM" ] && continue
-  WHEN=$(echo "$ITEM" | jq -r '.starts_at')
-  IS_SEASON=$(echo "$ITEM" | jq -r '.season_event // false')
-  # Compute distance in days to nearest booked or already-selected date
-  NEAREST=$(printf '%s\n%s\n' "$BOOKED_DATES" "$(echo "$SELECTED" | jq -r '.[].starts_at')" \
-    | awk -v t="$(date -d "$WHEN" +%s)" '
-      $1 { gsub(/T.*/,"T00:00:00",$1); cmd="date -d \""$1"\" +%s"; cmd | getline ts; close(cmd);
-           d = (ts > t) ? ts - t : t - ts; if (d/86400 < min || min == 0) min = d/86400 } END { print int(min) }')
-  if [ "$IS_SEASON" = "true" ] || [ -z "$NEAREST" ] || [ "$NEAREST" -ge 6 ]; then
-    SELECTED=$(echo "$SELECTED" | jq --argjson it "$ITEM" '. + [$it]')
-    [ "$(echo "$SELECTED" | jq 'length')" -ge "$CAP" ] && break
-  fi
-done < <(echo "$ALL" | jq -c '.[]')
+all_cands = json.load(sys.stdin)
+booked = [s.strip() for s in sys.argv[1].splitlines() if s.strip()]
+
+CAP, MIN_GAP_DAYS, WEEK_CAP = 5, 2, 2
+
+selected = []
+existing = [datetime.fromisoformat(s) for s in booked]
+week_counts = {}
+for d in existing:
+    w = d.strftime('%G-W%V')
+    week_counts[w] = week_counts.get(w, 0) + 1
+
+for cand in all_cands:
+    if len(selected) >= CAP:
+        break
+    cw = datetime.fromisoformat(cand['starts_at'])
+    w = cw.strftime('%G-W%V')
+    is_season = bool(cand.get('season_event', False))
+
+    if week_counts.get(w, 0) >= WEEK_CAP:
+        continue                              # week is full, season can't help
+
+    # Calendar-day diff, not timestamp diff — "Tue 20:00 vs Thu 19:00"
+    # is 2 calendar days apart, not 1.96, and Petr considers that fine.
+    min_gap_days = 999
+    others = existing + [datetime.fromisoformat(s['starts_at']) for s in selected]
+    for d in others:
+        gap = abs((cw.date() - d.date()).days)
+        if gap < min_gap_days:
+            min_gap_days = gap
+
+    if not is_season and min_gap_days < MIN_GAP_DAYS:
+        continue                              # back-to-back, forbidden
+
+    selected.append(cand)
+    week_counts[w] = week_counts.get(w, 0) + 1
+
+print(json.dumps(selected, ensure_ascii=False))
+PY
+)
 ```
 
-(The awk distance helper above is approximate — clean it up if the
-spacing logic misbehaves; the simpler / more reliable version is to
-compute distances in Python via a one-shot heredoc the same way the
-scrapers do.)
+### 6. Send what we have
 
-### 6. Backfill if pool is too thin
-
-If `$SELECTED` ends up with fewer than 3 items (small pool, every
-candidate clashed), relax the spacing rule from ±6 days to ±3 days
-and re-run step 5. If still fewer than 3, accept the top 3 regardless
-of spacing — better to send a short email than a useless one.
+Don't relax the rules if the pool ends up small — Petr asked for at
+most 2 per week, no back-to-back, and that's the contract. An email
+with 1–5 picks is fine; better short than a violation. With the
+6-month horizon this fallback rarely triggers.
 
 ### 7. Render + send the email
 

@@ -170,25 +170,33 @@ For each URL in `$WEBFETCH_URLS`, use the **WebFetch** tool with this
 extraction prompt:
 
 > "List every upcoming classical / contemporary classical / jazz event
-> on this page in the next 4 weeks from today, as a JSON array. Each
+> on this page in the next 6 months from today, as a JSON array. Each
 > item: `title`, `starts_at` (ISO 8601), `venue`, `url` (absolute,
 > deduplicated), `price_czk` if mentioned. Skip events already past.
 > Skip duplicates. Output JSON only."
 
+For best precision, substitute literal dates `between {NOW.date()} and
+{HORIZON.date()}` into the prompt (the page-rendered model can then
+filter exactly, instead of guessing today's date from the page).
+
 Append the LLM's JSON to `$CANDIDATES`. On WebFetch failure: log
 `WARN: WebFetch <url> failed` and continue.
 
-#### 5c. Filter to the 4-week horizon
-
-Use Python for date math — BSD `date` on macOS lacks `-d` and `-Iseconds`,
-so `date -d '+28 days' -Iseconds` silently produces garbage there.
+#### 5c. Filter to the 6-month rolling horizon
 
 ```bash
 NOW=$(python3 -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds'))")
-HORIZON=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc).astimezone()+timedelta(days=28)).isoformat(timespec='seconds'))")
+HORIZON=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc).astimezone()+timedelta(days=180)).isoformat(timespec='seconds'))")
 CANDIDATES=$(echo "$CANDIDATES" | jq --arg now "$NOW" --arg h "$HORIZON" \
   '[.[] | select(.starts_at >= $now and .starts_at <= $h)]')
 ```
+
+Rolling 180 days from "now" — each weekly run rolls forward; exact
+month-end alignment isn't required.
+
+A 6-month horizon brings autumn festivals (Dvořákova Praha — September,
+Struny podzimu / Prague Sounds — November) into scope, plus the next
+season's first-half subscriptions for ČF / PKF / FOK / SOČR.
 
 #### 5d. Enrich top candidates with program detail (composers + works)
 
@@ -197,8 +205,11 @@ is almost always a marketing string ("LSO • Pappano") that hides the actual
 program. Before ranking, fetch each candidate's detail page via WebFetch and
 extract the program into `{composer, work}` pairs.
 
-Cap at the top 30 candidates by simple pre-rank (ensemble bias + date
-proximity) to keep WebFetch usage bounded.
+Cap at the top 50 candidates by simple pre-rank (ensemble bias + date
+proximity + composer-in-title hits) to keep WebFetch usage bounded.
+With a 6-month horizon the scraped pool is typically 200+ events;
+50 covers all favourite-ensemble subscriptions + festival headliners
+without burning hundreds of WebFetch calls per weekly run.
 
 For each surviving candidate, call WebFetch with this prompt:
 
@@ -231,7 +242,7 @@ into a space by curl's URL handling, which makes the validator reject it.
 
 ```bash
 NOW_UTC=$(python3 -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))")
-HORIZON_PLUS=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc)+timedelta(days=60)).strftime('%Y-%m-%dT%H:%M:%SZ'))")
+HORIZON_PLUS=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc)+timedelta(days=180)).strftime('%Y-%m-%dT%H:%M:%SZ'))")
 BOOKED_TITLES=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
   --data-urlencode "starts_from=$NOW_UTC" \
   --data-urlencode "starts_to=$HORIZON_PLUS" \

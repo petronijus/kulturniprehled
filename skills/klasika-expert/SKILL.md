@@ -39,6 +39,8 @@ The JSON shape:
      "url": "https://...",
      "price_czk": "1 200–2 900",
      "tickets_available": true,
+     "source_type": "sezona",
+     "source_name": "Česká filharmonie",
      "program": [
        {"composer": "Gustav Mahler", "work": "Symfonie č. 5 cis moll"}
      ],
@@ -62,9 +64,23 @@ once-a-season material (Vienna Phil visiting, world premiere by a
 composer Petr loves, soloist near retirement). The aggregator will
 allow these to break the 1-event-per-week spacing rule.
 
+`source_type` + `source_name` — where the tip came from. The
+aggregator renders these as a colored badge in the email:
+
+| `source_type` | Meaning | Badge color | Example `source_name` |
+|---|---|---|---|
+| `festival` | One-off festival event | orange | "Dvořákova Praha", "Pražské jaro", "Prague Sounds" |
+| `sezona` | Regular ensemble subscription concert | grey | "Česká filharmonie", "FOK", "PKF" |
+| `objev` | Off-radar pick, not from usual sources | green | "MeetFactory program", "tip from Spotify" |
+
+The expert sets `source_type` based on where it found the candidate:
+- Ensemble scraper → `sezona`, `source_name` = ensemble name
+- Festival WebFetch → `festival`, `source_name` = festival name
+- Spotify/other discovery → `objev`, `source_name` = how it was found
+
 `why_cs` is mandatory and must be specific. **Lead with composers + works**, not
 conductors. Petr's primary signal is "I want to hear Shostakovich", not "I want
-to see Conductor X". Reference Discogs counts by composer where possible.
+to see Conductor X". Reference the Discogs collection qualitatively.
 Generic blurbs ("zajímavá hudba!") are forbidden.
 
 `program` is an array of `{composer, work}` pairs and is the most important

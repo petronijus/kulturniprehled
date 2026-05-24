@@ -390,6 +390,13 @@ HTML template (inline CSS, single-column, mobile-friendly):
       {{#if ensemble}} · {{ensemble}}{{/if}}
       {{#if price_czk}} · {{price_czk}} Kč{{/if}}
     </p>
+    {{#if source_name}}
+    <span style="display:inline-block;margin:6px 0;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:0.3px;
+      {{#if (eq source_type 'festival')}}background:#FFF3E0;color:#E65100;{{/if}}
+      {{#if (eq source_type 'sezona')}}background:#F5F5F5;color:#616161;{{/if}}
+      {{#if (eq source_type 'objev')}}background:#E8F5E9;color:#2E7D32;{{/if}}
+    ">{{source_name}}</span>
+    {{/if}}
     <p style="margin:8px 0 12px;font-style:italic;color:#222;font-size:14px;">{{why_cs}}</p>
     <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
       <a href="{{url}}" style="display:inline-block;padding:8px 14px;background:#111;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;">Detail + lístky →</a>

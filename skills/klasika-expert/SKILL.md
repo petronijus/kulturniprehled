@@ -268,9 +268,24 @@ Pick **8–12** ranked candidates. Per item:
 - Apply venue/ensemble bias from preferences as a small multiplier
   (~ +0.05 for a favourite ensemble).
 - **Price deflator.** Read the thresholds from preferences.md `## Price
-  awareness`. Take the midpoint of the `price_czk` range and subtract the
-  configured penalty (default: 0 below 1 000 Kč, –0.05 between 1 000–2 000,
-  –0.15 between 2 000–3 000, exclude > 3 000 Kč entirely).
+  awareness`. Compute an **effective midpoint** of the `price_czk` range
+  with a VIP-aware clamp (Pražské jaro at Obecní dům, Forum Karlín big
+  nights and similar venues sell 4 000–8 000 Kč box / sponsor seats that
+  skew the midpoint up past parter reality):
+
+  ```python
+  # price_czk parsed into (lower, upper) ints
+  if lower > 0 and upper / lower > 5:
+      effective_upper = lower * 4          # VIP-skewed → ignore the top tier
+  else:
+      effective_upper = upper
+  midpoint = (lower + effective_upper) / 2
+  ```
+
+  Then subtract the configured penalty (default: 0 below 1 000 Kč, –0.05
+  between 1 000–2 000, –0.15 between 2 000–3 000, exclude > 3 000 Kč
+  entirely). Surface the clamp visibly in run logs (e.g.
+  `PRICE_CLAMP=Rotterdam 900–8000 → 900–3600 mid 2250`) so it's auditable.
 - **Sold-out handling.** Keep `tickets_available: false` candidates in
   the pool. Don't deflate their score for it — the watchdog might catch
   released seats. Instead, prepend "⚠ Lístky momentálně vyprodány — můžeš

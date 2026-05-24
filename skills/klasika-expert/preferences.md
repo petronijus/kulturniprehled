@@ -80,7 +80,15 @@ The skill hits these in step 5b. LLM extracts upcoming events.
 Cena je soft deflator atraktivity. Vyprodáno **není** veto — hlídací pes
 někdy uvolní místa.
 
-| Cena (midpoint Kč) | Deflator | Poznámka |
+Petr nikdy nekupuje VIP / lóže / box / sponzor lístky, hledá primárně
+parter. Velké koncerty na velkých venues (Obecní dům, Forum Karlín)
+prodávají horní tier 4 000–8 000 Kč, který skill **nesmí** brát jako
+směrodatný. Algoritmus: pokud horní hranice rozsahu je více než 5× vyšší
+než dolní, ořezat ji na `dolní × 4` před výpočtem midpointu (viz SKILL.md
+step 7 "Price deflator"). Příklad: Rotterdam 900–8 000 → clamp na
+900–3 600 → midpoint 2 250 Kč ("drahé"), ne 4 450 Kč (vyřazeno).
+
+| Cena (midpoint po VIP-clampu, Kč) | Deflator | Poznámka |
 |---|---|---|
 | < 1 000 | 0.00 | komfortní zóna |
 | 1 000 – 2 000 | −0.05 | mírně dražší |

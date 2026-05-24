@@ -71,9 +71,12 @@ Names of `ensembles/<name>.sh` the skill runs in step 5a.
 The skill hits these in step 5b. LLM extracts upcoming events.
 
 - https://www.festival.cz/program/ — Pražské jaro
-- https://www.strunypodzimu.cz/cs/program — Struny podzimu
+- https://www.strunypodzimu.cz/cs/program — Struny podzimu (→ praguesounds.cz)
 - https://www.dvorakovapraha.cz/program — Dvořákova Praha
-- *(přidávej dle libosti)*
+- https://www.narodni-divadlo.cz/cs/program?type=opera — Národní divadlo + Státní opera (opera)
+
+Nefunguje (JS-rendered, WebFetch nevidí eventy):
+- ~~collegium1704.com~~ — TODO: najít alternativní zdroj pro Collegium 1704 (baroko)
 
 ## Price awareness
 

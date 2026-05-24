@@ -1,6 +1,6 @@
 ---
 name: kulturni-prehled-ingest
-description: Processes downloaded cultural-event tickets — registers the event with cover/venue images and price in the Kulturní Přehled backend, then mirrors the event into the shared Google Calendar, uploads tickets to Google Drive, and emails Běla.
+description: Processes downloaded cultural-event tickets — registers the event with cover/venue images and price in the Kulturní Přehled backend, then mirrors the event into the shared Google Calendar and uploads tickets to Google Drive. Běla gets notified automatically via the mobile app's background sync.
 ---
 
 ## Task
@@ -364,27 +364,18 @@ Program: [from website, or note that it hasn't been announced yet]
 Vstupenky v KP: $KP_API_BASE/v1/events/$EVENT_ID
 ```
 
-### 11. Email Běla
-
-Use `mcp__google-workspace__send_gmail_message`:
-
-- `user_google_email`: `petronijus@example.com`
-- `to`: `bela@example.com`
-- Always address her as **"Bělo"** (with háček — never "Belo" or
-  "Bělka")
-- Brief friendly Czech message: performer, date, time, venue, seat
-  numbers, departure time from Svatovítská 16.
-- `attachments`: local file paths of all ticket PDFs (the `/tmp` clean
-  copies if applicable).
-
-### 12. Report back
+### 11. Report back
 
 Reply to the user in Czech:
 
 - "Hotovo. V Kulturním přehledu jsi {EVENT_TITLE} na {DATETIME} v
   {VENUE}. Lístky ({N} ks, {TOTAL_PRICE_CZK}) jsou nahraný v KP i na
-  Drivu, kalendář a mail Bělo hotový."
+  Drivu, kalendář hotový. Běla dostane notifikaci v appce automaticky
+  (background sync, max 30 min)."
 - Include the KP event id and the Drive links.
+
+*Email Běle odebrán — appka teď posílá push-style lokální notifikaci
+při syncu nových eventů (viz `sync_controller.dart`).*
 
 ### Notes
 

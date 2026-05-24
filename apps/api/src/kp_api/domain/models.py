@@ -43,6 +43,7 @@ from kp_api.domain.enums import (
     EventCategory,
     EventSource,
     EventStatus,
+    FeedbackRating,
     UserRole,
     WatchlistKind,
 )
@@ -191,9 +192,7 @@ class Event(Base):
     cover_image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     venue_image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     venue_address: Mapped[str | None] = mapped_column(Text, nullable=True)
-    departure_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    departure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),
@@ -463,4 +462,27 @@ class AppliedOp(Base):
         nullable=False,
     )
     response: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = _created_at()
+
+
+class RecommendationFeedback(Base):
+    """Per-event feedback from the weekly digest email (thumbs up/down).
+
+    No FK to events — these are recommendations that may never get booked.
+    The signed token in the email link proves authenticity; no login required."""
+
+    __tablename__ = "recommendation_feedback"
+    __table_args__ = (
+        Index(
+            "ix_rec_feedback_lane_week",
+            "event_lane",
+            "digest_week",
+        ),
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    event_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    event_lane: Mapped[str] = mapped_column(String(40), nullable=False)
+    digest_week: Mapped[str] = mapped_column(String(10), nullable=False)
+    rating: Mapped[FeedbackRating] = mapped_column(String(10), nullable=False)
     created_at: Mapped[datetime] = _created_at()

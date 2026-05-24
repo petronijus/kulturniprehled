@@ -53,3 +53,8 @@ class WatchlistKind(StrEnum):
     FILM = "film"
     DIVADLO = "divadlo"
     KONCERT = "koncert"
+
+
+class FeedbackRating(StrEnum):
+    UP = "up"
+    DOWN = "down"

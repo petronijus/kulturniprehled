@@ -101,6 +101,31 @@ that the merge step uses:
 So if Petr has been to a concert 5 days ago, multiplier ~0.6 (we damp
 down further concerts). If 60 days, multiplier ~1.5 (we lean into them).
 
+### 3b. Fetch past feedback (preference signal)
+
+Pull all feedback history from the API. Use it as a scoring modifier
+in the merge step — thumbs-down on a title/lane/venue dampens similar
+future recommendations; thumbs-up boosts them.
+
+```bash
+FEEDBACK=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
+  "$KP_API_BASE/v1/feedback/history")
+```
+
+Compute per-lane sentiment: for each lane, count ups vs downs in the
+last 90 days. Convert to a multiplier:
+
+```python
+# lane_feedback_mult = 1.0 + 0.1 * (ups - downs)  # clamp 0.6–1.4
+```
+
+Apply this multiplier alongside the balance multiplier from step 3
+when computing `weighted_score` in step 4.
+
+Also check for title-level signals: if a specific event title got a
+thumbs-down in a prior week and reappears as a candidate (e.g. a
+recurring series), demote it heavily (×0.2).
+
 ### 4. Merge + score across lanes
 
 ```bash
@@ -304,7 +329,38 @@ most 2 per week, no back-to-back, and that's the contract. An email
 with 1–5 picks is fine; better short than a violation. With the
 6-month horizon this fallback rarely triggers.
 
-### 7. Render + send the email
+### 7. Generate feedback tokens
+
+For each selected event, generate HMAC-signed feedback tokens so the
+email can include clickable 👍/👎 links. The token encodes event title,
+lane, digest week, and the rating — verified server-side without login.
+
+```bash
+KP_JWT_SECRET="$(op item get 'Kulturni Prehled API JWT Secret' --fields label=credential --reveal 2>/dev/null)"
+```
+
+Token generation (Python, inline):
+
+```python
+import hashlib, hmac, json
+from base64 import urlsafe_b64encode
+
+def make_token(title, lane, week, rating, secret):
+    payload = json.dumps(
+        {"t": title, "l": lane, "w": week, "r": rating},
+        ensure_ascii=False, separators=(",", ":")
+    ).encode()
+    sig = hmac.new(secret.encode(), payload, hashlib.sha256).digest()[:16]
+    return urlsafe_b64encode(payload + sig).rstrip(b"=").decode()
+```
+
+For each item in `$SELECTED`, compute:
+- `token_up = make_token(title, lane, f"CW{WEEK}", "up", secret)`
+- `token_down = make_token(title, lane, f"CW{WEEK}", "down", secret)`
+- `url_up = f"{KP_API_BASE}/v1/feedback/rate?t={token_up}"`
+- `url_down = f"{KP_API_BASE}/v1/feedback/rate?t={token_down}"`
+
+### 8. Render + send the email
 
 ```bash
 KP_TO=petr@example.com
@@ -332,7 +388,11 @@ HTML template (inline CSS, single-column, mobile-friendly):
       {{#if price_czk}} · {{price_czk}} Kč{{/if}}
     </p>
     <p style="margin:8px 0 12px;font-style:italic;color:#222;font-size:14px;">{{why_cs}}</p>
-    <a href="{{url}}" style="display:inline-block;padding:8px 14px;background:#111;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;">Detail + lístky →</a>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
+      <a href="{{url}}" style="display:inline-block;padding:8px 14px;background:#111;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;">Detail + lístky →</a>
+      <a href="{{url_up}}" style="text-decoration:none;font-size:22px;" title="Líbí se">👍</a>
+      <a href="{{url_down}}" style="text-decoration:none;font-size:22px;" title="Nelíbí se">👎</a>
+    </div>
   </div>
   {{/each}}
 
@@ -358,7 +418,7 @@ mcp__google-workspace__send_gmail_message(
 **Real send, not draft.** If the send fails, write the rendered HTML
 to `$DIGEST_DIR/_fallback.html` so the run isn't lost.
 
-### 8. Cleanup + report
+### 9. Cleanup + report
 
 ```bash
 # Keep $DIGEST_DIR for one week so debugging stays possible; the next run

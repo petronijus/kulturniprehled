@@ -9,7 +9,7 @@ from slowapi.errors import RateLimitExceeded
 
 from kp_api import __version__
 from kp_api.adapters.storage import minio as storage
-from kp_api.api.v1 import auth, costs, events, healthz, stats, sync, tickets, watchlist
+from kp_api.api.v1 import auth, costs, events, feedback, healthz, stats, sync, tickets, watchlist
 from kp_api.config import get_settings
 from kp_api.observability import (
     SecurityHeadersMiddleware,
@@ -60,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(costs.events_router)
     app.include_router(stats.router)
     app.include_router(watchlist.router)
+    app.include_router(feedback.router)
     return app
 
 

@@ -46,7 +46,7 @@ The JSON shape:
      "conductor": "Semyon Bychkov",
      "score": 0.92,
      "season_event": false,
-     "why_cs": "Mahler 5 — Mahlera máš 6× v Discogs kolekci. ČF (36×) je tvůj nejzastoupenější orchestr; Bychkov je jediný šéfdirigent ČF, kterého ještě nesahal jsi naživo."}
+     "why_cs": "Mahlerovu 5. máš ve sbírce na vinylu — tady ji hraje ČF pod Bychkovem, kterého jsi ještě naživo neslyšel. Symfonická (weight 1.0), ČF je tvůj oblíbený orchestr."}
   ]
 }
 ```
@@ -243,41 +243,70 @@ into a space by curl's URL handling, which makes the validator reject it.
 ```bash
 NOW_UTC=$(python3 -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))")
 HORIZON_PLUS=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc)+timedelta(days=180)).strftime('%Y-%m-%dT%H:%M:%SZ'))")
-BOOKED_TITLES=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
-  --data-urlencode "starts_from=$NOW_UTC" \
+YEAR_START=$(python3 -c "from datetime import datetime,timezone; print(datetime(datetime.now().year, 1, 1).strftime('%Y-%m-%dT%H:%M:%SZ'))")
+LAST_YEAR_START=$(python3 -c "from datetime import datetime,timezone; print(datetime(datetime.now().year-1, 1, 1).strftime('%Y-%m-%dT%H:%M:%SZ'))")
+
+# Current year events — hard veto on same work
+THIS_YEAR_EVENTS=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
+  --data-urlencode "starts_from=$YEAR_START" \
   --data-urlencode "starts_to=$HORIZON_PLUS" \
   --data-urlencode "category=concert" \
-  --data-urlencode "limit=200" \
-  -G "$KP_API_BASE/v1/events" \
-  | jq -r '.items[].title // empty')
-# Drop candidates whose title fuzzy-matches a booked one.
-# (The LLM does the fuzzy match in step 7; just pass $BOOKED_TITLES along.)
+  --data-urlencode "limit=500" \
+  -G "$KP_API_BASE/v1/events")
+
+# Last year events — flag if repeating, don't veto
+LAST_YEAR_EVENTS=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
+  --data-urlencode "starts_from=$LAST_YEAR_START" \
+  --data-urlencode "starts_to=$YEAR_START" \
+  --data-urlencode "category=concert" \
+  --data-urlencode "limit=500" \
+  -G "$KP_API_BASE/v1/events")
 ```
+
+#### History dedup rules (critical)
+
+- **Same calendar year**: HARD VETO. If a candidate's `program[].work`
+  matches a work from any event Petr attended this year, drop it
+  entirely. "Same work" = same composition (e.g. "Mahler 5") regardless
+  of orchestra/conductor. Fuzzy-match on composer + title fragment.
+- **Previous year**: FLAG but don't veto. If a candidate repeats a work
+  from last year, keep it but prepend to `why_cs`:
+  "↩ Byl jsi na tom loni ({date}) — stojí za to znovu protože {reason}."
+  Only recommend if genuinely exceptional (different world-class
+  ensemble, once-in-a-decade soloist).
+- **2+ years ago**: No flag, treat as fresh.
 
 ### 7. Rank candidates (LLM step — you, the skill runner, ARE the LLM)
 
 Reason over:
 
 - `$PREFS` — vetoes, weights, favourite ensembles, soloists
-- `$SPOTIFY_TASTE` — fresh artists/albums
-- `$DISCOGS_TASTE` — owned-record artists, **counted by occurrence** (e.g.
-  "Beethoven 13×, Šostakovič 7×") — this is the primary composer signal
+- `$SPOTIFY_TASTE` — fresh listening (artists/albums from last 12 months)
+- `$DISCOGS_TASTE` — taste map: which composers + works Petr owns on
+  vinyl. Treat as a qualitative profile ("Petr likes Mahler, Dvořák,
+  Janáček, Stravinsky, Glass…"), NOT as a numeric scoring metric.
 - `$CANDIDATES` — every upcoming event, enriched by step 5d with `program`
-- `$BOOKED_TITLES` — exclude duplicates
+- `$THIS_YEAR_EVENTS` / `$LAST_YEAR_EVENTS` — history dedup (step 6)
 
 Pick **8–12** ranked candidates. Per item:
 
-- **Composer overlap with Discogs is the PRIMARY signal.** Sum the Discogs
-  occurrence counts for every composer in `program[]`. A concert with two
-  composers Petr owns heavily (e.g. Šostakovič 7× + Bruckner 6× = 13) beats
-  a "prestige" name + ensemble combo with no composer match. Do not lead
-  with conductor fame; Petr wants to hear *the music*, not see *the maestro*.
-- Ensemble and conductor are SECONDARY (used as tiebreakers, e.g. ČF (36×)
-  vs. a touring orchestra he doesn't know).
+- **Composer + work match with Discogs is the PRIMARY signal.** Check
+  whether the composers in `program[]` appear in Petr's Discogs
+  collection at all. A concert featuring composers Petr collects is
+  strongly preferred over one with no collection overlap. If a specific
+  *work* matches a record in the collection (e.g. Petr owns Mahler 5 on
+  vinyl and the concert plays Mahler 5), that's an even stronger signal.
+  Do NOT use raw occurrence counts as numbers — the presence in the
+  collection is what matters, not "15×".
+- Ensemble and conductor are SECONDARY (tiebreakers: favourite ensemble
+  like ČF vs. an unknown touring orchestra).
 - Apply genre weights from preferences (symfonická 1.0, komorní 1.0,
   vokální 0.9, soudobá 0.9, baroko 0.8, jazz s klasikou 0.7, world 0.4).
-- Apply venue/ensemble bias from preferences as a small multiplier
-  (~ +0.05 for a favourite ensemble).
+- Apply venue/ensemble bias from preferences as a small boost for
+  favourite ensembles.
+- **Spotify freshness bonus.** If `$SPOTIFY_TASTE` is available and a
+  candidate's composer/artist appears in recent listening, boost slightly —
+  it means Petr is actively in the mood for that music right now.
 - **Price deflator.** Read the thresholds from preferences.md `## Price
   awareness`. Compute an **effective midpoint** of the `price_czk` range
   with a VIP-aware clamp (Pražské jaro at Obecní dům, Forum Karlín big
@@ -304,9 +333,10 @@ Pick **8–12** ranked candidates. Per item:
 - Mark 1–2 items `season_event: true` if they're genuinely once-a-season
   (Vienna Phil visiting, last tour of a soloist Petr follows, world premiere
   by a composer in collection).
-- Write a Czech `why_cs` that **leads with composer + work**, then names the
-  specific Discogs count or genre weight that justifies it. Conductor goes
-  last, if at all.
+- Write a Czech `why_cs` that **leads with composer + work**, then names
+  the specific connection to Petr's taste (e.g. "Mahlerovu 5. máš ve
+  sbírce — tady ji hraje LSO pod Pappanem"). Don't cite raw Discogs
+  counts. Conductor goes last, if at all.
 
 ### 8. Write output JSON
 

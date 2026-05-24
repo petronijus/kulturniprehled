@@ -15,22 +15,25 @@ single ~5-item curated email.
 
 ```bash
 SKILLS_DIR=~/Documents/Dev/kulturniprehled/skills
-EXPERTS=$(ls -d "$SKILLS_DIR"/*-expert 2>/dev/null | xargs -n1 basename)
-echo "Experts found: $EXPERTS"
+AGGREGATOR_DIR="$SKILLS_DIR/kulturni-prehled"
+EXPERTS=$(grep -v '^#' "$AGGREGATOR_DIR/active-experts.txt" 2>/dev/null \
+  | sed '/^$/d' | tr '\n' ' ')
+echo "Active experts: $EXPERTS"
 ```
 
-Today's expected set:
+The file `skills/kulturni-prehled/active-experts.txt` lists one expert
+per line. Comment lines (`#`) are ignored. To enable a new expert, add
+its name; to disable, remove or comment it out.
+
+Current active:
 
 - `klasika-expert`
-- `elektronika-expert`
 
-Future:
+Paused (uncomment when tuned):
 
-- `divadlo-expert`
-- `film-expert`
-
-This skill needs no edits when a new expert lands — the discovery
-loop picks it up automatically.
+- `# elektronika-expert`
+- `# divadlo-expert`
+- `# film-expert`
 
 ### 1. Compute the week's digest directory
 
@@ -363,7 +366,7 @@ For each item in `$SELECTED`, compute:
 ### 8. Render + send the email
 
 ```bash
-KP_TO=petr@example.com
+KP_TO=petronijus@example.com
 KP_FROM=petronijus@example.com
 SUBJECT="Kulturní přehled — týden CW${WEEK}"
 ```
@@ -409,7 +412,7 @@ Render inline via string interpolation, then send:
 ```
 mcp__google-workspace__send_gmail_message(
   user_google_email = "petronijus@example.com",
-  to = ["petr@example.com"],
+  to = ["petronijus@example.com"],
   subject = SUBJECT,
   html_body = RENDERED_HTML
 )

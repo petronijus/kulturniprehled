@@ -38,6 +38,7 @@ The JSON shape:
      "date_human": "Čt 12. 6. 2026, 19:30",
      "url": "https://...",
      "price_czk": "1 200–2 900",
+     "tickets_available": true,
      "program": [
        {"composer": "Gustav Mahler", "work": "Symfonie č. 5 cis moll"}
      ],
@@ -202,13 +203,25 @@ proximity) to keep WebFetch usage bounded.
 For each surviving candidate, call WebFetch with this prompt:
 
 > "Extract the concert program as JSON: `{program: [{composer, work}],
-> soloists: [], conductor: '...' or null, price_range_czk: '...' or null}`.
-> List every composer + work that will be performed. Output JSON only."
+> soloists: [], conductor: '...' or null, price_czk: '...' or null,
+> tickets_available: true|false|null}`.
+> List every composer + work that will be performed. For `tickets_available`:
+> `true` if a 'Koupit lístek' / 'Buy ticket' / cart button is present,
+> `false` if the page says 'Vyprodáno' / 'Sold out' / 'Nedostupné' or
+> equivalent, `null` if you can't tell. For `price_czk` give a range
+> like '500–1 500' if multiple price categories, single number otherwise.
+> Output JSON only."
 
-Merge the returned `program` / `soloists` / `conductor` / `price_range_czk`
-back onto the candidate. If WebFetch fails or the prompt returns no program,
-set `program: []` and log `MISSING_PROGRAM=<url>` — that candidate ranks
-lower because the LLM can't justify it via composer overlap.
+Merge the returned `program` / `soloists` / `conductor` / `price_czk` /
+`tickets_available` back onto the candidate. If WebFetch fails or the
+prompt returns no program, set `program: []` and log
+`MISSING_PROGRAM=<url>` — that candidate ranks lower because the LLM
+can't justify it via composer overlap.
+
+**Don't drop sold-out candidates.** Petr sometimes catches released seats
+via a watchdog (hlídací pes na sreality of cultural tickets). Keep them
+in the pool with `tickets_available: false`; the ranking step adds a flag
+to `why_cs` so the email surfaces it.
 
 ### 6. Exclude already-booked
 
@@ -254,6 +267,14 @@ Pick **8–12** ranked candidates. Per item:
   vokální 0.9, soudobá 0.9, baroko 0.8, jazz s klasikou 0.7, world 0.4).
 - Apply venue/ensemble bias from preferences as a small multiplier
   (~ +0.05 for a favourite ensemble).
+- **Price deflator.** Read the thresholds from preferences.md `## Price
+  awareness`. Take the midpoint of the `price_czk` range and subtract the
+  configured penalty (default: 0 below 1 000 Kč, –0.05 between 1 000–2 000,
+  –0.15 between 2 000–3 000, exclude > 3 000 Kč entirely).
+- **Sold-out handling.** Keep `tickets_available: false` candidates in
+  the pool. Don't deflate their score for it — the watchdog might catch
+  released seats. Instead, prepend "⚠ Lístky momentálně vyprodány — můžeš
+  zkusit hlídacího psa. " to `why_cs`.
 - Mark 1–2 items `season_event: true` if they're genuinely once-a-season
   (Vienna Phil visiting, last tour of a soloist Petr follows, world premiere
   by a composer in collection).

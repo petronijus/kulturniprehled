@@ -123,6 +123,110 @@ done
 ALL=$(echo "$ALL" | jq 'sort_by(-.weighted_score)')
 ```
 
+### 4b. Calendar conflict check (Kocourek&Prdelčička)
+
+Petr + Běla share the **Kocourek&Prdelčička** Google Calendar for
+vacations, away days, dinner plans, and existing bookings outside KP.
+Pull events in the digest horizon and drop / flag conflicting candidates
+**before** the spacing rule runs.
+
+```bash
+KP_CAL_ID='c_9a5bbccc4605dfbee65ff6ec08e3259596e8fc63bb131db50438b28e9cfece87@group.calendar.google.com'
+HORIZON_28D=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc)+timedelta(days=28)).isoformat(timespec='seconds'))")
+```
+
+List events via the workspace MCP. The shared calendar is only visible
+to `petronijus@example.com` — Petr's work address (`petr@example.com`)
+doesn't have it on its calendar list. Use the workspace MCP, not the
+Google Calendar MCP, because the latter only sees the work account.
+
+```
+mcp__workspace-mcp__get_events(
+  user_google_email = "petronijus@example.com",
+  calendar_id       = KP_CAL_ID,
+  time_min          = NOW,
+  time_max          = HORIZON_28D,
+  max_results       = 100,
+  detailed          = true
+)
+```
+
+For each calendar event, classify:
+
+- **All-day event spanning ≥1 day** → treat every covered date as
+  blocked (Petr is on holiday / out of Prague). Candidates with
+  `starts_at` falling on any blocked date are dropped from `$ALL`.
+- **Timed event** (has `start.dateTime`) → compute overlap with each
+  candidate's `starts_at`. If candidate falls within `[event.start − 2h,
+  event.end + 1h]` → drop the candidate.
+- **Title heuristic** — if the all-day or multi-day event title matches
+  `(dovolená|holiday|pryč|away|cottage|šumperák|chalupa)` case-insensitive,
+  the date span is treated as blocked even if it lacks the all-day flag.
+
+Edge case: events Petr already booked through KP (concerts/theatre with
+tickets) appear here too because `concert-tickets-flow` creates them on
+this calendar. Those are also already in the KP API and get caught by
+step 6's existing-event exclusion in each expert — double-coverage is
+fine, drops are idempotent.
+
+Implementation sketch:
+
+```bash
+CAL_EVENTS_JSON='[ ... result of list_events ... ]'
+BLOCKED=$(echo "$CAL_EVENTS_JSON" | python3 - <<'PY'
+import json, sys, re
+from datetime import datetime, timedelta
+evs = json.load(sys.stdin)
+blocked_days, conflicts = set(), []
+vacation_rx = re.compile(r'(dovolen|holiday|pryč|away|cottage|šumperák|chalupa)', re.I)
+for e in evs:
+    title = (e.get('summary') or '').strip()
+    start = e.get('start', {})
+    end = e.get('end', {})
+    if 'date' in start:                            # all-day
+        d0 = datetime.fromisoformat(start['date'])
+        d1 = datetime.fromisoformat(end['date'])  # exclusive
+        cur = d0
+        while cur < d1:
+            blocked_days.add(cur.date().isoformat()); cur += timedelta(days=1)
+    elif vacation_rx.search(title):                # title-keyed multi-day
+        d0 = datetime.fromisoformat(start['dateTime'])
+        d1 = datetime.fromisoformat(end['dateTime'])
+        cur = d0
+        while cur.date() <= d1.date():
+            blocked_days.add(cur.date().isoformat()); cur += timedelta(days=1)
+    else:                                          # timed conflict
+        conflicts.append({
+            'start_iso': start.get('dateTime'),
+            'end_iso':   end.get('dateTime'),
+            'title':     title,
+        })
+json.dump({'blocked_days': sorted(blocked_days), 'conflicts': conflicts}, sys.stdout)
+PY
+)
+
+ALL=$(echo "$ALL" | jq --argjson b "$BLOCKED" '
+  [ .[] | . as $c |
+    ($c.starts_at[0:10]) as $d |
+    if ($b.blocked_days | index($d)) then
+      empty
+    elif (
+      $b.conflicts | any(
+        ($c.starts_at | fromdateiso8601) as $cs |
+        (.start_iso  | fromdateiso8601) as $es |
+        (.end_iso    | fromdateiso8601) as $ee |
+        ($cs >= $es - 7200) and ($cs <= $ee + 3600)
+      )
+    ) then
+      empty
+    else $c end
+  ]')
+```
+
+Log how many were dropped + the calendar titles that caused it so the
+final email's footer can mention it ("Pominul jsem 2 doporučení kvůli
+plánům v kalendáři: 'Dovolená Itálie 8–14. 6.'").
+
 ### 5. Apply spacing rule (1 event ≈ 1 week)
 
 Build the calendar of already-booked + already-selected events; walk

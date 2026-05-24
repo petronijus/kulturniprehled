@@ -75,6 +75,22 @@ The skill hits these in step 5b. LLM extracts upcoming events.
 - https://www.dvorakovapraha.cz/program — Dvořákova Praha
 - *(přidávej dle libosti)*
 
+## Price awareness
+
+Cena je soft deflator atraktivity. Vyprodáno **není** veto — hlídací pes
+někdy uvolní místa.
+
+| Cena (midpoint Kč) | Deflator | Poznámka |
+|---|---|---|
+| < 1 000 | 0.00 | komfortní zóna |
+| 1 000 – 2 000 | −0.05 | mírně dražší |
+| 2 000 – 3 000 | −0.15 | drahé, jen u silně preferovaných composer-matchů |
+| > 3 000 | vyřazeno |
+
+Pravidla pro `tickets_available: false`:
+- ponechat v poolu, score neměnit
+- v `why_cs` přidat na začátek `⚠ Lístky momentálně vyprodány — můžeš zkusit hlídacího psa.`
+
 ## Discogs username
 
 petronijus

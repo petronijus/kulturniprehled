@@ -335,7 +335,7 @@ with 1–5 picks is fine; better short than a violation. With the
 **Notable mentions:** Candidates that were strong (score ≥ 0.70) but
 got dropped by the calendar check (step 4b) or spacing rule (step 5)
 go into a `notable_mentions` array. Each entry carries:
-- `title`, `date_human` — what and when
+- `title`, `date_human`, `url` — what, when, and link to detail
 - `drop_reason` — short Czech explanation why it was dropped, e.g.
   "Koliduje s UX Monday (17:30–21:00)" or "Příliš blízko Wien Phil
   (2 dny)" or "Blokováno Krétou (10.–17. 6.)"
@@ -427,7 +427,7 @@ HTML template (inline CSS, single-column, mobile-friendly):
     </p>
     {{#each notable_mentions}}
     <p style="margin:0 0 8px;font-size:13px;color:#444;">
-      <strong>{{title}}</strong> · {{date_human}}
+      <a href="{{url}}" style="color:#111;text-decoration:underline;"><strong>{{title}}</strong></a> · {{date_human}}
       <br><span style="color:#888;font-size:12px;">{{drop_reason}}</span>
     </p>
     {{/each}}

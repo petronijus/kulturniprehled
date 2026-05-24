@@ -281,6 +281,13 @@ class KpDatabase extends _$KpDatabase {
         .get();
   }
 
+  Future<bool> eventExists(String id) async {
+    final row = await (select(
+      cachedEvents,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+    return row != null;
+  }
+
   Future<void> upsertEvent(CachedEventsCompanion row) =>
       into(cachedEvents).insertOnConflictUpdate(row);
 

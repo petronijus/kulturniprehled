@@ -71,6 +71,32 @@ class NotificationService {
     _initialized = true;
   }
 
+  Future<void> showNewEvent({
+    required String eventId,
+    required String title,
+    required DateTime startsAt,
+    required String? venueAddress,
+    required String? coverImageUrl,
+  }) async {
+    await initialize();
+    final DateFormat dateFmt = DateFormat("EEEE d.M. 'v' HH:mm", 'cs');
+    final String when = _capitalize(dateFmt.format(startsAt.toLocal()));
+    final String body = venueAddress != null && venueAddress.isNotEmpty
+        ? '$when — $venueAddress'
+        : when;
+    final String? cover = await _fetchCoverToFile(coverImageUrl);
+    await _plugin.show(
+      _idForEvent(eventId, 'new'),
+      'Nová akce: $title',
+      body,
+      _detailsWithCover(
+        channelId: 'new_event',
+        channelName: 'Nové akce',
+        coverPath: cover,
+      ),
+    );
+  }
+
   /// Cancels every previously scheduled notification and re-plans from
   /// scratch based on the supplied events. Call this after each sync.
   Future<void> reschedule(List<CachedEventRow> rows) async {

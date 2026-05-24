@@ -349,8 +349,13 @@ For each selected event, generate HMAC-signed feedback tokens so the
 email can include clickable 👍/👎 links. The token encodes event title,
 lane, digest week, and the rating — verified server-side without login.
 
+The HMAC secret **must** match the production `API_JWT_SECRET` — the
+local `.env` has a placeholder that won't verify on the server. Fetch
+from production:
+
 ```bash
-KP_JWT_SECRET="$(op item get 'Kulturni Prehled API JWT Secret' --fields label=credential --reveal 2>/dev/null)"
+KP_JWT_SECRET="$(ssh petronijus@192.0.2.101 'grep ^API_JWT_SECRET= /opt/kp/.env' | cut -d= -f2)"
+[ -n "$KP_JWT_SECRET" ] || { echo "WARN: no prod JWT secret, feedback links disabled"; }
 ```
 
 Token generation (Python, inline):

@@ -85,7 +85,7 @@ Append to `$CANDIDATES`. On failure: log warning, continue.
 ```bash
 NOW=$(date -Iseconds)
 HORIZON=$(date -d '+28 days' -Iseconds)
-CANDIDATES=$(echo "$CANDIDATES" | jq --arg now "$NOW" --arg h "$HORIZON" \
+CANDIDATES=$(printf '%s' "$CANDIDATES" | jq --arg now "$NOW" --arg h "$HORIZON" \
   '[.[] | select(.starts_at >= $now and .starts_at <= $h)]')
 ```
 

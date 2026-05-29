@@ -162,12 +162,12 @@ PAGE=1
 while :; do
   RESP=$(curl -sS -H "Authorization: Discogs token=$DISCOGS_TOKEN" -A 'kp-skill/1.0' \
     "https://api.discogs.com/users/$DISCOGS_USERNAME/collection/folders/0/releases?per_page=100&page=$PAGE")
-  COUNT=$(echo "$RESP" | jq '.releases | length')
+  COUNT=$(printf '%s' "$RESP" | jq '.releases | length')
   [ "$COUNT" -eq 0 ] && break
-  PAGE_ARTISTS=$(echo "$RESP" | jq -r '.releases[].basic_information.artists[].name' \
+  PAGE_ARTISTS=$(printf '%s' "$RESP" | jq -r '.releases[].basic_information.artists[].name' \
     | sed 's/[ ]*([0-9]\+)$//')      # strip "(2)" disambiguators
   ARTISTS=$(printf '%s\n%s' "$ARTISTS" "$PAGE_ARTISTS")
-  NEXT=$(echo "$RESP" | jq -r '.pagination.urls.next // empty')
+  NEXT=$(printf '%s' "$RESP" | jq -r '.pagination.urls.next // empty')
   [ -z "$NEXT" ] && break
   PAGE=$((PAGE + 1))
   sleep 1                            # 60 req/min cap for authed users
@@ -187,7 +187,7 @@ for E in $ENSEMBLE_SCRAPERS; do
     echo "WARN: scraper '$E' missing"; continue
   fi
   OUT=$("$SCRAPER" 2>/tmp/kp-klasika-$E.err)
-  if [ -z "$OUT" ] || ! echo "$OUT" | jq -e . >/dev/null 2>&1; then
+  if [ -z "$OUT" ] || ! printf '%s' "$OUT" | jq -e . >/dev/null 2>&1; then
     echo "WARN: '$E' returned nothing parseable — likely HTML changed"
     continue
   fi
@@ -218,7 +218,7 @@ Append the LLM's JSON to `$CANDIDATES`. On WebFetch failure: log
 ```bash
 NOW=$(python3 -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds'))")
 HORIZON=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc).astimezone()+timedelta(days=180)).isoformat(timespec='seconds'))")
-CANDIDATES=$(echo "$CANDIDATES" | jq --arg now "$NOW" --arg h "$HORIZON" \
+CANDIDATES=$(printf '%s' "$CANDIDATES" | jq --arg now "$NOW" --arg h "$HORIZON" \
   '[.[] | select(.starts_at >= $now and .starts_at <= $h)]')
 ```
 

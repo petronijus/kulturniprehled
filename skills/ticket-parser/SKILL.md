@@ -188,7 +188,7 @@ EVENT_RESPONSE=$(curl -fsS -A 'kp-skill/1.0' \
       venue_address:(if $venue_address=="" then null else $venue_address end),
       departure_at:(if $departure=="" then null else $departure end)}')" \
   "$KP_API_BASE/v1/events")
-EVENT_ID=$(echo "$EVENT_RESPONSE" | jq -r '.id')
+EVENT_ID=$(printf '%s' "$EVENT_RESPONSE" | jq -r '.id')
 [ -n "$EVENT_ID" ] && [ "$EVENT_ID" != "null" ] \
   || { echo "event creation failed: $EVENT_RESPONSE"; exit 1; }
 ```
@@ -225,8 +225,8 @@ RESP=$(curl -fsS -A 'kp-skill/1.0' \
   -d "$(jq -n --arg kind "$KIND" --arg ext jpg \
     '{kind:$kind, extension:$ext}')" \
   "$KP_API_BASE/v1/events/$EVENT_ID/images/upload-url")
-PUT_URL=$(echo "$RESP" | jq -r '.upload_url')
-PUBLIC_URL=$(echo "$RESP" | jq -r '.public_url')
+PUT_URL=$(printf '%s' "$RESP" | jq -r '.upload_url')
+PUBLIC_URL=$(printf '%s' "$RESP" | jq -r '.public_url')
 
 # 2. PUT the resized 960 px JPEG. -A is required (CF WAF) and -g lets
 # brackets through in the (presigned) URL.
@@ -270,8 +270,8 @@ UPLOAD=$(curl -fsS -A 'kp-skill/1.0' \
     '{event_id:$event_id, mime_type:$mime, original_filename:$name,
       size_bytes:($size|tonumber)}')" \
   "$KP_API_BASE/v1/tickets/upload-url")
-OBJECT_KEY=$(echo "$UPLOAD" | jq -r '.object_key')
-PUT_URL=$(echo "$UPLOAD" | jq -r '.upload_url')
+OBJECT_KEY=$(printf '%s' "$UPLOAD" | jq -r '.object_key')
+PUT_URL=$(printf '%s' "$UPLOAD" | jq -r '.upload_url')
 
 curl -fsS -g -A 'kp-skill/1.0' --upload-file "$PDF_PATH" "$PUT_URL"
 
@@ -384,8 +384,20 @@ při syncu nových eventů (viz `sync_controller.dart`).*
 - Calendar: Kocourek&Prdelcicka
 - KP API base: dev `http://localhost:18000`, prod
   `https://kulturniprehled.example.com`
-- MCP namespace is `mcp__google-workspace__*` (older skill versions
-  said `mcp__workspace-mcp__*` — wrong).
+- **Parsing JSON responses — never `echo "$VAR" | jq`.** The dev
+  MacBook's shell is `zsh`, whose builtin `echo` interprets backslash
+  escapes, so a perfectly valid response with an escaped newline in
+  `notes` (`"...ročník\n\nSezení..."`) gets turned into raw control
+  characters before `jq` sees it → `jq: parse error: Invalid string:
+  control characters... must be escaped`. The API is fine; `echo` is
+  the culprit. Use `printf '%s' "$VAR" | jq ...` (portable across bash
+  + zsh), or pipe `curl ... | jq` directly with no intermediate
+  variable. Same applies to `python3 -c 'json.load(...)'`.
+- MCP namespace for the Google Workspace tools is **per-machine** —
+  it depends on what the connected MCP server registered itself as.
+  Seen in the wild: `mcp__google-workspace__*` and
+  `mcp__workspace-mcp__*`. Don't hardcode one; use whichever Drive /
+  Calendar tool is actually exposed in the current session.
 - If the user passes arguments (specific file name, different guest),
   use those instead of defaults.
 - KP API errors: surface the HTTP body to the user — most failures

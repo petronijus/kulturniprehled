@@ -80,7 +80,7 @@ EVENTS=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
 
 days_since_cat() {
   local CAT=$1
-  local LAST=$(echo "$EVENTS" | jq -r --arg c "$CAT" \
+  local LAST=$(printf '%s' "$EVENTS" | jq -r --arg c "$CAT" \
     '[.items[] | select(.category==$c)] | sort_by(.starts_at) | last.starts_at // empty')
   [ -z "$LAST" ] && { echo 999; return; }
   echo $(( ( $(date +%s) - $(date -d "$LAST" +%s) ) / 86400 ))
@@ -135,10 +135,10 @@ recurring series), demote it heavily (×0.2).
 ALL='[]'
 for L in $(ls "$DIGEST_DIR"/*.json 2>/dev/null); do
   LANE_JSON=$(cat "$L")
-  LANE_NAME=$(echo "$LANE_JSON" | jq -r '.lane')
+  LANE_NAME=$(printf '%s' "$LANE_JSON" | jq -r '.lane')
   # Apply balance multiplier to each item's score; carry through metadata.
   MULT=$(...compute per the table above...)
-  TWEAKED=$(echo "$LANE_JSON" | jq --arg mult "$MULT" --arg lane "$LANE_NAME" '
+  TWEAKED=$(printf '%s' "$LANE_JSON" | jq --arg mult "$MULT" --arg lane "$LANE_NAME" '
     .items | map(. + {
       "lane": $lane,
       "label": ($lane | gsub("klasika";"Vážná hudba") | gsub("elektronika";"Elektronika")
@@ -148,7 +148,7 @@ for L in $(ls "$DIGEST_DIR"/*.json 2>/dev/null); do
   ALL=$(jq -n --argjson a "$ALL" --argjson b "$TWEAKED" '$a + $b')
 done
 # Sort by weighted score descending
-ALL=$(echo "$ALL" | jq 'sort_by(-.weighted_score)')
+ALL=$(printf '%s' "$ALL" | jq 'sort_by(-.weighted_score)')
 ```
 
 ### 4b. Calendar conflict check (Kocourek&Prdelčička)
@@ -233,7 +233,7 @@ json.dump({'blocked_days': sorted(blocked_days), 'conflicts': conflicts}, sys.st
 PY
 )
 
-ALL=$(echo "$ALL" | jq --argjson b "$BLOCKED" '
+ALL=$(printf '%s' "$ALL" | jq --argjson b "$BLOCKED" '
   [ .[] | . as $c |
     ($c.starts_at[0:10]) as $d |
     if ($b.blocked_days | index($d)) then
@@ -466,8 +466,8 @@ to `$DIGEST_DIR/_fallback.html` so the run isn't lost.
 ```bash
 # Keep $DIGEST_DIR for one week so debugging stays possible; the next run
 # blows it away in step 1.
-echo "Odesláno $(echo "$SELECTED" | jq 'length') doporučení."
-echo "Lane mix: $(echo "$SELECTED" | jq -r 'group_by(.lane) | map("\(.[0].lane)×\(length)") | join(", ")')"
+echo "Odesláno $(printf '%s' "$SELECTED" | jq 'length') doporučení."
+echo "Lane mix: $(printf '%s' "$SELECTED" | jq -r 'group_by(.lane) | map("\(.[0].lane)×\(length)") | join(", ")')"
 echo "Balance: $BALANCE_HINT"
 ```
 

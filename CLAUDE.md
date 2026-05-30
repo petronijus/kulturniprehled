@@ -161,9 +161,12 @@ git push origin v1.0.X
 ### 4. Build the signed APK locally
 
 The release keystore lives at `~/.android/kp-release.keystore`. Local key
-properties are at `apps/mobile/android/key.properties` (gitignored). Both are
-also stored in 1Password (`Kulturni Prehled Android Release Keystore`) for
-recovery.
+properties are at `apps/mobile/android/key.properties` (gitignored). The
+`Kulturni Prehled Android Release Keystore` 1Password item currently holds
+**only the store/key passwords — NOT the `.jks` file or the key alias** (the
+keystore exists only on the Linux PC; backing it up is an open TODO). See
+[docs/release-credentials.md](./docs/release-credentials.md) for the full
+build-credential inventory and per-machine provisioning steps.
 
 ```bash
 cd apps/mobile

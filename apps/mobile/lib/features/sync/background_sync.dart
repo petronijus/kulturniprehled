@@ -29,10 +29,12 @@ void kpBackgroundCallback() {
       // The second call is a near-no-op when the first already finished
       // (every download checks the DB before hitting the network).
       await container.read(offlineCacheServiceProvider).refresh();
-    } catch (_) {
-      // Swallow — the next periodic firing tries again. Returning false
-      // would ask WorkManager to retry with exponential backoff, which
-      // we don't want for a polling job.
+    } catch (e, st) {
+      // Don't ask WorkManager to retry (no `return false`) — the next
+      // periodic firing tries again anyway. But DO surface the error to
+      // logcat; this was previously swallowed silently, which is exactly
+      // what hid the background "new event" notification failure.
+      debugPrint('kp-bg-sync failed: $e\n$st');
     } finally {
       container.dispose();
     }

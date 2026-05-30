@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:kp_mobile/data/api_client/kp_client.dart';
@@ -85,13 +86,21 @@ class SyncController extends Notifier<SyncState> {
           notificationServiceProvider,
         );
         for (final EventDto event in newEvents) {
-          await notifs.showNewEvent(
-            eventId: event.id,
-            title: event.title,
-            startsAt: event.startsAt,
-            venueAddress: event.venueAddress,
-            coverImageUrl: event.coverImageUrl,
-          );
+          // A single failed notification must not abort the rest of the
+          // sync — and the error must surface, not vanish into pullChanges'
+          // own catch (that swallow hid a LocaleDataException in the
+          // background isolate for a long time).
+          try {
+            await notifs.showNewEvent(
+              eventId: event.id,
+              title: event.title,
+              startsAt: event.startsAt,
+              venueAddress: event.venueAddress,
+              coverImageUrl: event.coverImageUrl,
+            );
+          } catch (e, st) {
+            debugPrint('kp-notif: showNewEvent failed ${event.id}: $e\n$st');
+          }
         }
       }
       // Cache images + ticket binaries off the UI thread. We don't await
@@ -99,11 +108,15 @@ class SyncController extends Notifier<SyncState> {
       // spinner up; the next render will see whichever files have landed.
       unawaited(ref.read(offlineCacheServiceProvider).refresh());
     } on DioException catch (e) {
+      debugPrint(
+        'kp-sync: DioException ${e.response?.statusCode} ${e.message}',
+      );
       state = state.copyWith(
         isSyncing: false,
         error: e.response?.data?.toString() ?? e.message ?? 'sync failed',
       );
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('kp-sync: pullChanges failed: $e\n$st');
       state = state.copyWith(isSyncing: false, error: e.toString());
     }
   }

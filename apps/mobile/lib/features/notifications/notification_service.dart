@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -23,6 +24,7 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _plugin;
   bool _initialized = false;
+  bool _pluginReady = false;
 
   // Notification IDs are stable-by-hash so re-scheduling overwrites the
   // same slot. We collapse the event id (UUID) to a 31-bit int via
@@ -32,12 +34,24 @@ class NotificationService {
 
   static const int _weeklyDigestId = 1; // fixed slot
 
-  Future<void> initialize() async {
-    if (_initialized) return;
-    tz_data.initializeTimeZones();
-    final String localTzName = await FlutterTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(localTzName));
-
+  /// Minimal plugin bootstrap that is safe to call from ANY isolate —
+  /// including the headless WorkManager background isolate, which has no
+  /// attached Activity and a restricted plugin registrant. It only
+  /// registers the plugin so `show()` works; it deliberately skips the
+  /// `FlutterTimezone` lookup (needed only for `zonedSchedule`) and the
+  /// runtime-permission requests (which require an Activity and throw or
+  /// no-op in the background). Calling the full [initialize] on the
+  /// background `showNewEvent` path was silently throwing here, so the
+  /// "new event" notification never fired (the WorkManager callback
+  /// swallows the error).
+  Future<void> _ensurePluginReady() async {
+    if (_pluginReady) return;
+    // The background WorkManager isolate never runs main()'s
+    // `initializeDateFormatting('cs')`, so the `DateFormat(..., 'cs')` in
+    // showNewEvent throws LocaleDataException there and the notification
+    // never posts. Initialize the locale data here — idempotent, cheap,
+    // and covers every isolate that posts a notification.
+    await initializeDateFormatting('cs');
     const AndroidInitializationSettings android = AndroidInitializationSettings(
       'ic_stat_notify',
     );
@@ -51,6 +65,19 @@ class NotificationService {
       iOS: ios,
     );
     await _plugin.initialize(init);
+    _pluginReady = true;
+  }
+
+  /// Full foreground initialization: plugin bootstrap + timezone database
+  /// (for scheduled notifications) + runtime permission requests. Only
+  /// call this where an Activity is attached (i.e. from the UI isolate).
+  Future<void> initialize() async {
+    if (_initialized) return;
+    await _ensurePluginReady();
+
+    tz_data.initializeTimeZones();
+    final String localTzName = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(localTzName));
 
     // Request permissions explicitly the first time we initialize.
     final AndroidFlutterLocalNotificationsPlugin? androidImpl = _plugin
@@ -78,7 +105,10 @@ class NotificationService {
     required String? venueAddress,
     required String? coverImageUrl,
   }) async {
-    await initialize();
+    // Immediate `show()` only needs the plugin registered — NOT the
+    // timezone DB or permission prompts. This runs in the background
+    // isolate, so call the isolate-safe bootstrap, not full initialize().
+    await _ensurePluginReady();
     final DateFormat dateFmt = DateFormat("EEEE d.M. 'v' HH:mm", 'cs');
     final String when = _capitalize(dateFmt.format(startsAt.toLocal()));
     final String body = venueAddress != null && venueAddress.isNotEmpty

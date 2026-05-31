@@ -1,0 +1,45 @@
+"""PAT authorization scopes.
+
+A Personal Access Token is either **unrestricted** (its `scopes` column is
+NULL — it acts as the full user, like the desktop skill token) or **scoped**
+to an explicit set of capability strings. A scoped token is default-denied:
+it may only reach endpoints that declare one of its scopes via
+`require_scope`; every general endpoint rejects it outright.
+
+Scopes are deliberately coarse and purpose-built for the headless clients we
+run, not a generic RBAC surface — add a constant here when a new automation
+needs a narrow door.
+"""
+
+from __future__ import annotations
+
+# Read the precomputed weekly-digest context (event aggregates, balance
+# signal, feedback sentiment, booked dates). Held by the weekly culture
+# routine running in the cloud — read-only, so a leak cannot mutate data.
+SCOPE_DIGEST_READ = "digest:read"
+
+# Generate HMAC-signed 👍/👎 feedback links. The signing happens server-side
+# so the routine never sees `API_JWT_SECRET`.
+SCOPE_FEEDBACK_SIGN = "feedback:sign"
+
+ALL_SCOPES = frozenset({SCOPE_DIGEST_READ, SCOPE_FEEDBACK_SIGN})
+
+
+def parse_scopes(raw: str | None) -> frozenset[str] | None:
+    """Turn the stored space-separated scope string into a set.
+
+    Returns None for an unrestricted token (NULL column) so callers can treat
+    `None` as "no restriction" distinctly from an empty set ("restricted to
+    nothing")."""
+
+    if raw is None:
+        return None
+    return frozenset(raw.split())
+
+
+def format_scopes(scopes: list[str] | None) -> str | None:
+    """Inverse of `parse_scopes` for storage."""
+
+    if scopes is None:
+        return None
+    return " ".join(scopes)

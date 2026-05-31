@@ -388,6 +388,10 @@ class PersonalAccessToken(Base):
         nullable=False,
     )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Space-separated capability scopes. NULL means an unrestricted token
+    # that acts as the full user (the desktop skill token); a non-NULL value
+    # restricts the token to endpoints declaring one of these scopes.
+    scopes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = _created_at()
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

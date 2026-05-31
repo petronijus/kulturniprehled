@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api.config import Settings
 from kp_api.domain.models import PersonalAccessToken, RefreshToken, User
+from kp_api.domain.scopes import format_scopes
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_TYPE = "access"  # noqa: S105 (JWT type tag, not a secret)
@@ -183,12 +184,17 @@ async def mint_pat(
     name: str,
     settings: Settings,
     expires_at: datetime | None = None,
+    scopes: list[str] | None = None,
 ) -> str:
     """Issue a long-lived bearer JWT and record the row for revocation.
 
     Returns the encoded JWT — callers must show it to the user **once** and
-    never store the plaintext server-side. The DB row holds the `jti` and a
-    human-readable `name` for audit, never the token itself."""
+    never store the plaintext server-side. The DB row holds the `jti`, a
+    human-readable `name`, and optional `scopes` for audit and authorization,
+    never the token itself. `scopes=None` mints an unrestricted token (acts as
+    the full user); a list restricts it to endpoints declaring one of those
+    scopes — the source of truth is the DB row, not the JWT, so scope is never
+    trusted from the presented token."""
 
     now = _utcnow()
     jti = uuid4()
@@ -208,6 +214,7 @@ async def mint_pat(
             user_id=user.id,
             name=name,
             expires_at=expires_at,
+            scopes=format_scopes(scopes),
         )
     )
     await session.flush()

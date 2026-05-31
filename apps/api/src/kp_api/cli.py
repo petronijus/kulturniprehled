@@ -31,9 +31,10 @@ from kp_api.adapters.db import get_engine
 from kp_api.config import get_settings
 from kp_api.domain.enums import UserRole
 from kp_api.domain.models import User, Workspace, WorkspaceMember
+from kp_api.domain.scopes import ALL_SCOPES
 
 
-async def _cmd_mint_pat(email: str, name: str, quiet: bool) -> int:
+async def _cmd_mint_pat(email: str, name: str, quiet: bool, scopes: list[str] | None) -> int:
     settings = get_settings()
     factory = async_sessionmaker(bind=get_engine(), expire_on_commit=False)
     async with factory() as session:
@@ -45,7 +46,15 @@ async def _cmd_mint_pat(email: str, name: str, quiet: bool) -> int:
                 file=sys.stderr,
             )
             return 2
-        token = await mint_pat(session, user, name=name, settings=settings)
+        unknown = sorted(set(scopes or []) - ALL_SCOPES)
+        if unknown:
+            print(
+                f"error: unknown scope(s): {', '.join(unknown)}. "
+                f"Known: {', '.join(sorted(ALL_SCOPES))}.",
+                file=sys.stderr,
+            )
+            return 2
+        token = await mint_pat(session, user, name=name, settings=settings, scopes=scopes)
         await session.commit()
 
     if not quiet:
@@ -95,6 +104,14 @@ def _parser() -> argparse.ArgumentParser:
     mp.add_argument("--email", required=True)
     mp.add_argument("--name", required=True, help="human label for the token")
     mp.add_argument("--quiet", action="store_true", help="suppress hints, print only the token")
+    mp.add_argument(
+        "--scope",
+        action="append",
+        dest="scopes",
+        metavar="SCOPE",
+        help="restrict the token to this scope (repeatable). Omit for a full-access token. "
+        f"Known: {', '.join(sorted(ALL_SCOPES))}.",
+    )
 
     seed = sub.add_parser("seed-user", help="Create a user row without OAuth")
     seed.add_argument("--email", required=True)
@@ -106,7 +123,7 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.cmd == "mint-pat":
-        return asyncio.run(_cmd_mint_pat(args.email, args.name, args.quiet))
+        return asyncio.run(_cmd_mint_pat(args.email, args.name, args.quiet, args.scopes))
     if args.cmd == "seed-user":
         return asyncio.run(_cmd_seed_user(args.email, args.name))
     return 1

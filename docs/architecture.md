@@ -139,7 +139,7 @@ for free, and Claude itself does the ranking step.
 Topology:
 
 ```
-/schedule (Mon 08:00) ─→ /kulturni-prehled (aggregator)
+/schedule (Sat 11:00) ─→ /kulturni-prehled (aggregator)
                             │
                             ├─→ Skill /klasika-expert     → /tmp/kp-digest-CW<n>/klasika.json
                             ├─→ Skill /elektronika-expert → elektronika.json

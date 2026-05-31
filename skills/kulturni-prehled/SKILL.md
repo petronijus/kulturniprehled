@@ -473,7 +473,7 @@ echo "Balance: $BALANCE_HINT"
 
 ## When to use
 
-- **Primary**: weekly via `/schedule` (Monday 08:00). This is the
+- **Primary**: weekly via `/schedule` (Saturday 11:00). This is the
   entry point.
 - **Manual**: `/kulturni-prehled` whenever Petr wants a fresh digest
   immediately.

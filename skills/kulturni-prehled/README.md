@@ -2,8 +2,8 @@
 
 Weekly culture-aggregator skill. Mirrors the name of the app on
 purpose — *Kulturní Přehled* the agent feeds *Kulturní Přehled* the
-app, by emailing Petr the curated short-list every Monday morning so
-he can buy tickets at his desk.
+app, by emailing Petr the curated short-list every Saturday late
+morning so he can buy tickets over the weekend.
 
 The aggregator is the **only skill in the suite that sends email**.
 Domain experts (`klasika-expert`, `elektronika-expert`, eventually
@@ -17,7 +17,7 @@ The mechanics are in [`SKILL.md`](./SKILL.md). This file covers the
 ## Architecture at a glance
 
 ```
-/schedule (Mon 08:00) ─→ /kulturni-prehled (aggregator)
+/schedule (Sat 11:00) ─→ /kulturni-prehled (aggregator)
                             │
                             ├─→ Skill /klasika-expert     → /tmp/kp-digest-CW<n>/klasika.json
                             ├─→ Skill /elektronika-expert → /tmp/kp-digest-CW<n>/elektronika.json
@@ -112,7 +112,7 @@ shows the item.
 In a Claude Code session run `/schedule`:
 
 - **Name**: `kulturni-prehled`
-- **When**: Monday 08:00 Europe/Prague (cron: `0 8 * * 1`)
+- **When**: Saturday 11:00 Europe/Prague (cron: `0 9 * * 6` UTC; 1 h DST drift in winter is fine for a weekly digest)
 - **Task**: `/kulturni-prehled`
 
 The aggregator picks up the experts automatically — no need to

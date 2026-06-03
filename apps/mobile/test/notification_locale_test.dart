@@ -17,17 +17,20 @@ import 'package:intl/intl.dart';
 // the exact pattern used by the notification formats to a Czech string
 // without throwing.
 void main() {
-  test('Czech notification date format works once locale data is loaded', () async {
-    await initializeDateFormatting('cs');
+  test(
+    'Czech notification date format works once locale data is loaded',
+    () async {
+      await initializeDateFormatting('cs');
 
-    final DateFormat fmt = DateFormat("EEEE d.M. 'v' HH:mm", 'cs');
-    // 2026-11-12 is a Thursday — "čtvrtek" proves the 'cs' symbols loaded
-    // (not an English fallback), and formatting not throwing is the actual
-    // regression target.
-    final String out = fmt.format(DateTime(2026, 11, 12, 20, 0));
+      final DateFormat fmt = DateFormat("EEEE d.M. 'v' HH:mm", 'cs');
+      // 2026-11-12 is a Thursday — "čtvrtek" proves the 'cs' symbols loaded
+      // (not an English fallback), and formatting not throwing is the actual
+      // regression target.
+      final String out = fmt.format(DateTime(2026, 11, 12, 20));
 
-    expect(out, contains('čtvrtek'));
-    expect(out, contains('12.11.'));
-    expect(out, contains('20:00'));
-  });
+      expect(out, contains('čtvrtek'));
+      expect(out, contains('12.11.'));
+      expect(out, contains('20:00'));
+    },
+  );
 }

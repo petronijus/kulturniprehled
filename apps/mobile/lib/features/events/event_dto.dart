@@ -22,6 +22,7 @@ class EventDto {
     required this.venueImageUrl,
     required this.venueAddress,
     required this.departureAt,
+    required this.spotifyPlaylistUrl,
     required this.version,
     required this.updatedAt,
     required this.deletedAt,
@@ -51,6 +52,7 @@ class EventDto {
       venueImageUrl: map['venue_image_url'] as String?,
       venueAddress: map['venue_address'] as String?,
       departureAt: maybeDate('departure_at'),
+      spotifyPlaylistUrl: map['spotify_playlist_url'] as String?,
       version: map['version'] as int,
       updatedAt: DateTime.parse(map['updated_at'] as String),
       deletedAt: maybeDate('deleted_at'),
@@ -71,6 +73,7 @@ class EventDto {
   final String? venueImageUrl;
   final String? venueAddress;
   final DateTime? departureAt;
+  final String? spotifyPlaylistUrl;
   final int version;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -91,6 +94,7 @@ class EventDto {
       venueImageUrl: Value<String?>(venueImageUrl),
       venueAddress: Value<String?>(venueAddress),
       departureAt: Value<DateTime?>(departureAt),
+      spotifyPlaylistUrl: Value<String?>(spotifyPlaylistUrl),
       version: version,
       updatedAt: updatedAt,
       deletedAt: Value<DateTime?>(deletedAt),

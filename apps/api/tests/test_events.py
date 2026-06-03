@@ -149,6 +149,14 @@ async def test_create_persists_spotify_playlist_url(client: AsyncClient) -> None
     assert patch.status_code == 200, patch.text
     assert patch.json()["spotify_playlist_url"] == other
 
+    unrelated = await client.patch(
+        f"/v1/events/{event_id}",
+        json={"version": 2, "notes": "seat 12"},
+        headers=headers,
+    )
+    assert unrelated.status_code == 200, unrelated.text
+    assert unrelated.json()["spotify_playlist_url"] == other
+
 
 @pytest.mark.asyncio
 async def test_list_filters_by_date_and_category(client: AsyncClient) -> None:

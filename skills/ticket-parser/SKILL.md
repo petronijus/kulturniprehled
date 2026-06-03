@@ -379,17 +379,18 @@ The KP event remembers its playlist. Re-running the same concert must
 UPDATE, never duplicate:
 
 ```bash
+EVENT_DATE_ISO=${EVENT_STARTS_AT_ISO%%T*}            # 2026-06-12
+VENUE_SHORT=${EVENT_VENUE_ADDRESS%%,*}               # "Rudolfinum" from "Rudolfinum, Alšovo nábřeží 12, …"
+PROGRAM_ONELINE="<one line: composers + works from step 3, or the artist/tour name>"
+
 EXISTING_URL=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
   "$KP_API_BASE/v1/events/$EVENT_ID" | jq -r '.spotify_playlist_url // empty')
 
 PL_NAME="KP • ${EVENT_DATE_ISO} • ${EVENT_TITLE} — ${VENUE_SHORT}"   # e.g. KP • 2026-06-12 • Sokolov — Rudolfinum
-PL_DESC="${PROGRAM_ONELINE} | ${VENUE_SHORT} | kulturniprehled"      # Spotify caps descriptions at 300 chars — truncate
+PL_DESC=$(printf '%s | %s | kulturniprehled' "$PROGRAM_ONELINE" "$VENUE_SHORT" | cut -c1-300)
 
 if [ -n "$EXISTING_URL" ]; then
   PL_ID=${EXISTING_URL##*/}; PL_ID=${PL_ID%%\?*}
-  curl -sS -X PUT -H "Authorization: Bearer $SP_TOKEN" -H 'Content-Type: application/json' \
-    -d "$(jq -n --arg n "$PL_NAME" --arg d "$PL_DESC" '{name:$n, description:$d, public:true}')" \
-    "https://api.spotify.com/v1/playlists/$PL_ID"
 else
   SP_USER=$(curl -sS -H "Authorization: Bearer $SP_TOKEN" https://api.spotify.com/v1/me | jq -r .id)
   PL_ID=$(curl -sS -X POST -H "Authorization: Bearer $SP_TOKEN" -H 'Content-Type: application/json' \
@@ -398,11 +399,26 @@ else
 fi
 PLAYLIST_URL="https://open.spotify.com/playlist/$PL_ID"
 
-# Replace the full track list (PUT replaces; chunk: first 100 via PUT,
-# any remainder via POST /tracks with {"uris": [...]}).
+# Always (re)assert name/desc/public — the create endpoint sometimes
+# ignores `public:true`, and re-runs refresh a stale name/description.
+curl -sS -X PUT -H "Authorization: Bearer $SP_TOKEN" -H 'Content-Type: application/json' \
+  -d "$(jq -n --arg n "$PL_NAME" --arg d "$PL_DESC" '{name:$n, description:$d, public:true}')" \
+  "https://api.spotify.com/v1/playlists/$PL_ID"
+
+# Replace the full track list. PUT replaces with the first 100; each
+# additional 100-URI chunk is appended via POST (classical full-work
+# programs can exceed 100 tracks).
 curl -sS -X PUT -H "Authorization: Bearer $SP_TOKEN" -H 'Content-Type: application/json' \
   -d "$(jq -n --argjson u "$TRACK_URIS_JSON" '{uris:($u[:100])}')" \
   "https://api.spotify.com/v1/playlists/$PL_ID/tracks"
+TOTAL=$(jq -n --argjson u "$TRACK_URIS_JSON" '$u | length')
+OFFSET=100
+while [ "$OFFSET" -lt "$TOTAL" ]; do
+  curl -sS -X POST -H "Authorization: Bearer $SP_TOKEN" -H 'Content-Type: application/json' \
+    -d "$(jq -n --argjson u "$TRACK_URIS_JSON" --argjson o "$OFFSET" '{uris:($u[$o:$o+100])}')" \
+    "https://api.spotify.com/v1/playlists/$PL_ID/tracks"
+  OFFSET=$((OFFSET + 100))
+done
 ```
 
 #### d. Cover image
@@ -417,7 +433,7 @@ src = Image.open("/tmp/cover_960.jpg")
 src.thumbnail((600, 600))
 src.convert("RGB").save("/tmp/pl_cover.jpg", "JPEG", quality=80, optimize=True)
 PY
-base64 -w0 /tmp/pl_cover.jpg | curl -sS -X PUT \
+base64 < /tmp/pl_cover.jpg | tr -d '\n' | curl -sS -X PUT \
   -H "Authorization: Bearer $SP_TOKEN" -H 'Content-Type: image/jpeg' \
   --data-binary @- "https://api.spotify.com/v1/playlists/$PL_ID/images"
 ```

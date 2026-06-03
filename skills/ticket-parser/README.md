@@ -47,7 +47,7 @@ ln -sfn \
      name `Kulturni Prehled`, redirect URI `http://127.0.0.1:8888/callback`.
   2. Authorize once in a browser (replace `$CLIENT_ID`):
      `https://accounts.spotify.com/authorize?client_id=$CLIENT_ID&response_type=code&redirect_uri=http%3A%2F%2F127.0.0.1%3A8888%2Fcallback&scope=playlist-modify-public%20ugc-image-upload`
-     and copy the `code` query param off the redirect URL.
+     and copy the `code` query param off the redirect URL — nothing listens on `127.0.0.1:8888`, so the browser will show a connection-refused page; copy the `code` parameter from the address bar anyway.
   3. Exchange the code for a refresh token:
      ```bash
      curl -sS -X POST https://accounts.spotify.com/api/token \

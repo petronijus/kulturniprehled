@@ -46,8 +46,7 @@ class _SyncEventRepository extends EventsRepository {
       Future<List<CachedTicketRow>>.value(<CachedTicketRow>[]);
 }
 
-Widget _appWithStub(CachedEventRow event) {
-  final KpDatabase db = buildInMemoryDatabase();
+Widget _appWithStub(CachedEventRow event, KpDatabase db) {
   final GoRouter router = GoRouter(
     initialLocation: '/event/evt-1',
     routes: <RouteBase>[
@@ -76,11 +75,13 @@ void main() {
   setUpAll(() async => initializeDateFormatting('cs'));
 
   testWidgets('shows playlist link when the event has one', (tester) async {
+    final KpDatabase db = buildInMemoryDatabase();
+    addTearDown(db.close);
     final CachedEventRow event = _makeEvent(
       spotifyPlaylistUrl: 'https://open.spotify.com/playlist/abc',
     );
 
-    await tester.pumpWidget(_appWithStub(event));
+    await tester.pumpWidget(_appWithStub(event, db));
     for (int i = 0; i < 5; i++) {
       await tester.pump();
     }
@@ -94,9 +95,11 @@ void main() {
   });
 
   testWidgets('hides playlist link when the event has none', (tester) async {
+    final KpDatabase db = buildInMemoryDatabase();
+    addTearDown(db.close);
     final CachedEventRow event = _makeEvent();
 
-    await tester.pumpWidget(_appWithStub(event));
+    await tester.pumpWidget(_appWithStub(event, db));
     for (int i = 0; i < 5; i++) {
       await tester.pump();
     }

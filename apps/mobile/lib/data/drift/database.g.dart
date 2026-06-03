@@ -151,6 +151,17 @@ class $CachedEventsTable extends CachedEvents
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _spotifyPlaylistUrlMeta =
+      const VerificationMeta('spotifyPlaylistUrl');
+  @override
+  late final GeneratedColumn<String> spotifyPlaylistUrl =
+      GeneratedColumn<String>(
+        'spotify_playlist_url',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _versionMeta = const VerificationMeta(
     'version',
   );
@@ -211,6 +222,7 @@ class $CachedEventsTable extends CachedEvents
     venueImageUrl,
     venueAddress,
     departureAt,
+    spotifyPlaylistUrl,
     version,
     updatedAt,
     deletedAt,
@@ -341,6 +353,15 @@ class $CachedEventsTable extends CachedEvents
         ),
       );
     }
+    if (data.containsKey('spotify_playlist_url')) {
+      context.handle(
+        _spotifyPlaylistUrlMeta,
+        spotifyPlaylistUrl.isAcceptableOrUnknown(
+          data['spotify_playlist_url']!,
+          _spotifyPlaylistUrlMeta,
+        ),
+      );
+    }
     if (data.containsKey('version')) {
       context.handle(
         _versionMeta,
@@ -436,6 +457,10 @@ class $CachedEventsTable extends CachedEvents
         DriftSqlType.dateTime,
         data['${effectivePrefix}departure_at'],
       ),
+      spotifyPlaylistUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}spotify_playlist_url'],
+      ),
       version: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}version'],
@@ -476,6 +501,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
   final String? venueImageUrl;
   final String? venueAddress;
   final DateTime? departureAt;
+  final String? spotifyPlaylistUrl;
   final int version;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -495,6 +521,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     this.venueImageUrl,
     this.venueAddress,
     this.departureAt,
+    this.spotifyPlaylistUrl,
     required this.version,
     required this.updatedAt,
     this.deletedAt,
@@ -530,6 +557,9 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     }
     if (!nullToAbsent || departureAt != null) {
       map['departure_at'] = Variable<DateTime>(departureAt);
+    }
+    if (!nullToAbsent || spotifyPlaylistUrl != null) {
+      map['spotify_playlist_url'] = Variable<String>(spotifyPlaylistUrl);
     }
     map['version'] = Variable<int>(version);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -570,6 +600,9 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
       departureAt: departureAt == null && nullToAbsent
           ? const Value.absent()
           : Value(departureAt),
+      spotifyPlaylistUrl: spotifyPlaylistUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(spotifyPlaylistUrl),
       version: Value(version),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -599,6 +632,9 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
       venueImageUrl: serializer.fromJson<String?>(json['venueImageUrl']),
       venueAddress: serializer.fromJson<String?>(json['venueAddress']),
       departureAt: serializer.fromJson<DateTime?>(json['departureAt']),
+      spotifyPlaylistUrl: serializer.fromJson<String?>(
+        json['spotifyPlaylistUrl'],
+      ),
       version: serializer.fromJson<int>(json['version']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -623,6 +659,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
       'venueImageUrl': serializer.toJson<String?>(venueImageUrl),
       'venueAddress': serializer.toJson<String?>(venueAddress),
       'departureAt': serializer.toJson<DateTime?>(departureAt),
+      'spotifyPlaylistUrl': serializer.toJson<String?>(spotifyPlaylistUrl),
       'version': serializer.toJson<int>(version),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -645,6 +682,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     Value<String?> venueImageUrl = const Value.absent(),
     Value<String?> venueAddress = const Value.absent(),
     Value<DateTime?> departureAt = const Value.absent(),
+    Value<String?> spotifyPlaylistUrl = const Value.absent(),
     int? version,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -670,6 +708,9 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
         : this.venueImageUrl,
     venueAddress: venueAddress.present ? venueAddress.value : this.venueAddress,
     departureAt: departureAt.present ? departureAt.value : this.departureAt,
+    spotifyPlaylistUrl: spotifyPlaylistUrl.present
+        ? spotifyPlaylistUrl.value
+        : this.spotifyPlaylistUrl,
     version: version ?? this.version,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -703,6 +744,9 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
       departureAt: data.departureAt.present
           ? data.departureAt.value
           : this.departureAt,
+      spotifyPlaylistUrl: data.spotifyPlaylistUrl.present
+          ? data.spotifyPlaylistUrl.value
+          : this.spotifyPlaylistUrl,
       version: data.version.present ? data.version.value : this.version,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -727,6 +771,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
           ..write('venueImageUrl: $venueImageUrl, ')
           ..write('venueAddress: $venueAddress, ')
           ..write('departureAt: $departureAt, ')
+          ..write('spotifyPlaylistUrl: $spotifyPlaylistUrl, ')
           ..write('version: $version, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -751,6 +796,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
     venueImageUrl,
     venueAddress,
     departureAt,
+    spotifyPlaylistUrl,
     version,
     updatedAt,
     deletedAt,
@@ -774,6 +820,7 @@ class CachedEventRow extends DataClass implements Insertable<CachedEventRow> {
           other.venueImageUrl == this.venueImageUrl &&
           other.venueAddress == this.venueAddress &&
           other.departureAt == this.departureAt &&
+          other.spotifyPlaylistUrl == this.spotifyPlaylistUrl &&
           other.version == this.version &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -795,6 +842,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
   final Value<String?> venueImageUrl;
   final Value<String?> venueAddress;
   final Value<DateTime?> departureAt;
+  final Value<String?> spotifyPlaylistUrl;
   final Value<int> version;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -815,6 +863,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     this.venueImageUrl = const Value.absent(),
     this.venueAddress = const Value.absent(),
     this.departureAt = const Value.absent(),
+    this.spotifyPlaylistUrl = const Value.absent(),
     this.version = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -836,6 +885,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     this.venueImageUrl = const Value.absent(),
     this.venueAddress = const Value.absent(),
     this.departureAt = const Value.absent(),
+    this.spotifyPlaylistUrl = const Value.absent(),
     required int version,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -866,6 +916,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     Expression<String>? venueImageUrl,
     Expression<String>? venueAddress,
     Expression<DateTime>? departureAt,
+    Expression<String>? spotifyPlaylistUrl,
     Expression<int>? version,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -887,6 +938,8 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
       if (venueImageUrl != null) 'venue_image_url': venueImageUrl,
       if (venueAddress != null) 'venue_address': venueAddress,
       if (departureAt != null) 'departure_at': departureAt,
+      if (spotifyPlaylistUrl != null)
+        'spotify_playlist_url': spotifyPlaylistUrl,
       if (version != null) 'version': version,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -910,6 +963,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     Value<String?>? venueImageUrl,
     Value<String?>? venueAddress,
     Value<DateTime?>? departureAt,
+    Value<String?>? spotifyPlaylistUrl,
     Value<int>? version,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -931,6 +985,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
       venueImageUrl: venueImageUrl ?? this.venueImageUrl,
       venueAddress: venueAddress ?? this.venueAddress,
       departureAt: departureAt ?? this.departureAt,
+      spotifyPlaylistUrl: spotifyPlaylistUrl ?? this.spotifyPlaylistUrl,
       version: version ?? this.version,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -984,6 +1039,9 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
     if (departureAt.present) {
       map['departure_at'] = Variable<DateTime>(departureAt.value);
     }
+    if (spotifyPlaylistUrl.present) {
+      map['spotify_playlist_url'] = Variable<String>(spotifyPlaylistUrl.value);
+    }
     if (version.present) {
       map['version'] = Variable<int>(version.value);
     }
@@ -1019,6 +1077,7 @@ class CachedEventsCompanion extends UpdateCompanion<CachedEventRow> {
           ..write('venueImageUrl: $venueImageUrl, ')
           ..write('venueAddress: $venueAddress, ')
           ..write('departureAt: $departureAt, ')
+          ..write('spotifyPlaylistUrl: $spotifyPlaylistUrl, ')
           ..write('version: $version, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -5081,6 +5140,7 @@ typedef $$CachedEventsTableCreateCompanionBuilder =
       Value<String?> venueImageUrl,
       Value<String?> venueAddress,
       Value<DateTime?> departureAt,
+      Value<String?> spotifyPlaylistUrl,
       required int version,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -5103,6 +5163,7 @@ typedef $$CachedEventsTableUpdateCompanionBuilder =
       Value<String?> venueImageUrl,
       Value<String?> venueAddress,
       Value<DateTime?> departureAt,
+      Value<String?> spotifyPlaylistUrl,
       Value<int> version,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -5186,6 +5247,11 @@ class $$CachedEventsTableFilterComposer
 
   ColumnFilters<DateTime> get departureAt => $composableBuilder(
     column: $table.departureAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get spotifyPlaylistUrl => $composableBuilder(
+    column: $table.spotifyPlaylistUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5289,6 +5355,11 @@ class $$CachedEventsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get spotifyPlaylistUrl => $composableBuilder(
+    column: $table.spotifyPlaylistUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get version => $composableBuilder(
     column: $table.version,
     builder: (column) => ColumnOrderings(column),
@@ -5373,6 +5444,11 @@ class $$CachedEventsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get spotifyPlaylistUrl => $composableBuilder(
+    column: $table.spotifyPlaylistUrl,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get version =>
       $composableBuilder(column: $table.version, builder: (column) => column);
 
@@ -5431,6 +5507,7 @@ class $$CachedEventsTableTableManager
                 Value<String?> venueImageUrl = const Value.absent(),
                 Value<String?> venueAddress = const Value.absent(),
                 Value<DateTime?> departureAt = const Value.absent(),
+                Value<String?> spotifyPlaylistUrl = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -5451,6 +5528,7 @@ class $$CachedEventsTableTableManager
                 venueImageUrl: venueImageUrl,
                 venueAddress: venueAddress,
                 departureAt: departureAt,
+                spotifyPlaylistUrl: spotifyPlaylistUrl,
                 version: version,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -5473,6 +5551,7 @@ class $$CachedEventsTableTableManager
                 Value<String?> venueImageUrl = const Value.absent(),
                 Value<String?> venueAddress = const Value.absent(),
                 Value<DateTime?> departureAt = const Value.absent(),
+                Value<String?> spotifyPlaylistUrl = const Value.absent(),
                 required int version,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -5493,6 +5572,7 @@ class $$CachedEventsTableTableManager
                 venueImageUrl: venueImageUrl,
                 venueAddress: venueAddress,
                 departureAt: departureAt,
+                spotifyPlaylistUrl: spotifyPlaylistUrl,
                 version: version,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,

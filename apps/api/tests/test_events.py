@@ -124,6 +124,41 @@ async def test_create_persists_departure_at(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_persists_spotify_playlist_url(client: AsyncClient) -> None:
+    # The ingest skill PATCHes the playlist URL after building the Spotify
+    # playlist; the mobile app renders a "Playlist" link from it. Make sure
+    # the field round-trips through POST + PATCH.
+    pair = await login_as(client, "petr@example.com")
+    headers = auth_header(pair["access_token"])
+    url = "https://open.spotify.com/playlist/3cEYpjA9oz9GiPac4AsH4n"
+    create = await client.post(
+        "/v1/events",
+        json=_event_payload(spotify_playlist_url=url),
+        headers=headers,
+    )
+    assert create.status_code == 201, create.text
+    assert create.json()["spotify_playlist_url"] == url
+
+    other = "https://open.spotify.com/playlist/5AbCdE9oz9GiPac4AsH4n"
+    event_id = create.json()["id"]
+    patch = await client.patch(
+        f"/v1/events/{event_id}",
+        json={"version": 1, "spotify_playlist_url": other},
+        headers=headers,
+    )
+    assert patch.status_code == 200, patch.text
+    assert patch.json()["spotify_playlist_url"] == other
+
+    unrelated = await client.patch(
+        f"/v1/events/{event_id}",
+        json={"version": 2, "notes": "seat 12"},
+        headers=headers,
+    )
+    assert unrelated.status_code == 200, unrelated.text
+    assert unrelated.json()["spotify_playlist_url"] == other
+
+
+@pytest.mark.asyncio
 async def test_list_filters_by_date_and_category(client: AsyncClient) -> None:
     pair = await login_as(client, "petr@example.com")
     headers = auth_header(pair["access_token"])

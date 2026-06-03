@@ -30,6 +30,7 @@ class CachedEvents extends Table {
   TextColumn get venueImageUrl => text().nullable()();
   TextColumn get venueAddress => text().nullable()();
   DateTimeColumn get departureAt => dateTime().nullable()();
+  TextColumn get spotifyPlaylistUrl => text().nullable()();
   IntColumn get version => integer()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();
@@ -181,7 +182,7 @@ class KpDatabase extends _$KpDatabase {
   KpDatabase.test(super.executor);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -217,6 +218,9 @@ class KpDatabase extends _$KpDatabase {
       }
       if (from < 9) {
         await m.createTable(cachedImages);
+      }
+      if (from < 10) {
+        await m.addColumn(cachedEvents, cachedEvents.spotifyPlaylistUrl);
       }
     },
   );

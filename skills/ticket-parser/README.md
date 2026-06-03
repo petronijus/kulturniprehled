@@ -7,9 +7,10 @@ End-to-end ingestion of downloaded cultural-event tickets:
 3. Looks up MHD travel time from Svatovítská 16 to the venue.
 4. Creates the event in Kulturní Přehled (`POST /v1/events`).
 5. Uploads each ticket to KP via presigned MinIO URL.
-6. Mirrors to Google Drive.
-7. Creates the event in the shared Google Calendar.
-8. Emails Běla.
+6. Builds or updates a Spotify playlist for concert events (step 8.5).
+7. Mirrors to Google Drive.
+8. Creates the event in the shared Google Calendar.
+9. Emails Běla.
 
 The KP-side steps are the new bit; the Drive/Calendar/Gmail steps preserve
 the existing personal workflow that predates this project.
@@ -41,6 +42,26 @@ ln -sfn \
     PAT=$(./scripts/mint-pat.sh petr@example.com 'desktop-skill')
     op item edit 'Kulturni Prehled API Token' "credential=$PAT"
     ```
+- One-time Spotify Web API setup (for the concert-playlist step):
+  1. Create an app at <https://developer.spotify.com/dashboard> —
+     name `Kulturni Prehled`, redirect URI `http://127.0.0.1:8888/callback`.
+  2. Authorize once in a browser (replace `$CLIENT_ID`):
+     `https://accounts.spotify.com/authorize?client_id=$CLIENT_ID&response_type=code&redirect_uri=http%3A%2F%2F127.0.0.1%3A8888%2Fcallback&scope=playlist-modify-public%20ugc-image-upload`
+     and copy the `code` query param off the redirect URL — nothing listens on `127.0.0.1:8888`, so the browser will show a connection-refused page; copy the `code` parameter from the address bar anyway.
+  3. Exchange the code for a refresh token:
+     ```bash
+     curl -sS -X POST https://accounts.spotify.com/api/token \
+       -u "$CLIENT_ID:$CLIENT_SECRET" \
+       -d grant_type=authorization_code -d code="$CODE" \
+       -d redirect_uri=http://127.0.0.1:8888/callback | jq -r .refresh_token
+     ```
+  4. Store all three in 1Password item `Spotify API key` (pre-existing
+     item in the `API` vault) with fields `client ID`, `client secret`,
+     `refresh_token`. Done 2026-06-03; the refresh token is live.
+     Gotcha for non-interactive shells: `op item edit` silently expects
+     an item-JSON template on stdin (it hangs on an open pipe and
+     ignores assignment args) — pipe `op item get --format json`-derived
+     JSON in, or run the edit from a real terminal.
 
 ## How it authenticates
 

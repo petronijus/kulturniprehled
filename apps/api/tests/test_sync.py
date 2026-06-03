@@ -253,6 +253,37 @@ async def test_apply_batch_continues_after_individual_failure(
 
 
 @pytest.mark.asyncio
+async def test_event_sync_payload_includes_spotify_playlist_url(
+    client: AsyncClient,
+) -> None:
+    # Mobile caches the change_log payload verbatim; the playlist link must
+    # be part of serialize_event or the app never sees it.
+    pair = await login_as(client, "petr@example.com")
+    headers = auth_header(pair["access_token"])
+    url = "https://open.spotify.com/playlist/3cEYpjA9oz9GiPac4AsH4n"
+    create = await client.post(
+        "/v1/events",
+        json={
+            "title": "Sokolov",
+            "category": "concert",
+            "starts_at": "2026-09-01T19:30:00Z",
+            "spotify_playlist_url": url,
+        },
+        headers=headers,
+    )
+    assert create.status_code == 201, create.text
+
+    pull = (await client.get("/v1/sync?since=0", headers=headers)).json()
+    payloads = [
+        c["payload"]
+        for c in pull["changes"]
+        if c["entity_type"] == "event" and c["payload"]["title"] == "Sokolov"
+    ]
+    assert payloads, pull
+    assert payloads[-1]["spotify_playlist_url"] == url
+
+
+@pytest.mark.asyncio
 async def test_sync_changes_appear_to_other_workspace_member(
     client: AsyncClient,
 ) -> None:

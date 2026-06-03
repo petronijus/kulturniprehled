@@ -1,6 +1,6 @@
 ---
 name: kulturni-prehled-ingest
-description: Processes downloaded cultural-event tickets — registers the event with cover/venue images and price in the Kulturní Přehled backend, then mirrors the event into the shared Google Calendar and uploads tickets to Google Drive. Běla gets notified automatically via the mobile app's background sync.
+description: Processes downloaded cultural-event tickets — registers the event with cover/venue images and price in the Kulturní Přehled backend, builds a Spotify concert playlist (concerts only), then mirrors the event into the shared Google Calendar and uploads tickets to Google Drive. Běla gets notified automatically via the mobile app's background sync.
 ---
 
 ## Task
@@ -319,6 +319,137 @@ the PODLE KATEGORIE breakdown rolls up under "Vstupné" / similar.
 If the price is free (e.g. free pre-festival event), skip this step
 entirely — don't post a zero cost; it just clutters the Stats list.
 
+### 8.5. Build / update the Spotify playlist (concerts only)
+
+Skip unless `EVENT_CATEGORY == concert`. **Non-fatal**: if any Spotify
+call fails (missing 1Password item, expired refresh token, search misses),
+log `WARN: spotify step failed — <reason>`, set `PLAYLIST_URL=""` and
+continue with step 9 — never abort the ingest over the playlist.
+
+#### a. Access token
+
+```bash
+SP_CLIENT_ID=$(op item get 'Spotify API key' --fields 'label=client ID' --reveal)
+SP_CLIENT_SECRET=$(op item get 'Spotify API key' --fields 'label=client secret' --reveal)
+SP_REFRESH=$(op item get 'Spotify API key' --fields label=refresh_token --reveal)
+SP_TOKEN=$(curl -sS -X POST https://accounts.spotify.com/api/token \
+  -u "$SP_CLIENT_ID:$SP_CLIENT_SECRET" \
+  -d grant_type=refresh_token -d refresh_token="$SP_REFRESH" | jq -r .access_token)
+[ -n "$SP_TOKEN" ] && [ "$SP_TOKEN" != "null" ] || { echo "WARN: spotify auth failed"; SP_TOKEN=""; }
+```
+
+#### b. Pick the tracks (LLM step — you, the skill runner, ARE the curator)
+
+Two modes:
+
+- **Program known** (the `{composer, work}` / line-up list from step 3):
+  for each work, in program order, find the **complete recording — all
+  movements**. Recording priority:
+  1. the concert's own performers / conductor (closest to the live sound),
+  2. else a canonical, well-regarded recording,
+  3. else the top search hit.
+- **Program unknown**: the headline performer's **latest album in full**
+  (for a classical soloist/ensemble: their most recent release).
+
+Search via the Web API (NOT the claude.ai Spotify MCP — that one cannot
+target playlists):
+
+```bash
+# find the album carrying the work (URL-encode the query)
+curl -sS -H "Authorization: Bearer $SP_TOKEN" \
+  -G 'https://api.spotify.com/v1/search' \
+  --data-urlencode "q=Mahler Symphony No. 5 Bychkov Czech Philharmonic" \
+  --data-urlencode 'type=album' --data-urlencode 'limit=5'
+# then list its tracks and keep the ones belonging to the work
+curl -sS -H "Authorization: Bearer $SP_TOKEN" \
+  "https://api.spotify.com/v1/albums/$ALBUM_ID/tracks?limit=50"
+```
+
+For the latest-album fallback: search `type=artist`, take the best name
+match, then `GET /v1/artists/$ARTIST_ID/albums?include_groups=album&limit=1`
+(results are newest-first) and add every track of that album.
+
+Collect the chosen track URIs (`spotify:track:...`) into `$TRACK_URIS_JSON`
+(a JSON array, program order). If it ends up empty, treat as failure (warn +
+skip the rest of 8.5).
+
+#### c. Create or update the playlist (idempotent)
+
+The KP event remembers its playlist. Re-running the same concert must
+UPDATE, never duplicate:
+
+```bash
+EVENT_DATE_ISO=${EVENT_STARTS_AT_ISO%%T*}            # 2026-06-12
+VENUE_SHORT=${EVENT_VENUE_ADDRESS%%,*}               # "Rudolfinum" from "Rudolfinum, Alšovo nábřeží 12, …"
+PROGRAM_ONELINE="<one line: composers + works from step 3, or the artist/tour name>"
+
+EXISTING_URL=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
+  "$KP_API_BASE/v1/events/$EVENT_ID" | jq -r '.spotify_playlist_url // empty')
+
+PL_NAME="KP • ${EVENT_DATE_ISO} • ${EVENT_TITLE} — ${VENUE_SHORT}"   # e.g. KP • 2026-06-12 • Sokolov — Rudolfinum
+PL_DESC=$(printf '%s | %s | kulturniprehled' "$PROGRAM_ONELINE" "$VENUE_SHORT" | cut -c1-300)
+
+if [ -n "$EXISTING_URL" ]; then
+  PL_ID=${EXISTING_URL##*/}; PL_ID=${PL_ID%%\?*}
+else
+  SP_USER=$(curl -sS -H "Authorization: Bearer $SP_TOKEN" https://api.spotify.com/v1/me | jq -r .id)
+  PL_ID=$(curl -sS -X POST -H "Authorization: Bearer $SP_TOKEN" -H 'Content-Type: application/json' \
+    -d "$(jq -n --arg n "$PL_NAME" --arg d "$PL_DESC" '{name:$n, description:$d, public:true}')" \
+    "https://api.spotify.com/v1/users/$SP_USER/playlists" | jq -r .id)
+fi
+PLAYLIST_URL="https://open.spotify.com/playlist/$PL_ID"
+
+# Always (re)assert name/desc/public — the create endpoint sometimes
+# ignores `public:true`, and re-runs refresh a stale name/description.
+curl -sS -X PUT -H "Authorization: Bearer $SP_TOKEN" -H 'Content-Type: application/json' \
+  -d "$(jq -n --arg n "$PL_NAME" --arg d "$PL_DESC" '{name:$n, description:$d, public:true}')" \
+  "https://api.spotify.com/v1/playlists/$PL_ID"
+
+# Replace the full track list. PUT replaces with the first 100; each
+# additional 100-URI chunk is appended via POST (classical full-work
+# programs can exceed 100 tracks).
+curl -sS -X PUT -H "Authorization: Bearer $SP_TOKEN" -H 'Content-Type: application/json' \
+  -d "$(jq -n --argjson u "$TRACK_URIS_JSON" '{uris:($u[:100])}')" \
+  "https://api.spotify.com/v1/playlists/$PL_ID/tracks"
+TOTAL=$(jq -n --argjson u "$TRACK_URIS_JSON" '$u | length')
+OFFSET=100
+while [ "$OFFSET" -lt "$TOTAL" ]; do
+  curl -sS -X POST -H "Authorization: Bearer $SP_TOKEN" -H 'Content-Type: application/json' \
+    -d "$(jq -n --argjson u "$TRACK_URIS_JSON" --argjson o "$OFFSET" '{uris:($u[$o:$o+100])}')" \
+    "https://api.spotify.com/v1/playlists/$PL_ID/tracks"
+  OFFSET=$((OFFSET + 100))
+done
+```
+
+#### d. Cover image
+
+Reuse the event cover from step 3 (`/tmp/cover_960.jpg`), shrink to fit
+Spotify's 256 KB base64 cap:
+
+```bash
+python3 - <<'PY'
+from PIL import Image
+src = Image.open("/tmp/cover_960.jpg")
+src.thumbnail((600, 600))
+src.convert("RGB").save("/tmp/pl_cover.jpg", "JPEG", quality=80, optimize=True)
+PY
+base64 < /tmp/pl_cover.jpg | tr -d '\n' | curl -sS -X PUT \
+  -H "Authorization: Bearer $SP_TOKEN" -H 'Content-Type: image/jpeg' \
+  --data-binary @- "https://api.spotify.com/v1/playlists/$PL_ID/images"
+```
+
+#### e. PATCH the event with the playlist URL
+
+```bash
+VERSION=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
+  "$KP_API_BASE/v1/events/$EVENT_ID" | jq -r .version)
+curl -fsS -A 'kp-skill/1.0' -X PATCH \
+  -H "Authorization: Bearer $KP_TOKEN" -H 'Content-Type: application/json' \
+  -d "$(jq -n --argjson v "$VERSION" --arg url "$PLAYLIST_URL" \
+    '{version:$v, spotify_playlist_url:$url}')" \
+  "$KP_API_BASE/v1/events/$EVENT_ID" | jq '{spotify_playlist_url, version}'
+```
+
 ### 9. Mirror to Google Drive
 
 For each ticket file use `mcp__google-workspace__create_drive_file`:
@@ -359,10 +490,14 @@ Místa: [sector, row, seat numbers for all tickets]
 🚌 Odjezd ze Svatovítské 16: [departure time] (MHD, ~[N] min,
    příjezd 15 min před začátkem)
 
+🎧 Playlist: $PLAYLIST_URL
+
 Program: [from website, or note that it hasn't been announced yet]
 
 Vstupenky v KP: $KP_API_BASE/v1/events/$EVENT_ID
 ```
+
+Omit the `🎧 Playlist:` line when `PLAYLIST_URL` is empty — non-concert events and Spotify failures.
 
 ### 11. Report back
 
@@ -370,8 +505,8 @@ Reply to the user in Czech:
 
 - "Hotovo. V Kulturním přehledu jsi {EVENT_TITLE} na {DATETIME} v
   {VENUE}. Lístky ({N} ks, {TOTAL_PRICE_CZK}) jsou nahraný v KP i na
-  Drivu, kalendář hotový. Běla dostane notifikaci v appce automaticky
-  (background sync, max 30 min)."
+  Drivu, kalendář hotový. Playlist na přípravu: {PLAYLIST_URL}. Běla dostane notifikaci v appce automaticky
+  (background sync, max 30 min)." (Omit the "Playlist na přípravu:" sentence when `PLAYLIST_URL` is empty.)
 - Include the KP event id and the Drive links.
 
 *Email Běle odebrán — appka teď posílá push-style lokální notifikaci
@@ -407,3 +542,8 @@ při syncu nových eventů (viz `sync_controller.dart`).*
   `/v1/auth/refresh`, 120/min on everything else. The skill stays well
   under the limit; if you see a 429, you're either looped or another
   process is hammering the API.
+- Spotify Web API credentials live in 1Password item
+  `Spotify API key` (fields `client ID`, `client secret`,
+  `refresh_token`); scopes `playlist-modify-public ugc-image-upload`.
+  One-time setup in README.md. The claude.ai Spotify MCP is NOT a
+  substitute — it cannot add tracks to an existing playlist.

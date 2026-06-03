@@ -25,12 +25,20 @@ class EventDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
+  // Captured in initState so dispose() can increment without calling ref.read
+  // after the element is unmounted (Riverpod forbids ref access post-unmount).
+  late final StateController<int> _replayNotifier;
+
+  @override
+  void initState() {
+    super.initState();
+    _replayNotifier = ref.read(agendaReplayProvider.notifier);
+  }
+
   @override
   void dispose() {
-    // Tell the agenda to replay its blur-in titles when we go back. Read
-    // a fresh reference so we don't capture a stale notifier — this runs
-    // after the Scaffold is torn down.
-    ref.read(agendaReplayProvider.notifier).state++;
+    // Tell the agenda to replay its blur-in titles when we go back.
+    _replayNotifier.state++;
     super.dispose();
   }
 
@@ -261,6 +269,11 @@ class _EventDetailBody extends StatelessWidget {
               const SizedBox(height: 32),
               if (event.notes != null && event.notes!.isNotEmpty)
                 _NotesText(text: event.notes!),
+              if (event.spotifyPlaylistUrl != null &&
+                  event.spotifyPlaylistUrl!.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 20),
+                _PlaylistLink(url: event.spotifyPlaylistUrl!),
+              ],
             ],
           ),
         ),
@@ -480,6 +493,43 @@ class _VenueSection extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlaylistLink extends StatelessWidget {
+  const _PlaylistLink({required this.url});
+
+  final String url;
+
+  Future<void> _open() async {
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        const Icon(Icons.music_note_outlined, size: 18, color: Colors.black),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: _open,
+          child: const Padding(
+            padding: EdgeInsets.symmetric(vertical: 2),
+            child: Text(
+              'Playlist na Spotify',
+              style: TextStyle(
+                fontFamily: 'StackSansHeadline',
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                letterSpacing: 0.48,
+                color: Colors.black,
+                decoration: TextDecoration.underline,
+              ),
+            ),
           ),
         ),
       ],

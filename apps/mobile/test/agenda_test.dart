@@ -136,6 +136,9 @@ void main() {
         status: 'planned',
         source: 'manual',
         notes: const Value<String?>(null),
+        spotifyPlaylistUrl: const Value<String?>(
+          'https://open.spotify.com/playlist/abc',
+        ),
         version: 1,
         updatedAt: now,
         deletedAt: const Value<DateTime?>(null),
@@ -146,5 +149,9 @@ void main() {
     final CachedEventRow? row = await db.findEvent('evt-1');
     expect(row, isNotNull);
     expect(row!.title, equals('Test'));
+    expect(
+      row.spotifyPlaylistUrl,
+      equals('https://open.spotify.com/playlist/abc'),
+    );
   });
 }

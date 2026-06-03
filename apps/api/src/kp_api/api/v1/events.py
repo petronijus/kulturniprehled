@@ -100,6 +100,7 @@ async def create_event(
         venue_image_url=body.venue_image_url,
         venue_address=body.venue_address,
         departure_at=body.departure_at,
+        spotify_playlist_url=body.spotify_playlist_url,
         created_by=user.id,
         version=1,
     )

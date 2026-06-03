@@ -329,9 +329,9 @@ continue with step 9 — never abort the ingest over the playlist.
 #### a. Access token
 
 ```bash
-SP_CLIENT_ID=$(op item get 'Spotify Web API (Kulturni Prehled)' --fields label=client_id --reveal)
-SP_CLIENT_SECRET=$(op item get 'Spotify Web API (Kulturni Prehled)' --fields label=client_secret --reveal)
-SP_REFRESH=$(op item get 'Spotify Web API (Kulturni Prehled)' --fields label=refresh_token --reveal)
+SP_CLIENT_ID=$(op item get 'Spotify API key' --fields 'label=client ID' --reveal)
+SP_CLIENT_SECRET=$(op item get 'Spotify API key' --fields 'label=client secret' --reveal)
+SP_REFRESH=$(op item get 'Spotify API key' --fields label=refresh_token --reveal)
 SP_TOKEN=$(curl -sS -X POST https://accounts.spotify.com/api/token \
   -u "$SP_CLIENT_ID:$SP_CLIENT_SECRET" \
   -d grant_type=refresh_token -d refresh_token="$SP_REFRESH" | jq -r .access_token)
@@ -543,7 +543,7 @@ při syncu nových eventů (viz `sync_controller.dart`).*
   under the limit; if you see a 429, you're either looped or another
   process is hammering the API.
 - Spotify Web API credentials live in 1Password item
-  `Spotify Web API (Kulturni Prehled)` (`client_id`, `client_secret`,
+  `Spotify API key` (fields `client ID`, `client secret`,
   `refresh_token`); scopes `playlist-modify-public ugc-image-upload`.
   One-time setup in README.md. The claude.ai Spotify MCP is NOT a
   substitute — it cannot add tracks to an existing playlist.

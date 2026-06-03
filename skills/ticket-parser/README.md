@@ -55,8 +55,13 @@ ln -sfn \
        -d grant_type=authorization_code -d code="$CODE" \
        -d redirect_uri=http://127.0.0.1:8888/callback | jq -r .refresh_token
      ```
-  4. Store all three in 1Password item `Spotify Web API (Kulturni Prehled)`
-     with fields `client_id`, `client_secret`, `refresh_token`.
+  4. Store all three in 1Password item `Spotify API key` (pre-existing
+     item in the `API` vault) with fields `client ID`, `client secret`,
+     `refresh_token`. Done 2026-06-03; the refresh token is live.
+     Gotcha for non-interactive shells: `op item edit` silently expects
+     an item-JSON template on stdin (it hangs on an open pipe and
+     ignores assignment args) — pipe `op item get --format json`-derived
+     JSON in, or run the edit from a real terminal.
 
 ## How it authenticates
 

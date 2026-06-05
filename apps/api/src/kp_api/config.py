@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     api_jwt_secret: str = "replace-me"  # noqa: S105 (dev default, prod overrides)
     api_jwt_access_ttl_seconds: int = 900
     api_jwt_refresh_ttl_seconds: int = 2_592_000
+    # Reuse of a just-rotated refresh token within this window is treated as
+    # a benign client-side race (two isolates of one app, lost response) —
+    # the request is rejected but the token family survives. Beyond it,
+    # reuse is assumed hostile and burns the family.
+    api_refresh_reuse_grace_seconds: int = 60
 
     # Google OAuth
     google_oauth_client_id: str = ""

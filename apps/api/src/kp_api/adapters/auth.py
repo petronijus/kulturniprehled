@@ -278,7 +278,17 @@ async def rotate_refresh(session: AsyncSession, token: str, settings: Settings) 
     if row.expires_at < _utcnow():
         raise AuthError("refresh expired")
     if row.rotated_at is not None:
-        # Reuse — burn the entire family.
+        # A second isolate of the same client can legitimately replay the
+        # just-rotated token: the mobile app refreshes from both the UI and
+        # the background-sync isolate, and a lost response or a process
+        # death between the server-side rotation and the client-side
+        # persist leaves a stale copy behind. Within the grace window that
+        # is not an attack — reject only this request and leave the family
+        # alone, the successor token keeps working.
+        grace = timedelta(seconds=settings.api_refresh_reuse_grace_seconds)
+        if _utcnow() - row.rotated_at <= grace:
+            raise AuthError("refresh superseded")
+        # Beyond the grace window assume a stolen copy — burn the family.
         await session.execute(
             update(RefreshToken)
             .where(RefreshToken.family_id == family_id)

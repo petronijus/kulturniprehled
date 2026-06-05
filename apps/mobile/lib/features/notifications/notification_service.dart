@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -20,9 +21,11 @@ import 'package:kp_mobile/features/events/events_repository.dart';
 /// get the cache populated and the notifications scheduled; once that's
 /// done, alarms fire even when the app is closed.
 class NotificationService {
-  NotificationService(this._plugin);
+  NotificationService(this._plugin, {Future<String> Function()? localTimezone})
+    : _localTimezone = localTimezone ?? FlutterTimezone.getLocalTimezone;
 
   final FlutterLocalNotificationsPlugin _plugin;
+  final Future<String> Function() _localTimezone;
   bool _initialized = false;
   bool _pluginReady = false;
 
@@ -76,7 +79,7 @@ class NotificationService {
     await _ensurePluginReady();
 
     tz_data.initializeTimeZones();
-    final String localTzName = await FlutterTimezone.getLocalTimezone();
+    final String localTzName = await _localTimezone();
     tz.setLocalLocation(tz.getLocation(localTzName));
 
     // Request permissions explicitly the first time we initialize.
@@ -129,9 +132,44 @@ class NotificationService {
 
   /// Cancels every previously scheduled notification and re-plans from
   /// scratch based on the supplied events. Call this after each sync.
-  Future<void> reschedule(List<CachedEventRow> rows) async {
+  ///
+  /// Serialized and coalescing. The agenda stream emits once per drift
+  /// transaction, so one sync triggers a burst of calls. Concurrent runs
+  /// used to interleave their cancelAll/zonedSchedule platform calls, and
+  /// the plugin's cancel path re-creates the alarm PendingIntent from a
+  /// bare intent with FLAG_UPDATE_CURRENT — which strips the payload off
+  /// an alarm another run had just scheduled. The alarm then fired with no
+  /// extras and the receiver dropped it ("Failed to parse a notification
+  /// from Intent"), i.e. every scheduled notification silently vanished.
+  /// Only one run executes at a time; bursts collapse to the newest rows.
+  Future<void> reschedule(List<CachedEventRow> rows) {
+    _pendingRows = rows;
+    return _rescheduleDrain ??= _drainReschedules();
+  }
+
+  List<CachedEventRow>? _pendingRows;
+  Future<void>? _rescheduleDrain;
+
+  Future<void> _drainReschedules() async {
+    try {
+      while (_pendingRows != null) {
+        final List<CachedEventRow> rows = _pendingRows!;
+        _pendingRows = null;
+        try {
+          await _rescheduleNow(rows);
+        } catch (e, st) {
+          // A failed run must not kill the drain loop — a newer emission
+          // may already be pending and its run can still succeed.
+          debugPrint('kp-notif: reschedule failed: $e\n$st');
+        }
+      }
+    } finally {
+      _rescheduleDrain = null;
+    }
+  }
+
+  Future<void> _rescheduleNow(List<CachedEventRow> rows) async {
     await initialize();
-    await _plugin.cancelAll();
 
     final DateTime now = DateTime.now();
     final List<CachedEventRow> upcoming = rows
@@ -145,8 +183,6 @@ class NotificationService {
         .toList();
     upcoming.sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
-    // 1) Weekly digest — next Monday at 09:00 local. Only schedule if
-    //    there are events in the seven days starting on that Monday.
     final DateTime nextMonday9 = _nextWeekday(now, DateTime.monday, 9);
     final DateTime weekEnd = nextMonday9.add(const Duration(days: 7));
     final List<CachedEventRow> weekEvents = upcoming
@@ -158,11 +194,30 @@ class NotificationService {
               r.startsAt.toLocal().isBefore(weekEnd),
         )
         .toList();
+    // Download every cover BEFORE touching platform notification state.
+    // The downloads are the slow awaits; keeping them out of the
+    // cancelAll→zonedSchedule stretch keeps that stretch free of yield
+    // points where another isolate-side task could observe a half-built
+    // slate.
+    final Map<String, String?> coverPaths = <String, String?>{};
+    final List<String?> coverUrls = <String?>[
+      if (weekEvents.isNotEmpty) weekEvents.first.coverImageUrl,
+      for (final CachedEventRow event in upcoming) event.coverImageUrl,
+    ];
+    for (final String? url in coverUrls) {
+      if (url == null || url.isEmpty || coverPaths.containsKey(url)) {
+        continue;
+      }
+      coverPaths[url] = await _fetchCoverToFile(url);
+    }
+
+    await _plugin.cancelAll();
+
+    // 1) Weekly digest — next Monday at 09:00 local. Only schedule if
+    //    there are events in the seven days starting on that Monday.
     if (weekEvents.isNotEmpty) {
       final String body = _digestBody(weekEvents);
-      final String? cover = await _fetchCoverToFile(
-        weekEvents.first.coverImageUrl,
-      );
+      final String? cover = coverPaths[weekEvents.first.coverImageUrl];
       await _scheduleAt(
         id: _weeklyDigestId,
         when: nextMonday9,
@@ -186,7 +241,7 @@ class NotificationService {
         startsLocal.day,
         9,
       );
-      final String? cover = await _fetchCoverToFile(event.coverImageUrl);
+      final String? cover = coverPaths[event.coverImageUrl];
 
       if (dayOf9.isAfter(now)) {
         await _scheduleAt(
@@ -238,7 +293,15 @@ class NotificationService {
       body,
       scheduledAt,
       details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      // alarmClock, not exactAllowWhileIdle: the broadcast of a plain exact
+      // alarm is marked deferrable-until-active, so when the app process is
+      // cached+frozen (phone locked for a few minutes is enough) the
+      // receiver never runs and the notification silently vanishes —
+      // verified on the Pixel 2026-06-05 (broadcast enq==fin, disp never).
+      // setAlarmClock is the one alarm class the freezer must deliver, and
+      // "wake the user up / time to leave" is exactly its intended
+      // semantics. Needs USE_EXACT_ALARM (declared in the manifest).
+      androidScheduleMode: AndroidScheduleMode.alarmClock,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );

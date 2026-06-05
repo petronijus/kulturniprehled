@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
+from kp_api.config import Settings
 from tests.conftest import auth_header, login_as
 
 
@@ -25,7 +26,12 @@ async def test_login_with_unknown_email_is_rejected(client: AsyncClient) -> None
 
 
 @pytest.mark.asyncio
-async def test_refresh_rotates_and_old_refresh_is_burnt(client: AsyncClient) -> None:
+async def test_refresh_reuse_within_grace_rejects_without_burning(
+    client: AsyncClient,
+) -> None:
+    """A just-rotated token replayed by a second isolate of the same client
+    (lost response, process death mid-persist) is rejected, but the family —
+    and with it the successor token the other isolate holds — survives."""
     first = await login_as(client, "petr@example.com")
     refreshed = await client.post(
         "/v1/auth/refresh", json={"refresh_token": first["refresh_token"]}
@@ -34,15 +40,42 @@ async def test_refresh_rotates_and_old_refresh_is_burnt(client: AsyncClient) -> 
     new_pair = refreshed.json()
     assert new_pair["refresh_token"] != first["refresh_token"]
 
-    # Reusing the original refresh must fail AND burn the whole family.
     reuse = await client.post("/v1/auth/refresh", json={"refresh_token": first["refresh_token"]})
     assert reuse.status_code == 401
 
-    # After reuse detection the second (legitimate) refresh is revoked too.
+    # The legitimate successor still works — the family was NOT burnt.
     after_reuse = await client.post(
         "/v1/auth/refresh", json={"refresh_token": new_pair["refresh_token"]}
     )
-    assert after_reuse.status_code == 401
+    assert after_reuse.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_refresh_reuse_after_grace_burns_family(
+    client: AsyncClient, settings: Settings
+) -> None:
+    """Beyond the grace window a replay is treated as a stolen copy: the
+    request fails and the whole family is revoked."""
+    settings.api_refresh_reuse_grace_seconds = 0
+    try:
+        first = await login_as(client, "petr@example.com")
+        refreshed = await client.post(
+            "/v1/auth/refresh", json={"refresh_token": first["refresh_token"]}
+        )
+        assert refreshed.status_code == 200
+        new_pair = refreshed.json()
+
+        reuse = await client.post(
+            "/v1/auth/refresh", json={"refresh_token": first["refresh_token"]}
+        )
+        assert reuse.status_code == 401
+
+        after_reuse = await client.post(
+            "/v1/auth/refresh", json={"refresh_token": new_pair["refresh_token"]}
+        )
+        assert after_reuse.status_code == 401
+    finally:
+        settings.api_refresh_reuse_grace_seconds = 60
 
 
 @pytest.mark.asyncio

@@ -136,9 +136,24 @@ Ask the user if they want to shut down macOS VM and start Windows back.
 If yes:
 
 ```bash
-ssh petronijus@192.0.2.154 'sudo shutdown -h now' 2>/dev/null || true
-# Wait for status: stopped
-ssh root@192.0.2.100 'qm start 106'
+# SSH sudo shutdown is the ONLY reliable way to stop this VM — `qm shutdown 108`
+# (ACPI) always times out, macOS has no guest agent. NOPASSWD sudo works;
+# the op-cache pipe is a belt-and-braces fallback (sudo -S reads stdin).
+op-cache "sudo server-mac" password | \
+  ssh petronijus@192.0.2.154 'sudo -S -p "" shutdown -h now' 2>/dev/null || true
+
+# Verify it actually stopped; hard-stop as fallback (fine for a release VM).
+for i in $(seq 1 18); do
+  ssh root@192.0.2.100 'qm status 108' | grep -q stopped && break
+  sleep 5
+done
+ssh root@192.0.2.100 'qm status 108 | grep -q stopped || qm stop 108'
+
+# CRITICAL: start Windows ONLY after 108 is confirmed stopped — both at
+# once = 52 GB just for these two on a 64 GB host. And if Windows ever
+# freezes: NEVER qmreset a GPU-passthrough VM (NVIDIA vfio reset bug can
+# take the whole host down — happened 2026-06-05); use qm stop + qm start.
+ssh root@192.0.2.100 'qm status 108 | grep -q stopped && qm start 106'
 ```
 
 ### 7. Report

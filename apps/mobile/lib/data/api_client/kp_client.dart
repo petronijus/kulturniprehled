@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'package:kp_mobile/core/config.dart';
 import 'package:kp_mobile/data/storage/token_store.dart';
@@ -12,6 +14,16 @@ import 'package:kp_mobile/data/storage/token_store.dart';
 // transparently refreshes the access token on the first 401 with a fresh
 // refresh-token rotation. If the refresh itself fails the client clears the
 // token store so the router redirects to /login on the next frame.
+//
+// Refresh discipline (hard-learned 2026-06-03, see docs/handover.md): the
+// UI isolate and the WorkManager background isolate each own a KpClient,
+// and two concurrent rotations of the same refresh token trip the server's
+// reuse detection — which burns the whole token family and silently logs
+// the device out. Rotation therefore runs inside an OS file lock shared by
+// every isolate, re-checks the token store after acquiring it (the other
+// isolate may have already rotated), and only clears the store on a
+// definitive 401/403 from the refresh endpoint — never on a transient
+// network error.
 
 class TokenRefreshFailure implements Exception {
   const TokenRefreshFailure();
@@ -20,7 +32,7 @@ class TokenRefreshFailure implements Exception {
 }
 
 class KpClient {
-  KpClient(this._tokenStore, {Dio? dio})
+  KpClient(this._tokenStore, {Dio? dio, Future<String> Function()? lockDir})
     : _dio =
           dio ??
           Dio(
@@ -30,12 +42,16 @@ class KpClient {
               receiveTimeout: const Duration(seconds: 30),
               headers: <String, String>{'Accept': 'application/json'},
             ),
-          ) {
+          ),
+      _lockDir =
+          lockDir ??
+          (() async => (await getApplicationSupportDirectory()).path) {
     _dio.interceptors.add(_AuthInterceptor(this));
   }
 
   final Dio _dio;
   final TokenStore _tokenStore;
+  final Future<String> Function() _lockDir;
 
   Dio get dio => _dio;
 
@@ -57,38 +73,76 @@ class KpClient {
     return raw as Map<String, dynamic>;
   }
 
-  Future<TokenPair?> _refresh() async {
-    final TokenPair? current = await _tokenStore.read();
-    if (current == null) {
-      return null;
-    }
+  /// Rotates the refresh token and returns the new pair, or the pair another
+  /// isolate already rotated to while we were waiting for the lock.
+  ///
+  /// [staleAccessToken] is the bearer that just got the 401 — if the stored
+  /// pair no longer matches it, a concurrent isolate has already refreshed
+  /// and rotating again would only risk tripping reuse detection.
+  Future<TokenPair?> _refresh({String? staleAccessToken}) async {
+    final RandomAccessFile lock = await _acquireRefreshLock();
     try {
-      final Response<dynamic> response =
-          await Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl)).post<dynamic>(
-            '/v1/auth/refresh',
-            data: <String, String>{'refresh_token': current.refreshToken},
-          );
-      final Map<String, dynamic> body = response.data! as Map<String, dynamic>;
-      final TokenPair pair = TokenPair(
-        accessToken: body['access_token'] as String,
-        refreshToken: body['refresh_token'] as String,
-        accessExpiresAt: DateTime.parse(body['access_expires_at'] as String),
-        refreshExpiresAt: DateTime.parse(body['refresh_expires_at'] as String),
-      );
-      await _tokenStore.write(pair);
-      return pair;
-    } on DioException {
-      await _tokenStore.clear();
-      return null;
+      final TokenPair? current = await _tokenStore.read();
+      if (current == null) {
+        return null;
+      }
+      if (staleAccessToken != null && current.accessToken != staleAccessToken) {
+        return current;
+      }
+      try {
+        final Response<dynamic> response =
+            await Dio(BaseOptions(baseUrl: _dio.options.baseUrl)).post<dynamic>(
+              '/v1/auth/refresh',
+              data: <String, String>{'refresh_token': current.refreshToken},
+            );
+        final Map<String, dynamic> body =
+            response.data! as Map<String, dynamic>;
+        final TokenPair pair = TokenPair(
+          accessToken: body['access_token'] as String,
+          refreshToken: body['refresh_token'] as String,
+          accessExpiresAt: DateTime.parse(body['access_expires_at'] as String),
+          refreshExpiresAt: DateTime.parse(
+            body['refresh_expires_at'] as String,
+          ),
+        );
+        await _tokenStore.write(pair);
+        return pair;
+      } on DioException catch (e) {
+        final int? status = e.response?.statusCode;
+        if (status == 401 || status == 403) {
+          // Definitive rejection — the refresh token is dead server-side.
+          // Clear so the router sends the user to /login instead of the
+          // app silently 401-ing forever.
+          await _tokenStore.clear();
+        }
+        // Anything else (timeout, DNS, 5xx) is transient: keep the tokens
+        // and let the next sync retry.
+        return null;
+      }
+    } finally {
+      try {
+        await lock.unlock();
+      } finally {
+        await lock.close();
+      }
     }
+  }
+
+  Future<RandomAccessFile> _acquireRefreshLock() async {
+    final File file = File('${await _lockDir()}/kp_refresh.lock');
+    final RandomAccessFile raf = await file.open(mode: FileMode.append);
+    await raf.lock(FileLock.blockingExclusive);
+    return raf;
   }
 }
 
 class _AuthInterceptor extends Interceptor {
   _AuthInterceptor(this._client);
 
+  static const String _retriedKey = 'kp_auth_retried';
+
   final KpClient _client;
-  bool _isRetrying = false;
+  Future<TokenPair?>? _refreshInFlight;
 
   @override
   Future<void> onRequest(
@@ -111,24 +165,34 @@ class _AuthInterceptor extends Interceptor {
   ) async {
     final bool unauthorised = err.response?.statusCode == 401;
     final bool isAuthCall = err.requestOptions.path.startsWith('/v1/auth/');
-    if (!unauthorised || isAuthCall || _isRetrying) {
+    final bool alreadyRetried = err.requestOptions.extra[_retriedKey] == true;
+    if (!unauthorised || isAuthCall || alreadyRetried) {
       handler.next(err);
       return;
     }
-    _isRetrying = true;
+    final String? staleAccess =
+        (err.requestOptions.headers['Authorization'] as String?)?.replaceFirst(
+          'Bearer ',
+          '',
+        );
+    // Concurrent 401s share one refresh instead of racing the rotation
+    // (or, previously, skipping the retry outright).
+    final TokenPair? refreshed = await (_refreshInFlight ??= _client
+        ._refresh(staleAccessToken: staleAccess)
+        .whenComplete(() => _refreshInFlight = null));
+    if (refreshed == null) {
+      handler.next(err);
+      return;
+    }
+    final Options retryOptions = Options(
+      method: err.requestOptions.method,
+      headers: <String, dynamic>{
+        ...err.requestOptions.headers,
+        'Authorization': 'Bearer ${refreshed.accessToken}',
+      },
+      extra: <String, dynamic>{...err.requestOptions.extra, _retriedKey: true},
+    );
     try {
-      final TokenPair? refreshed = await _client._refresh();
-      if (refreshed == null) {
-        handler.next(err);
-        return;
-      }
-      final Options retryOptions = Options(
-        method: err.requestOptions.method,
-        headers: <String, dynamic>{
-          ...err.requestOptions.headers,
-          'Authorization': 'Bearer ${refreshed.accessToken}',
-        },
-      );
       final Response<dynamic> retry = await _client._dio.request<dynamic>(
         err.requestOptions.path,
         data: err.requestOptions.data,
@@ -136,8 +200,8 @@ class _AuthInterceptor extends Interceptor {
         options: retryOptions,
       );
       handler.resolve(retry);
-    } finally {
-      _isRetrying = false;
+    } on DioException catch (retryErr) {
+      handler.next(retryErr);
     }
   }
 }

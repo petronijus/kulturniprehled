@@ -293,7 +293,15 @@ class NotificationService {
       body,
       scheduledAt,
       details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      // alarmClock, not exactAllowWhileIdle: the broadcast of a plain exact
+      // alarm is marked deferrable-until-active, so when the app process is
+      // cached+frozen (phone locked for a few minutes is enough) the
+      // receiver never runs and the notification silently vanishes —
+      // verified on the Pixel 2026-06-05 (broadcast enq==fin, disp never).
+      // setAlarmClock is the one alarm class the freezer must deliver, and
+      // "wake the user up / time to leave" is exactly its intended
+      // semantics. Needs USE_EXACT_ALARM (declared in the manifest).
+      androidScheduleMode: AndroidScheduleMode.alarmClock,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );

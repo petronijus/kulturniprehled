@@ -40,7 +40,7 @@ class _MemorySecureStorage implements FlutterSecureStorage {
   }
 }
 
-enum _RefreshBehaviour { rotate, serverError, reject }
+enum _RefreshBehaviour { rotate, serverError, reject, supersededByPeer }
 
 void main() {
   late HttpServer server;
@@ -95,6 +95,20 @@ void main() {
           case _RefreshBehaviour.serverError:
             req.response.statusCode = 500;
           case _RefreshBehaviour.reject:
+            req.response.statusCode = 401;
+          case _RefreshBehaviour.supersededByPeer:
+            // Another isolate won the rotation moments ago: its successor
+            // pair is already persisted, and the server rejects our stale
+            // token within the reuse-grace window without burning the
+            // family.
+            await tokenStore.write(
+              TokenPair(
+                accessToken: 'new-access',
+                refreshToken: 'new-refresh',
+                accessExpiresAt: DateTime.now().add(const Duration(hours: 1)),
+                refreshExpiresAt: DateTime.now().add(const Duration(days: 30)),
+              ),
+            );
             req.response.statusCode = 401;
         }
       } else {
@@ -168,4 +182,20 @@ void main() {
 
     expect(await tokenStore.read(), isNull);
   });
+
+  test(
+    'superseded rotation adopts the peer pair instead of clearing',
+    () async {
+      await writeInitialPair();
+      refreshBehaviour = _RefreshBehaviour.supersededByPeer;
+
+      final Response<dynamic> response = await client.dio.get<dynamic>(
+        '/v1/sync',
+      );
+
+      expect(response.statusCode, 200);
+      final TokenPair? stored = await tokenStore.read();
+      expect(stored?.refreshToken, 'new-refresh');
+    },
+  );
 }

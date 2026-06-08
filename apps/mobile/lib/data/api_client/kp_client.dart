@@ -110,9 +110,19 @@ class KpClient {
       } on DioException catch (e) {
         final int? status = e.response?.statusCode;
         if (status == 401 || status == 403) {
-          // Definitive rejection — the refresh token is dead server-side.
-          // Clear so the router sends the user to /login instead of the
-          // app silently 401-ing forever.
+          // The rejection may be a benign "refresh superseded": the file
+          // lock is fcntl-based and does NOT exclude two isolates of the
+          // same process, so the UI and background isolates can still
+          // race one rotation. The loser's token is rejected within the
+          // server's grace window while the winner has already persisted
+          // the successor pair — clearing the store here would throw that
+          // pair away and silently log the device out (2026-06-06).
+          // Only treat the rejection as fatal if the store still holds
+          // exactly the token the server refused.
+          final TokenPair? latest = await _tokenStore.read();
+          if (latest != null && latest.refreshToken != current.refreshToken) {
+            return latest;
+          }
           await _tokenStore.clear();
         }
         // Anything else (timeout, DNS, 5xx) is transient: keep the tokens

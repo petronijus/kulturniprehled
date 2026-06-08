@@ -40,6 +40,7 @@ skill biases recommendations toward anything that overlaps.
 - FOK – Symfonický orchestr hl. m. Prahy
 - SOČR – Symfonický orchestr Českého rozhlasu
 - Orchestr Berg (kontemporární)
+- Klangsystematiek (soudobá / experimentální koncertní série, Praha)
 - Vienna Philharmonic (host)
 - Berlin Philharmonic (host)
 - *(přidávej dle libosti)*
@@ -74,6 +75,7 @@ The skill hits these in step 5b. LLM extracts upcoming events.
 - https://www.strunypodzimu.cz/cs/program — Struny podzimu (→ praguesounds.cz)
 - https://www.dvorakovapraha.cz/program — Dvořákova Praha
 - https://www.narodni-divadlo.cz/cs/program?type=opera — Národní divadlo + Státní opera (opera)
+- https://www.klangsystematiek.com/live/ — Klangsystematiek (koncertní série soudobé/experimentální hudby, Praha; WebFetch-readable, eventy mají per-date detail URL …/<den><měsíc><rok>/)
 
 Nefunguje (JS-rendered, WebFetch nevidí eventy):
 - ~~collegium1704.com~~ — TODO: najít alternativní zdroj pro Collegium 1704 (baroko)

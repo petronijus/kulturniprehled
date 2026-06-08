@@ -99,7 +99,16 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen<int>(statsReplayProvider, (int? previous, int next) {
-      if (previous != next) _replayTick.value++;
+      if (previous != next) {
+        _replayTick.value++;
+        // The screen state outlives auth hiccups (the shell keeps tab
+        // states alive), so a failed load used to stick around as a
+        // stale error until the user found the retry button. Re-entering
+        // the tab is a natural "try again" signal.
+        if (_error != null && !_loading) {
+          _load();
+        }
+      }
     });
     final double topPad = MediaQuery.of(context).padding.top + 96;
     return Scaffold(

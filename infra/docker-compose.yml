@@ -84,6 +84,9 @@ services:
       ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      # Discogs taste map served via /v1/digest/context (empty → discogs: null).
+      DISCOGS_TOKEN: ${DISCOGS_TOKEN:-}
+      DISCOGS_USERNAME: ${DISCOGS_USERNAME:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-prod}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}

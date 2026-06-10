@@ -146,13 +146,22 @@ DISCOGS_USERNAME=$(awk '/^## Discogs username/{flag=1; next} flag && NF{print; e
 
 #### 4a. Spotify
 
+Spotify is the **recency + breadth** signal; the long-term anchor is
+Discogs (4b). Pull BOTH horizons so a quiet recent month doesn't erase
+years of taste — query the connector once per line:
+
 Call `mcp__claude_ai_Spotify__search` with `language: "en"`:
 
-- `"my classical / contemporary / chamber music top artists last 12 months"`
-- `"my saved classical albums recently"`
+- `"my all-time / long-term top classical & contemporary classical artists"`
+- `"my top classical / chamber / contemporary classical artists of the last 6 months"`
+- `"every classical & contemporary album in my saved/liked library"` (the WHOLE library, not just recent saves)
+- `"classical, contemporary-classical and jazz-with-classical-crossover artists across my playlists"`
 
-Collect artist + album names into `$SPOTIFY_TASTE`. If the MCP returns
-nothing, set `MISSING_SPOTIFY=1`.
+Merge artist + album names into `$SPOTIFY_TASTE`, de-duplicated. Where
+the connector distinguishes horizon, tag each entry `long_term` vs
+`recent` so step 7 can treat a years-long favourite as a steady signal
+and a one-off recent play as a lighter freshness nudge. If every query
+returns nothing, set `MISSING_SPOTIFY=1`.
 
 #### 4b. Discogs (if token present)
 

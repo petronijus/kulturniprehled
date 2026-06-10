@@ -25,7 +25,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from kp_api.api.deps import SessionDep, require_scope
+from kp_api.adapters.discogs import DiscogsTaste, fetch_discogs_taste
+from kp_api.api.deps import SessionDep, SettingsDep, require_scope
 from kp_api.domain.enums import EventCategory, FeedbackRating
 from kp_api.domain.models import Event, RecommendationFeedback, User, Workspace, WorkspaceMember
 from kp_api.domain.scopes import SCOPE_DIGEST_READ
@@ -93,6 +94,15 @@ class DigestContextResponse(BaseModel):
     balance: BalanceSignal
     booked: list[BookedEvent]
     feedback: FeedbackSignal
+    # Long-term taste anchor for the klasika lane. `null` when no Discogs
+    # token is configured or Discogs is unreachable — a soft-missing source.
+    discogs: DiscogsTaste | None = None
+
+
+async def provide_discogs_taste(settings: SettingsDep) -> DiscogsTaste | None:
+    """Dependency wrapper so tests can override the (networked) fetch."""
+
+    return await fetch_discogs_taste(settings.discogs_token, settings.discogs_username)
 
 
 async def _user_workspace(session: AsyncSession, user: User) -> Workspace:
@@ -110,6 +120,7 @@ async def _user_workspace(session: AsyncSession, user: User) -> Workspace:
 async def digest_context(
     session: SessionDep,
     user: Annotated[User, Depends(require_scope(SCOPE_DIGEST_READ))],
+    discogs: Annotated[DiscogsTaste | None, Depends(provide_discogs_taste)],
     horizon_days: Annotated[int, Query(ge=1, le=365)] = 180,
     lookback_days: Annotated[int, Query(ge=1, le=365)] = 180,
 ) -> DigestContextResponse:
@@ -197,4 +208,5 @@ async def digest_context(
         balance=BalanceSignal(days_since=days_since, multiplier=multiplier, hint=hint),
         booked=booked,
         feedback=FeedbackSignal(lane_sentiment=lane_sentiment, recent_downvoted_titles=downvoted),
+        discogs=discogs,
     )

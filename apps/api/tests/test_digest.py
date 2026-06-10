@@ -10,11 +10,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api.adapters.auth import mint_pat
+from kp_api.adapters.discogs import DiscogsRelease, DiscogsTaste
+from kp_api.api.v1.digest import provide_discogs_taste
 from kp_api.config import Settings
 from kp_api.domain.enums import FeedbackRating
 from kp_api.domain.ids import uuid7
 from kp_api.domain.models import RecommendationFeedback, User
 from kp_api.domain.scopes import SCOPE_DIGEST_READ
+from kp_api.main import app
 from tests.conftest import auth_header, login_as
 
 
@@ -64,6 +67,9 @@ async def test_digest_context_balance_and_booked(
 
     assert body["digest_week"].startswith("CW")
 
+    # No Discogs token configured in tests → the lane is a soft-missing source.
+    assert body["discogs"] is None
+
 
 @pytest.mark.asyncio
 async def test_digest_context_feedback_sentiment(
@@ -102,3 +108,34 @@ async def test_digest_context_feedback_sentiment(
     # 1.0 + 0.1 * (2 - 1) = 1.1
     assert klasika["multiplier"] == pytest.approx(1.1)
     assert "Disliked C" in feedback["recent_downvoted_titles"]
+
+
+@pytest.mark.asyncio
+async def test_digest_context_includes_discogs_taste(
+    client: AsyncClient, settings: Settings, db_session: AsyncSession
+) -> None:
+    await login_as(client, "petr@example.com")
+    user = await db_session.scalar(select(User).where(User.email == "petr@example.com"))
+    assert user is not None
+    pat = await mint_pat(
+        db_session, user, name="routine", settings=settings, scopes=[SCOPE_DIGEST_READ]
+    )
+    await db_session.commit()
+
+    taste = DiscogsTaste(
+        username="petronijus",
+        release_count=1,
+        artists=["Gustav Mahler"],
+        releases=[DiscogsRelease(title="Symphony No. 5", artists=["Gustav Mahler"], year=1985)],
+    )
+    app.dependency_overrides[provide_discogs_taste] = lambda: taste
+    try:
+        response = await client.get("/v1/digest/context", headers=auth_header(pat))
+    finally:
+        app.dependency_overrides.pop(provide_discogs_taste, None)
+
+    assert response.status_code == 200, response.text
+    discogs = response.json()["discogs"]
+    assert discogs["username"] == "petronijus"
+    assert discogs["artists"] == ["Gustav Mahler"]
+    assert discogs["releases"][0]["title"] == "Symphony No. 5"

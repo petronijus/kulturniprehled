@@ -22,7 +22,13 @@ SCOPE_DIGEST_READ = "digest:read"
 # so the routine never sees `API_JWT_SECRET`.
 SCOPE_FEEDBACK_SIGN = "feedback:sign"
 
-ALL_SCOPES = frozenset({SCOPE_DIGEST_READ, SCOPE_FEEDBACK_SIGN})
+# Send the rendered weekly digest email. The cloud Gmail connector can only
+# create drafts, so the routine hands the finished HTML to the backend, which
+# relays it over SMTP to the single configured recipient. A leak can only
+# email that fixed address — never an arbitrary one.
+SCOPE_DIGEST_SEND = "digest:send"
+
+ALL_SCOPES = frozenset({SCOPE_DIGEST_READ, SCOPE_FEEDBACK_SIGN, SCOPE_DIGEST_SEND})
 
 
 def parse_scopes(raw: str | None) -> frozenset[str] | None:

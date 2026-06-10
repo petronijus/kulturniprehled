@@ -16,7 +16,7 @@ from kp_api.config import Settings
 from kp_api.domain.enums import FeedbackRating
 from kp_api.domain.ids import uuid7
 from kp_api.domain.models import RecommendationFeedback, User
-from kp_api.domain.scopes import SCOPE_DIGEST_READ
+from kp_api.domain.scopes import SCOPE_DIGEST_READ, SCOPE_DIGEST_SEND
 from kp_api.main import app
 from tests.conftest import auth_header, login_as
 
@@ -139,3 +139,76 @@ async def test_digest_context_includes_discogs_taste(
     assert discogs["username"] == "petronijus"
     assert discogs["artists"] == ["Gustav Mahler"]
     assert discogs["releases"][0]["title"] == "Symphony No. 5"
+
+
+async def _digest_pat(
+    client: AsyncClient, settings: Settings, db_session: AsyncSession, scopes: list[str]
+) -> str:
+    await login_as(client, "petr@example.com")
+    user = await db_session.scalar(select(User).where(User.email == "petr@example.com"))
+    assert user is not None
+    pat = await mint_pat(db_session, user, name="routine", settings=settings, scopes=scopes)
+    await db_session.commit()
+    return pat
+
+
+@pytest.mark.asyncio
+async def test_digest_send_relays_via_backend(
+    client: AsyncClient,
+    settings: Settings,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pat = await _digest_pat(client, settings, db_session, [SCOPE_DIGEST_SEND])
+
+    sent: dict[str, str] = {}
+
+    async def fake_send(_s: Settings, subject: str, html_body: str) -> str:
+        sent["subject"] = subject
+        sent["html"] = html_body
+        return "petronijus@example.com"
+
+    monkeypatch.setattr("kp_api.api.v1.digest.send_digest_email", fake_send)
+
+    response = await client.post(
+        "/v1/digest/send",
+        headers=auth_header(pat),
+        json={"subject": "Kulturní přehled — týden CW24", "html_body": "<h1>x</h1>"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json() == {"status": "sent", "to": "petronijus@example.com"}
+    assert sent["subject"].startswith("Kulturní přehled")
+    assert sent["html"] == "<h1>x</h1>"
+
+
+@pytest.mark.asyncio
+async def test_digest_send_rejects_token_without_scope(
+    client: AsyncClient, settings: Settings, db_session: AsyncSession
+) -> None:
+    # A read-only digest token must not be able to send mail.
+    pat = await _digest_pat(client, settings, db_session, [SCOPE_DIGEST_READ])
+
+    response = await client.post(
+        "/v1/digest/send",
+        headers=auth_header(pat),
+        json={"subject": "s", "html_body": "<p>x</p>"},
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_digest_send_503_when_relay_unconfigured(
+    client: AsyncClient, settings: Settings, db_session: AsyncSession
+) -> None:
+    # Test settings carry no SMTP host → the relay is disabled.
+    pat = await _digest_pat(client, settings, db_session, [SCOPE_DIGEST_SEND])
+
+    response = await client.post(
+        "/v1/digest/send",
+        headers=auth_header(pat),
+        json={"subject": "s", "html_body": "<p>x</p>"},
+    )
+
+    assert response.status_code == 503

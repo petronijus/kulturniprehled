@@ -22,9 +22,9 @@ the local skill did through those is replaced here by:
 
 ## Inputs handed to you in the task message
 
-- `KP_DIGEST_TOKEN` — a bearer PAT scoped to **only** `digest:read` and
-  `feedback:sign`. It cannot read or mutate anything else. Send it as
-  `Authorization: Bearer $KP_DIGEST_TOKEN`.
+- `KP_DIGEST_TOKEN` — a bearer PAT scoped to **only** `digest:read`,
+  `feedback:sign`, and `digest:send`. It cannot read or mutate anything
+  else. Send it as `Authorization: Bearer $KP_DIGEST_TOKEN`.
 - `KP_API_BASE` — `https://kulturniprehled.example.com` (public via
   Cloudflare Tunnel; reachable from the cloud).
 
@@ -115,14 +115,26 @@ step 7 (no JWT secret needed here).
 Reuse the **exact HTML template and subject** from
 `skills/kulturni-prehled/SKILL.md` step 8 (`Kulturní přehled — týden
 CW{week}`, `balance.hint` in the subheader, the per-pick card with the
-signed 👍/👎 links, notable-mentions block). Send a **real email** (not a
-draft) via the claude.ai **Gmail** connector:
+signed 👍/👎 links, notable-mentions block).
 
-- **to:** `petronijus@example.com` (never the example.com work address)
-- **from:** the connected Gmail account
+**Send via the KP API, not the Gmail connector** — the cloud Gmail
+connector can only create drafts, so the backend relays the email over
+SMTP to the fixed recipient (`petronijus@example.com`, server-side
+config — you don't pass a `to`):
 
-If the send fails, write the rendered HTML to the run log so the digest
-isn't lost.
+```bash
+curl -sS -X POST -H "Authorization: Bearer $KP_DIGEST_TOKEN" \
+  -H "Content-Type: application/json" \
+  "$KP_API_BASE/v1/digest/send" \
+  -d "$(jq -n --arg s "Kulturní přehled — týden CW${WEEK}" --arg h "$HTML" \
+        '{subject: $s, html_body: $h}')"
+```
+
+Expect `200 {"status":"sent","to":"petronijus@example.com"}`. **Fallback:**
+if it returns `503` (relay not configured) or `502` (send failed), create
+a Gmail **draft** via the connector instead **and** write the rendered
+HTML to the run log so the digest isn't lost — then tell Petr to send the
+draft by hand.
 
 ### 8. Report
 
@@ -131,9 +143,9 @@ Print a one-line summary: how many picks sent, the lane mix, and
 
 ## Guardrails
 
-- Read-only token: you can call `GET /v1/digest/context` and
-  `POST /v1/feedback/sign` and nothing else on the KP API — don't try
-  other endpoints, they'll 403.
+- Narrow token: you can call `GET /v1/digest/context`,
+  `POST /v1/feedback/sign`, and `POST /v1/digest/send` — nothing else on
+  the KP API; other endpoints 403.
 - One email per run, max ~5 picks, never relax the spacing rule to pad
   the list.
 - Don't run more than once per day (external scrapes + connectors).

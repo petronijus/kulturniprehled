@@ -77,6 +77,20 @@ class Settings(BaseSettings):
     discogs_token: str = ""
     discogs_username: str = ""
 
+    # SMTP relay for the digest email. The cloud Gmail connector can only draft,
+    # so POST /v1/digest/send relays the rendered HTML over SMTP. Provider-
+    # agnostic (Gmail SMTP, a self-hosted server, a transactional service —
+    # whatever the env points at). `digest_mail_to` is the ONLY recipient the
+    # send endpoint will target, so a leaked digest:send token can't spam.
+    # Empty `smtp_host` → the endpoint 503s (feature disabled).
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_starttls: bool = True
+    digest_mail_from: str = ""
+    digest_mail_to: str = ""
+
     # Error reporting (Sentry / GlitchTip). When empty the SDK is not
     # initialised at all — dev runs stay silent.
     sentry_dsn: str = ""

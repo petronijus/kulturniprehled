@@ -20,16 +20,17 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api.adapters.discogs import DiscogsTaste, fetch_discogs_taste
+from kp_api.adapters.email import EmailNotConfigured, EmailSendError, send_digest_email
 from kp_api.api.deps import SessionDep, SettingsDep, require_scope
 from kp_api.domain.enums import EventCategory, FeedbackRating
 from kp_api.domain.models import Event, RecommendationFeedback, User, Workspace, WorkspaceMember
-from kp_api.domain.scopes import SCOPE_DIGEST_READ
+from kp_api.domain.scopes import SCOPE_DIGEST_READ, SCOPE_DIGEST_SEND
 
 router = APIRouter(prefix="/v1/digest", tags=["digest"])
 
@@ -97,6 +98,16 @@ class DigestContextResponse(BaseModel):
     # Long-term taste anchor for the klasika lane. `null` when no Discogs
     # token is configured or Discogs is unreachable — a soft-missing source.
     discogs: DiscogsTaste | None = None
+
+
+class DigestSendRequest(BaseModel):
+    subject: str = Field(min_length=1)
+    html_body: str = Field(min_length=1)
+
+
+class DigestSendResponse(BaseModel):
+    status: str
+    to: str
 
 
 async def provide_discogs_taste(settings: SettingsDep) -> DiscogsTaste | None:
@@ -210,3 +221,25 @@ async def digest_context(
         feedback=FeedbackSignal(lane_sentiment=lane_sentiment, recent_downvoted_titles=downvoted),
         discogs=discogs,
     )
+
+
+@router.post("/send", response_model=DigestSendResponse)
+async def digest_send(
+    body: DigestSendRequest,
+    settings: SettingsDep,
+    user: Annotated[User, Depends(require_scope(SCOPE_DIGEST_SEND))],
+) -> DigestSendResponse:
+    """Relay the rendered digest over SMTP to the fixed configured recipient.
+
+    The cloud Gmail connector can only draft; this is the routine's send
+    path. The recipient is server-side config, never client input, so the
+    `digest:send` scope cannot be turned into an open relay.
+    """
+
+    try:
+        to = await send_digest_email(settings, body.subject, body.html_body)
+    except EmailNotConfigured as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+    except EmailSendError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"email relay failed: {exc}") from exc
+    return DigestSendResponse(status="sent", to=to)

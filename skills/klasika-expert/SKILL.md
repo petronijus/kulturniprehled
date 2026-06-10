@@ -165,6 +165,14 @@ returns nothing, set `MISSING_SPOTIFY=1`.
 
 #### 4b. Discogs (if token present)
 
+**If the caller already handed you a Discogs taste map, use it and skip
+this fetch.** The `kulturni-prehled` aggregator (and the cloud routine)
+gets the collection server-side from `GET /v1/digest/context` → `discogs`
+(`{artists[], releases[]}`) and passes it in as `$DISCOGS_TASTE`. Only
+fall back to the direct `api.discogs.com` pagination below when running
+**standalone** with a local `op` Discogs token and no caller-supplied
+map — the cloud environment can't reach `api.discogs.com` at all.
+
 ```bash
 ARTISTS=""
 PAGE=1

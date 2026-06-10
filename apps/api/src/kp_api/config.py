@@ -70,6 +70,13 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-6"
 
+    # Discogs — Petr's vinyl collection is the klasika lane's long-term taste
+    # anchor, served to the cloud digest routine via /v1/digest/context so the
+    # routine needs no Discogs token of its own. Optional: empty disables it
+    # and the endpoint returns `discogs: null`.
+    discogs_token: str = ""
+    discogs_username: str = ""
+
     # Error reporting (Sentry / GlitchTip). When empty the SDK is not
     # initialised at all — dev runs stay silent.
     sentry_dsn: str = ""

@@ -14,6 +14,7 @@ the local skill did through those is replaced here by:
 | Local skill used… | Cloud routine uses instead… |
 | --- | --- |
 | `op` token + raw `/v1/events`, `/v1/feedback/history`, `jq`/`date` math | **`GET /v1/digest/context`** — server precomputes balance, booked list, feedback sentiment |
+| `op` Discogs token + `api.discogs.com` pagination | **`discogs` field of `/v1/digest/context`** — server fetches + caches the collection; no Discogs token or `api.discogs.com` egress needed here |
 | `ssh` to prod for `API_JWT_SECRET` to sign feedback links | **`POST /v1/feedback/sign`** — server signs them |
 | `Skill` tool → `klasika-expert` | read `skills/klasika-expert/SKILL.md` + `preferences.md` and **execute its logic inline** |
 | local `google-workspace` MCP | claude.ai **Gmail** + **Google Calendar** connectors |
@@ -41,8 +42,12 @@ curl -sS -H "Authorization: Bearer $KP_DIGEST_TOKEN" \
 Returns: `digest_week` (e.g. `CW22`), `balance.multiplier` per lane,
 `balance.hint` (Czech), `booked[]` (title + starts_at + category for the
 next 180 days), `feedback.lane_sentiment` (per-lane multiplier),
-`feedback.recent_downvoted_titles`. **This replaces steps 3, 3b, and the
-booked-dates fetch of the local skill.** Don't recompute any of it.
+`feedback.recent_downvoted_titles`, and **`discogs`** — Petr's vinyl
+collection taste map (`{username, release_count, artists[], releases[]}`
+with `releases[] = {title, artists[], year}`), or `null` when the
+backend has no Discogs token. **This replaces steps 3, 3b, the
+booked-dates fetch, and the expert's own Discogs fetch (4b) of the local
+skill.** Don't recompute any of it.
 
 ### 2. Run the active experts inline
 
@@ -51,8 +56,13 @@ Read `skills/kulturni-prehled/active-experts.txt` for the active lanes
 `preferences.md` and perform its candidate-gathering inline**:
 
 - Taste profile → claude.ai **Spotify** connector (search/library) plus
-  the hand-edited `preferences.md` (and the Discogs taste notes the
-  expert references — treat them qualitatively, never as scores).
+  the hand-edited `preferences.md`, plus the **`discogs` field from step
+  1** as `$DISCOGS_TASTE` (the long-term anchor — `artists[]` for
+  composer presence, `releases[]` for specific work matches). **Skip the
+  expert's SKILL.md step 4b `api.discogs.com` fetch entirely** — it's
+  unreachable here and already served by the context. Treat the Discogs
+  profile qualitatively, never as scores. If `discogs` is `null`, note it
+  as a missing source and rank on Spotify + preferences alone.
 - Concert listings → `WebFetch` the orchestra / festival URLs the expert
   SKILL lists (and its static-scraper targets — fetch them the same way).
 - Exclude anything already in `booked[]` from step 1 (dedup).

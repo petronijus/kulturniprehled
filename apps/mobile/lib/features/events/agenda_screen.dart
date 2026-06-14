@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:kp_mobile/core/sensors/tilt_provider.dart';
+import 'package:kp_mobile/core/widgets/blend_mask.dart';
 import 'package:kp_mobile/core/widgets/blur_in_text.dart';
 import 'package:kp_mobile/core/widgets/date_row.dart';
 import 'package:kp_mobile/core/widgets/morphing_hero_cover.dart';
@@ -136,12 +137,16 @@ class _ParallaxScope extends InheritedWidget {
       scrollCtrl != old.scrollCtrl || tilt != old.tilt;
 }
 
-/// Wraps a layer with a Transform.translate driven by scroll position and
-/// device tilt. Apply the same widget multiple times with different scale
-/// factors to build a multi-layer parallax — background gets a small tilt
-/// amplitude but a large scroll factor (it sticks), foreground gets the
-/// opposite (it moves with the scroll, drifts more on tilt).
-class _ParallaxLayer extends StatelessWidget {
+/// Wraps a layer with a Transform.translate driven by the layer's position
+/// **relative to the viewport** (plus device tilt). Keying off the layer's own
+/// on-screen position — rather than the list's absolute scroll offset — keeps
+/// the parallax per-card: a card sitting at a given spot on screen always
+/// shows the same layer displacement, no matter how far down the list it is.
+/// (The old absolute-offset version made the cover/title gap grow without
+/// bound the further you scrolled.) Apply the widget multiple times with
+/// different scale factors to build a multi-layer parallax — a larger factor
+/// lags more and reads as "further back".
+class _ParallaxLayer extends StatefulWidget {
   const _ParallaxLayer({
     required this.child,
     this.scrollFactor = 0,
@@ -150,27 +155,63 @@ class _ParallaxLayer extends StatelessWidget {
 
   final Widget child;
 
-  /// Positive values translate the child *down* as the user scrolls down,
-  /// which visually makes it lag behind the rest of the list (more "back").
+  /// Drift per pixel of the card's offset from the viewport centre. A
+  /// *positive* factor slides the layer **down** as you scroll further down
+  /// the list (it lags, reading as "further back"); a *negative* factor leads
+  /// by sliding up. Bounded per card — keyed to viewport position, not the
+  /// absolute scroll offset.
   final double scrollFactor;
 
   /// Pixels of drift at full tilt (±1 on the normalised tilt input).
   final Offset tiltAmplitude;
 
   @override
+  State<_ParallaxLayer> createState() => _ParallaxLayerState();
+}
+
+class _ParallaxLayerState extends State<_ParallaxLayer> {
+  @override
+  void initState() {
+    super.initState();
+    // The first build runs before layout, so the render box has no position
+    // to measure yet — schedule one repaint once it does.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  /// Signed distance (px) from the viewport centre **up to** this layer's
+  /// centre, read from the previous frame's layout: positive while the layer
+  /// sits above the centre, and it grows as the list scrolls down — so
+  /// `delta * factor` keeps the original scroll direction while resetting per
+  /// card. Measuring the layer's own (untransformed) position is safe:
+  /// `RenderTransform` never folds its own translate into its own
+  /// `localToGlobal`, so there's no feedback loop with the offset we apply.
+  double _viewportDelta() {
+    final RenderObject? ro = context.findRenderObject();
+    if (ro is! RenderBox || !ro.hasSize || !ro.attached) {
+      return 0;
+    }
+    final double centreY =
+        ro.localToGlobal(Offset.zero).dy + ro.size.height / 2;
+    final double viewportCentre = MediaQuery.of(context).size.height / 2;
+    return viewportCentre - centreY;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final _ParallaxScope scope = _ParallaxScope.of(context);
     return AnimatedBuilder(
       animation: Listenable.merge(<Listenable>[scope.scrollCtrl, scope.tilt]),
-      builder: (context, _) {
-        final double scroll = scope.scrollCtrl.hasClients
-            ? scope.scrollCtrl.offset
-            : 0.0;
+      builder: (context, child) {
+        final double delta = _viewportDelta();
         final Offset tilt = scope.tilt.value;
-        final double dx = tilt.dx * tiltAmplitude.dx;
-        final double dy = scroll * scrollFactor + tilt.dy * tiltAmplitude.dy;
+        final double dx = tilt.dx * widget.tiltAmplitude.dx;
+        final double dy =
+            delta * widget.scrollFactor + tilt.dy * widget.tiltAmplitude.dy;
         return Transform.translate(offset: Offset(dx, dy), child: child);
       },
+      child: widget.child,
     );
   }
 }
@@ -250,13 +291,18 @@ class _AgendaList extends StatelessWidget {
       ),
       itemCount: itemCount,
       itemBuilder: (context, index) {
-        if (index < months.length) {
-          return _MonthSection(
-            group: months[index],
-            startEventIndex: startEventIndices[index],
-          );
-        }
-        return _PastTile(count: past.length);
+        final Widget item = index < months.length
+            ? _MonthSection(
+                group: months[index],
+                startEventIndex: startEventIndices[index],
+              )
+            : _PastTile(count: past.length);
+        // Opaque white painted *inside* the scroll content (behind the ghost
+        // month, so that still shows through). It rides into Android's
+        // stretch-overscroll layer with the content, giving the date/title
+        // difference-blend a backdrop there too — without it the black-on-white
+        // text drops out on the end-bounce, leaving only text over the photos.
+        return ColoredBox(color: Colors.white, child: item);
       },
     );
   }
@@ -341,8 +387,10 @@ class _MonthSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             const SizedBox(height: 80),
-            for (int i = 0; i < group.events.length; i++)
+            for (int i = 0; i < group.events.length; i++) ...<Widget>[
+              if (i > 0) const SizedBox(height: 20),
               _EventCard(event: group.events[i], index: startEventIndex + i),
+            ],
             const SizedBox(height: 16),
           ],
         ),
@@ -449,18 +497,22 @@ class _EventCard extends StatelessWidget {
                     children: <Widget>[
                       SizedBox(
                         width: 240,
-                        child: BlurInText(
-                          key: ValueKey<String>('title-${event.id}'),
-                          text: event.title,
-                          restartTrigger: _ReplayScope.of(context),
-                          startDelay: Duration(
-                            milliseconds: index * _staggerMs,
-                          ),
-                          style: const TextStyle(
-                            fontFamily: 'Gloock',
-                            fontSize: 50,
-                            height: 1.0,
-                            color: Colors.black,
+                        // Same white + difference trick as the date row, so the
+                        // title stays legible where it crosses the dark cover.
+                        child: BlendMask(
+                          child: BlurInText(
+                            key: ValueKey<String>('title-${event.id}'),
+                            text: event.title,
+                            restartTrigger: _ReplayScope.of(context),
+                            startDelay: Duration(
+                              milliseconds: index * _staggerMs,
+                            ),
+                            style: const TextStyle(
+                              fontFamily: 'Gloock',
+                              fontSize: 50,
+                              height: 1.0,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
@@ -469,10 +521,17 @@ class _EventCard extends StatelessWidget {
                         tag: 'daterow-${event.id}',
                         child: Material(
                           type: MaterialType.transparency,
-                          child: DateRow(
-                            leading: catLabel,
-                            center: dateLabel,
-                            trailing: timeLabel,
+                          // White + difference blend inverts whatever is behind
+                          // the row, so the date/time stays legible where it
+                          // overlaps the dark cover circle (and reads black on
+                          // the plain background to its left).
+                          child: BlendMask(
+                            child: DateRow(
+                              leading: catLabel,
+                              center: dateLabel,
+                              trailing: timeLabel,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),

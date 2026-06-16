@@ -192,7 +192,8 @@ For routine releases: `ssh deploy@kp-vm /opt/kp/infra/deploy/upgrade.sh`.
 
 ## License
 
-Proprietary — see [`LICENSE`](./LICENSE).
+[AGPL-3.0](./LICENSE) — network copyleft: if you run a modified version as a
+network service, you must make the source available to its users.
 
 ## Secrets
 

@@ -1,0 +1,16 @@
+name: kulturniprehled
+tag_format: v{version}
+version_files:
+  - path: apps/mobile/pubspec.yaml      # version: X.Y.Z+N (build number N also increments)
+changelog: CHANGELOG.md
+artifacts:
+  mode: local                           # built locally; not in GitHub CI
+  local_build: cd apps/mobile && flutter build apk --release
+  # rename build/app/outputs/flutter-apk/app-release.apk -> kp-mobile-v{version}.apk before upload
+  local_upload:
+    - kp-mobile-v*.apk
+  # iOS ships to the App Store (see private runbooks), not as a GitHub asset.
+registry:
+  images: []
+preflight_extra:
+  - cd apps/api && python -m pytest -q

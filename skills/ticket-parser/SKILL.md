@@ -514,7 +514,7 @@ při syncu nových eventů (viz `sync_controller.dart`).*
 
 ### Notes
 
-- bastla account: `petronijus@example.com`
+- personal email account: `petronijus@example.com`
 - Běla: `bela@example.com` — **always with háček: Běla / Bělo**
 - Calendar: Kocourek&Prdelcicka
 - KP API base: dev `http://localhost:18000`, prod

@@ -103,3 +103,6 @@ Thumbs.db
 
 # Generated launcher-icon intermediate (Pillow output of scripts/build_launcher_icon.py)
 apps/mobile/assets/brand/launcher_master.png
+
+# Private overlay (clone of github.com/petronijus/kulturniprehled-private)
+/private/

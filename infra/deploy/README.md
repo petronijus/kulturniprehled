@@ -39,18 +39,29 @@ Then **manually**:
 
 ## Routine upgrades
 
+The API image is **built and pushed to GHCR locally** (not on the VM, not in
+CI) — build it first on your dev machine:
+
+```bash
+echo "$GHCR_PAT" | docker login ghcr.io -u petronijus --password-stdin   # PAT: write:packages
+scripts/build-push.sh        # builds + pushes ghcr.io/petronijus/kulturniprehled-api:{sha,latest}
+```
+
+Then upgrade on the VM (pulls the image, no build):
+
 ```bash
 ssh deploy@kp-vm
+docker login ghcr.io -u petronijus     # one-time, if the package is private
 /opt/kp/infra/deploy/upgrade.sh
 ```
 
 The script:
 
-1. `git pull --ff-only` so the local tree matches `main` (or whatever
-   branch the operator has checked out — typically the latest tag).
-2. `docker compose pull api` to fetch the new image from GHCR.
+1. `git pull --ff-only` so the local tree matches `main` (compose files +
+   migration metadata; the app itself is **not** built here).
+2. `docker compose pull api` to fetch the prebuilt image from GHCR.
 3. Runs Alembic migrations once up-front, **before** restarting the API.
-4. Rolls the API container.
+4. Rolls the API container (pulled image, `--no-deps`, no `--build`).
 5. Polls `/healthz` for 30 s and reports failure with the last 50 log
    lines if the new container doesn't come up.
 

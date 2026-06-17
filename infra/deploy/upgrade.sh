@@ -47,11 +47,14 @@ docker compose --env-file "$ENV_FILE" \
     run --rm -e RUN_MIGRATIONS=1 --entrypoint /bin/sh api \
     -c "alembic upgrade head"
 
-echo "[upgrade] restarting api (zero-downtime within compose limits)"
+echo "[upgrade] restarting api with the pulled image (no build on the VM)"
+# The API image is built + pushed LOCALLY (scripts/build-push.sh) and pulled
+# above — the VM never builds from source. Set KP_API_TAG to deploy a specific
+# tag (defaults to :latest).
 # shellcheck disable=SC2086
 docker compose --env-file "$ENV_FILE" \
     -f "$COMPOSE_FILE" $PROD_OVERLAY \
-    up -d --no-deps --build api
+    up -d --no-deps api
 
 echo "[upgrade] waiting for /healthz..."
 for i in $(seq 1 30); do

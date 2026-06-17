@@ -13,7 +13,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-kp}
       POSTGRES_USER: ${POSTGRES_USER:-kp}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "${POSTGRES_HOST_PORT:-15432}:5432"
@@ -31,7 +31,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-kp-minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-changeme-changeme}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env}
     ports:
       - "${MINIO_HOST_PORT:-19000}:9000"
       - "${MINIO_CONSOLE_HOST_PORT:-19001}:9001"
@@ -50,7 +50,7 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set kp http://minio:9000 ${MINIO_ACCESS_KEY:-kp-minio} ${MINIO_SECRET_KEY:-changeme-changeme} &&
+      mc alias set kp http://minio:9000 ${MINIO_ACCESS_KEY:-kp-minio} ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env} &&
       mc mb --ignore-existing kp/${MINIO_BUCKET_TICKETS:-tickets} &&
       mc anonymous set none kp/${MINIO_BUCKET_TICKETS:-tickets};
       "
@@ -66,17 +66,17 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-kp}
       POSTGRES_USER: ${POSTGRES_USER:-kp}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-kp-minio}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-changeme-changeme}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env}
       MINIO_BUCKET_TICKETS: ${MINIO_BUCKET_TICKETS:-tickets}
       # Public endpoint baked into presigned URLs — must match the host
       # mobile clients actually hit (Cloudflare-tunneled subdomain in prod).
       MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-}
       MINIO_PUBLIC_USE_SSL: ${MINIO_PUBLIC_USE_SSL:-}
       MINIO_PRESIGNED_URL_TTL_SECONDS: ${MINIO_PRESIGNED_URL_TTL_SECONDS:-900}
-      API_JWT_SECRET: ${API_JWT_SECRET:-dev-only-secret}
+      API_JWT_SECRET: ${API_JWT_SECRET:?set API_JWT_SECRET in .env}
       API_JWT_ACCESS_TTL_SECONDS: ${API_JWT_ACCESS_TTL_SECONDS:-900}
       API_JWT_REFRESH_TTL_SECONDS: ${API_JWT_REFRESH_TTL_SECONDS:-2592000}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}

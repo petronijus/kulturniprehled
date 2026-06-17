@@ -27,3 +27,6 @@ HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["uvicorn", "kp_api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Link this GHCR package to its source repo (auto-connects on push)
+LABEL org.opencontainers.image.source=https://github.com/petronijus/kulturniprehled

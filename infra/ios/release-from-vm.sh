@@ -94,6 +94,7 @@ ssh "$MAC_HOST" "cat > /tmp/kp_ios_build.sh << 'BUILDSCRIPT'
 export PATH=\"/usr/local/share/flutter/bin:/usr/local/bin:\$PATH\"
 export HOME=/Users/petronijus
 security unlock-keychain -p \"$MAC_PW\" ~/Library/Keychains/login.keychain-db
+cd $REPO_DIR && ./scripts/ios-inject-client-id.sh
 cd $REPO_DIR/apps/mobile
 flutter build ipa --release \
   --export-options-plist=ios/ExportOptions.plist \
@@ -101,6 +102,7 @@ flutter build ipa --release \
   --dart-define=KP_GOOGLE_OAUTH_SERVER_CLIENT_ID=$GOOG_CLIENT_ID \
   > /tmp/kp_ios_build.log 2>&1
 echo \"\$?\" > /tmp/kp_ios_build_exit
+cd $REPO_DIR && ./scripts/ios-inject-client-id.sh --restore
 BUILDSCRIPT
 chmod +x /tmp/kp_ios_build.sh"
 

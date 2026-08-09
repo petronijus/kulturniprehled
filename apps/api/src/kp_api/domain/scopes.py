@@ -28,6 +28,11 @@ SCOPE_FEEDBACK_SIGN = "feedback:sign"
 # email that fixed address — never an arbitrary one.
 SCOPE_DIGEST_SEND = "digest:send"
 
+# Read the events list (GET /v1/events). Held by the weekly routine so its
+# history dedup (same work attended this year = hard veto) can see past
+# events; read-only, mutations stay unrestricted-only.
+SCOPE_EVENTS_READ = "events:read"
+
 # Read the season-planner surface: pool, scenarios, plan summary, novelties.
 # Held by the weekly novelty routine in the cloud.
 SCOPE_SEASON_READ = "season:read"
@@ -42,6 +47,7 @@ ALL_SCOPES = frozenset(
         SCOPE_DIGEST_READ,
         SCOPE_FEEDBACK_SIGN,
         SCOPE_DIGEST_SEND,
+        SCOPE_EVENTS_READ,
         SCOPE_SEASON_READ,
         SCOPE_SEASON_WRITE,
     }

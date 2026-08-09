@@ -14,7 +14,8 @@ only the interactive MCP connectors are missing.
 
 | Local skill uses… | Claudebox uses instead… |
 | --- | --- |
-| `op` token | `$KP_DIGEST_TOKEN` env (scoped PAT: `digest:read feedback:sign digest:send season:read season:write`), injected by run-weekly.sh from a 0600 file — never print it |
+| `op` token | `$KP_DIGEST_TOKEN` env (scoped PAT: `digest:read feedback:sign digest:send events:read season:read season:write`), injected by run-weekly.sh from a 0600 file — never print it |
+| `/v1/events` history queries (same-work hard veto) | work as-is — the PAT carries `events:read` (read-only; mutations stay unrestricted-only) |
 | local `google-workspace` MCP (calendar) | `$KP_CALENDAR_ICS_URL` env (secret iCal address of the Kocourek&Prdelčička calendar), when set — see below; unset → empty blocked set + a footer note in the email |
 | Gmail send via workspace MCP | **`POST /v1/digest/send`** (SMTP relay; recipient is server-side). On 503/502: write the rendered HTML next to the run log and do NOT ack — there is no draft fallback here |
 | Spotify connector | skip; note in `missing_sources` |

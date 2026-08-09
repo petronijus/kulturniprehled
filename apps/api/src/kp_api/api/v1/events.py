@@ -12,13 +12,13 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api.adapters.storage import minio as storage
-from kp_api.api.deps import CurrentUser, SessionDep
+from kp_api.api.deps import CurrentUser, SessionDep, require_scope
 from kp_api.domain.enums import ChangeOp, EventCategory, EventSource, EventStatus
 from kp_api.domain.models import Event, User, Workspace, WorkspaceMember
 from kp_api.domain.schemas import (
@@ -27,6 +27,7 @@ from kp_api.domain.schemas import (
     EventResponse,
     EventUpdate,
 )
+from kp_api.domain.scopes import SCOPE_EVENTS_READ
 from kp_api.sync.changelog import record_event_change
 
 router = APIRouter(prefix="/v1/events", tags=["events"])
@@ -51,7 +52,10 @@ def _utcnow() -> datetime:
 @router.get("", response_model=EventListResponse)
 async def list_events(
     session: SessionDep,
-    user: CurrentUser,
+    # require_scope instead of CurrentUser: unrestricted credentials pass as
+    # before, and the weekly routine's events:read PAT can read history for
+    # the same-work hard veto without touching the mutating surface.
+    user: Annotated[User, Depends(require_scope(SCOPE_EVENTS_READ))],
     starts_from: Annotated[datetime | None, Query()] = None,
     starts_to: Annotated[datetime | None, Query()] = None,
     category: Annotated[EventCategory | None, Query()] = None,

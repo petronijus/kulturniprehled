@@ -39,18 +39,26 @@ Edit freely — the skill rereads it on every run.
 The skill hits these via WebFetch in step 4. LLM extracts upcoming
 events (next 4 weeks) since these line-ups change frequently.
 
-Primary (club sites):
+Primary (club sites — Petrovy kluby, kandidáti odsud jsou vždy fér):
 
 - https://www.palacakropolis.cz — Palác Akropolis
-- https://www.crossclub.cz/cs/program/ — Cross Club <!-- TODO(Petr): verify URL -->
-- https://www.roxy.cz/program — Roxy <!-- TODO(Petr): verify URL -->
-- https://anka.li/upcoming-events/ — Ankali (verified 2026-08; ankali.bio is dead DNS)
 - https://punctum.cz — Punctum / Krásovka <!-- TODO(Petr): verify URL — returned an empty page 2026-08 -->
+- https://lunchmeat.cz — Lunchmeat (festival + jednorázovky)
+- https://archaplus.cz/program/ — Archa+ <!-- TODO(Petr): verify URL (bývalé Divadlo Archa) -->
+- https://www.meetfactory.cz/cs/program — MeetFactory <!-- TODO(Petr): verify URL -->
 
-Secondary (aggregators — robust when a club site breaks; the caller
-dedups against primary sources by dedup_key):
+Secondary (aggregators — Resident Advisor, GoOut, Songkick). **STRICT
+RULE**: aggregators serve (a) date/availability verification and
+(b) catching favourite-artist shows at venues without their own
+programme page (Basinski @ Gabriel Loci). A candidate sourced ONLY from
+an aggregator must match `## Favourite artists / labels` or score ≥ 0.7
+on genre fit — venue-only discoveries are noise, never emit them.
 
-- https://ra.co/events/cz/prague — Resident Advisor Praha
+- https://ra.co/events/cz/prague — Resident Advisor Praha (403 for curl; try WebFetch)
 - https://goout.net/cs/praha/koncerty/?tags=electronic — GoOut elektronika
+
+**Venue veto**: Cross Club, Ankali, Roxy (Petr tam nechodí — 2026-08-10).
+Favourite-artist exception applies i tady: kdyby v Ankali hrál někdo
+z Favourite artists, smí projít — samotné venue kandidáta nekvalifikuje.
 
 *(přidávej dle libosti: Lethargy, Sonic Visions, Fuchs2, …)*

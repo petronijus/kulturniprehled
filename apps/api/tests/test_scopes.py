@@ -20,6 +20,7 @@ from kp_api.config import Settings
 from kp_api.domain.models import User
 from kp_api.domain.scopes import (
     SCOPE_DIGEST_READ,
+    SCOPE_EVENTS_READ,
     SCOPE_FEEDBACK_SIGN,
     SCOPE_SEASON_READ,
     SCOPE_SEASON_WRITE,
@@ -194,3 +195,22 @@ async def test_unrestricted_credentials_pass_season_endpoints(
         "/v1/season/plans/current", headers=auth_header(pair["access_token"])
     )
     assert jwt_read.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_events_read_scope_reads_but_cannot_mutate(
+    client: AsyncClient, settings: Settings, db_session: AsyncSession
+) -> None:
+    user = await _known_user(client, db_session)
+    pat = await mint_pat(
+        db_session, user, name="routine", settings=settings, scopes=[SCOPE_EVENTS_READ]
+    )
+    await db_session.commit()
+
+    assert (await client.get("/v1/events", headers=auth_header(pat))).status_code == 200
+    denied = await client.post(
+        "/v1/events",
+        headers=auth_header(pat),
+        json={"title": "X", "category": "concert", "starts_at": "2026-10-01T19:00:00+02:00"},
+    )
+    assert denied.status_code == 403

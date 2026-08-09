@@ -22,10 +22,11 @@ Two runs live here:
    without it ever touching a terminal:
 
    ```bash
-   # on the VM (192.168.20.101):
-   docker compose exec api python -m kp_api.cli mint-pat \
-     --email petr@... --name claudebox-weekly \
-     --scopes "digest:read feedback:sign digest:send season:read season:write"
+   # on the VM (192.168.20.101), from /opt/kp:
+   docker compose -f infra/docker-compose.yml --env-file .env exec -T api \
+     python -m kp_api.cli mint-pat --email <owner-email> --name claudebox-weekly --quiet \
+     --scope digest:read --scope feedback:sign --scope digest:send \
+     --scope events:read --scope season:read --scope season:write
    # pipe the output straight into:
    #   ssh claudebox 'umask 077; mkdir -p ~/.config/kulturni-prehled; cat > ~/.config/kulturni-prehled/kp-token'
    ```

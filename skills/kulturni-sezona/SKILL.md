@@ -31,7 +31,13 @@ capable token (the local unrestricted PAT qualifies):
 url?, price_czk?, program?, detail?, enriched_at?, score?, why_cs?,
 source_type?, source_name?, season_event?, tickets_available?}`.
 
-**`dedup_key` recipe (identity across re-scrapes — never change casually):**
+**`dedup_key` recipe (identity across re-scrapes — never change casually;
+changed once 2026-08-10, title→URL, with a DB key migration):**
+
+Identity comes from the **event URL** when the source has one — titles
+are marketing strings that the ranking LLM also tends to polish, which
+made the same event hash differently between runs. Title is only the
+fallback for URL-less candidates.
 
 ```python
 import hashlib, re, unicodedata
@@ -39,9 +45,17 @@ def normalize(s):
     s = unicodedata.normalize("NFD", s.lower())
     s = "".join(c for c in s if unicodedata.category(c) != "Mn")
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", s)).strip()
-def dedup_key(lane, title, starts_at_date):
-    return hashlib.sha256(f"{lane}|{normalize(title)}|{starts_at_date}".encode()).hexdigest()[:64]
+def canonical_url(url):
+    u = url.lower().split("#")[0].split("?")[0].rstrip("/")
+    return re.sub(r"^https?://(www\.)?", "", u)
+def dedup_key(lane, title, url, starts_at_date):
+    ident = canonical_url(url) if url else normalize(title)
+    return hashlib.sha256(f"{lane}|{ident}|{starts_at_date}".encode()).hexdigest()[:64]
 ```
+
+The date stays in the key — multi-date productions share one URL.
+**Never retitle a candidate after its key is computed; the key must be
+derived from the raw scraped record.**
 
 ### 0. Resolve season + auth
 

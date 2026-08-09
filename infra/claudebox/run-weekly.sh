@@ -5,7 +5,7 @@
 # Anthropic API key). Models ai-config's repo-maintenance runner.
 #
 # Secrets: ~/.config/kulturni-prehled/kp-token (0600) holds the scoped PAT
-# (digest:read feedback:sign digest:send season:read season:write) —
+# (digest:read feedback:sign digest:send events:read season:read season:write) —
 # provisioned per infra/claudebox/README.md. Optional:
 # ~/.config/kulturni-prehled/calendar-ics-url with the shared calendar's
 # secret iCal address (blocked-day checks degrade gracefully without it).

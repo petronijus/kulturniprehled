@@ -37,15 +37,34 @@ for m in re.finditer(
     if href in seen:
         continue
 
+    # socr.rozhlas.cz has switched between numeric ("15. 6. 2026 v 19.30")
+    # and worded ("24. září 2026 ve 20.00") date formats — accept both,
+    # including the "v"/"ve" preposition variants.
+    CZ_MONTHS = {
+        'ledna': 1, 'unora': 2, 'února': 2, 'brezna': 3, 'března': 3,
+        'dubna': 4, 'kvetna': 5, 'května': 5, 'cervna': 6, 'června': 6,
+        'cervence': 7, 'července': 7, 'srpna': 8, 'zari': 9, 'září': 9,
+        'rijna': 10, 'října': 10, 'listopadu': 11, 'prosince': 12,
+    }
     d_m = re.search(
-        r'(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})(?:\s+v\s+(\d{1,2})[\.:](\d{2}))?',
+        r'(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})(?:\s+ve?\s+(\d{1,2})[\.:](\d{2}))?',
         desc,
     )
-    if not d_m:
-        continue
+    if d_m:
+        day, mo, yr = (int(x) for x in d_m.groups()[:3])
+    else:
+        d_m = re.search(
+            r'(\d{1,2})\.\s*([a-záéíóúůýčďěňřšťž]+)\s*(\d{4})'
+            r'(?:\s+ve?\s+(\d{1,2})[\.:](\d{2}))?',
+            desc, re.IGNORECASE,
+        )
+        if not d_m or d_m.group(2).lower() not in CZ_MONTHS:
+            continue
+        day = int(d_m.group(1))
+        mo = CZ_MONTHS[d_m.group(2).lower()]
+        yr = int(d_m.group(3))
     seen.add(href)
 
-    day, mo, yr = (int(x) for x in d_m.groups()[:3])
     hh = int(d_m.group(4)) if d_m.group(4) else 19
     mm = int(d_m.group(5)) if d_m.group(5) else 30
 

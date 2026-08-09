@@ -44,8 +44,8 @@ Primary (club sites):
 - https://www.palacakropolis.cz — Palác Akropolis
 - https://www.crossclub.cz/cs/program/ — Cross Club <!-- TODO(Petr): verify URL -->
 - https://www.roxy.cz/program — Roxy <!-- TODO(Petr): verify URL -->
-- https://ankali.bio — Ankali <!-- TODO(Petr): verify URL (domain has changed before; RA fallback below covers it) -->
-- https://punctum.cz — Punctum / Krásovka <!-- TODO(Petr): verify URL -->
+- https://anka.li/upcoming-events/ — Ankali (verified 2026-08; ankali.bio is dead DNS)
+- https://punctum.cz — Punctum / Krásovka <!-- TODO(Petr): verify URL — returned an empty page 2026-08 -->
 
 Secondary (aggregators — robust when a club site breaks; the caller
 dedups against primary sources by dedup_key):

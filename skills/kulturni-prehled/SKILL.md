@@ -182,6 +182,13 @@ SUBJECT="Kulturní přehled — novinky, týden CW${WEEK}"
       {{label}}{{#if season_event}} · událost sezóny{{/if}} · NOVÉ
     </p>
     <h2 style="font-size:17px;margin:0 0 6px;">{{title}}</h2>
+    {{#if source_name}}
+    <span style="display:inline-block;margin:0 0 6px;padding:2px 8px 2px 4px;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:0.3px;
+      {{#if (eq source_type 'festival')}}background:#FFF3E0;color:#E65100;{{/if}}
+      {{#if (eq source_type 'sezona')}}background:#F5F5F5;color:#616161;{{/if}}
+      {{#if (eq source_type 'objev')}}background:#E8F5E9;color:#2E7D32;{{/if}}
+    ">{{#if source_logo_url}}<img src="{{source_logo_url}}" width="16" height="16" alt="" style="vertical-align:-4px;border-radius:3px;margin-right:4px">{{/if}}{{source_name}}</span>
+    {{/if}}
     <p style="margin:0 0 4px;color:#444;font-size:14px;">
       {{date_human}}{{#if venue}} · {{venue}}{{/if}}{{#if price_czk}} · {{price_czk}} Kč{{/if}}
     </p>
@@ -226,6 +233,18 @@ SUBJECT="Kulturní přehled — novinky, týden CW${WEEK}"
 
 `date_human` computed programmatically (Czech weekday map, never
 guessed) as in `klasika-expert/SKILL.md` step 0.
+
+**Source logos** (`source_logo_url`): official ensemble/festival logos
+live in the public MinIO bucket —
+`https://kulturniprehled-tickets.example.com/event-images/logos/<slug>.png`
+where `<slug>` = `source_name` lowercased, diacritics stripped,
+non-alphanumerics collapsed to single dashes (e.g. "Česká filharmonie"
+→ `ceska-filharmonie`, "PKF – Prague Philharmonia" → `pkf`). The
+frontend's canonical slug map is
+`apps/api/web/src/domain/sources.ts` — if the slug is not in that map,
+omit the `<img>` (aggregator sources like Songkick/GoOut have no logo
+on purpose). New logos: drop a PNG into `apps/api/web/public/logos/`
+AND `mc cp` it to the bucket so web + e-mail stay in sync.
 
 Send via the workspace MCP (real send, not draft):
 

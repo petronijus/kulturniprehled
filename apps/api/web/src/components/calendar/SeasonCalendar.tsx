@@ -21,8 +21,11 @@ interface SeasonCalendarProps {
   blockedDays: ReadonlySet<IsoDate>;
   /** The dragged candidate's own date, or null when no drag is active. */
   dragTargetDate: IsoDate | null;
-  /** Card being hovered in the pool — its date cell (and chip) light up. */
-  highlightCandidate: { id: string; date: IsoDate } | null;
+  /** Hovered + pinned pool cards — their date cells (and chips) light up. */
+  highlightIds: ReadonlySet<string>;
+  highlightDates: ReadonlySet<IsoDate>;
+  /** Where the calendar should scroll (last hover/pin interaction). */
+  scrollTarget: IsoDate | null;
 }
 
 export function SeasonCalendar({
@@ -36,7 +39,9 @@ export function SeasonCalendar({
   violations,
   blockedDays,
   dragTargetDate,
-  highlightCandidate,
+  highlightIds,
+  highlightDates,
+  scrollTarget,
 }: SeasonCalendarProps) {
   const months = useMemo(
     () => monthsBetween(season.starts_on, season.ends_on),
@@ -194,19 +199,19 @@ export function SeasonCalendar({
     section?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [dragTargetDate]);
 
-  // Hovered card → bring its month into view (debounced so scanning the
-  // card list doesn't make the calendar jump around).
+  // Hovered/pinned card → bring its month into view (debounced so scanning
+  // the card list doesn't make the calendar jump around).
   useEffect(() => {
-    if (highlightCandidate === null) {
+    if (scrollTarget === null) {
       return;
     }
     const timer = window.setTimeout(() => {
       scrollRef.current
-        ?.querySelector(`[data-month="${monthOf(highlightCandidate.date)}"]`)
+        ?.querySelector(`[data-month="${monthOf(scrollTarget)}"]`)
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [highlightCandidate]);
+  }, [scrollTarget]);
 
   const jumpTo = (month: IsoMonth) => {
     scrollRef.current
@@ -232,7 +237,8 @@ export function SeasonCalendar({
             diffOf={diffOf}
             violatedIds={violatedIds}
             previewMode={previewMode}
-            highlightCandidate={highlightCandidate}
+            highlightIds={highlightIds}
+            highlightDates={highlightDates}
           />
         ))}
       </div>

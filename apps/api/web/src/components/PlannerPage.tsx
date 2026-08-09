@@ -29,7 +29,7 @@ export function PlannerPage() {
   const [previewScenarioId, setPreviewScenarioId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [hoveredCandidate, setHoveredCandidate] = useState<Candidate | null>(null);
-  const [pinnedCandidate, setPinnedCandidate] = useState<Candidate | null>(null);
+  const [pinnedCandidates, setPinnedCandidates] = useState<Candidate[]>([]);
 
   const pool = useMemo(() => poolQuery.data ?? [], [poolQuery.data]);
   const scenarios = useMemo(() => scenariosQuery.data ?? [], [scenariosQuery.data]);
@@ -67,7 +67,7 @@ export function PlannerPage() {
       if (previewMode) {
         setPreviewScenarioId(null);
       } else {
-        setPinnedCandidate(null);
+        setPinnedCandidates([]);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -75,7 +75,11 @@ export function PlannerPage() {
   }, [previewMode]);
 
   const togglePin = useCallback((candidate: Candidate) => {
-    setPinnedCandidate((current) => (current?.id === candidate.id ? null : candidate));
+    setPinnedCandidates((current) =>
+      current.some((c) => c.id === candidate.id)
+        ? current.filter((c) => c.id !== candidate.id)
+        : [...current, candidate],
+    );
   }, []);
 
   const setStatus = useCallback(
@@ -155,9 +159,23 @@ export function PlannerPage() {
               violations={violations}
               blockedDays={NO_BLOCKED_DAYS}
               dragTargetDate={dragTargetDate}
-              highlightCandidate={(() => {
-                const active = hoveredCandidate ?? pinnedCandidate;
-                return active === null ? null : { id: active.id, date: candidateDate(active) };
+              highlightIds={(() => {
+                const ids = new Set(pinnedCandidates.map((c) => c.id));
+                if (hoveredCandidate !== null) {
+                  ids.add(hoveredCandidate.id);
+                }
+                return ids;
+              })()}
+              highlightDates={(() => {
+                const dates = new Set(pinnedCandidates.map(candidateDate));
+                if (hoveredCandidate !== null) {
+                  dates.add(candidateDate(hoveredCandidate));
+                }
+                return dates;
+              })()}
+              scrollTarget={(() => {
+                const last = hoveredCandidate ?? pinnedCandidates[pinnedCandidates.length - 1];
+                return last === undefined || last === null ? null : candidateDate(last);
               })()}
             />
             <CandidatePool
@@ -165,7 +183,7 @@ export function PlannerPage() {
               months={months}
               onSetStatus={setStatus}
               onHoverChange={setHoveredCandidate}
-              pinnedId={pinnedCandidate?.id ?? null}
+              pinnedIds={new Set(pinnedCandidates.map((c) => c.id))}
               onTogglePin={togglePin}
               actionsDisabled={previewMode}
             />

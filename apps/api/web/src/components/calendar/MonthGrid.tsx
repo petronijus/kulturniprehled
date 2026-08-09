@@ -18,7 +18,8 @@ interface MonthGridProps {
   diffOf: (candidateId: string) => "none" | "added" | "removed";
   violatedIds: ReadonlySet<string>;
   previewMode: boolean;
-  highlightCandidate: { id: string; date: IsoDate } | null;
+  highlightIds: ReadonlySet<string>;
+  highlightDates: ReadonlySet<IsoDate>;
 }
 
 export function MonthGrid({
@@ -33,7 +34,8 @@ export function MonthGrid({
   diffOf,
   violatedIds,
   previewMode,
-  highlightCandidate,
+  highlightIds,
+  highlightDates,
 }: MonthGridProps) {
   const [yearStr, monthStr] = month.split("-") as [string, string];
   const monthName = cs.months[Number(monthStr) - 1] ?? month;
@@ -79,7 +81,8 @@ export function MonthGrid({
             diffOf={diffOf}
             violatedIds={violatedIds}
             previewMode={previewMode}
-            highlightCandidate={highlightCandidate}
+            highlightIds={highlightIds}
+            highlightDates={highlightDates}
           />
         ))}
       </div>

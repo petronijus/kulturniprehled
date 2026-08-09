@@ -102,12 +102,35 @@ def configure_limiter(settings: Settings) -> None:
     limiter.enabled = settings.rate_limit_enabled
 
 
+# The SPA document at /app needs Google Identity Services: the GIS script,
+# its button iframe, and its token endpoints all live on accounts.google.com.
+# Everything the SPA itself loads is same-origin ('self' — Vite production
+# builds emit no inline scripts). Every other path keeps the API lockdown
+# CSP below.
+_SPA_CSP = (
+    "default-src 'self'; "
+    "img-src 'self' data:; "
+    "style-src 'self'; "
+    "script-src 'self' https://accounts.google.com; "
+    "connect-src 'self' https://accounts.google.com; "
+    "frame-src https://accounts.google.com; "
+    "frame-ancestors 'none'; "
+    "base-uri 'none'"
+)
+
+_API_CSP = "default-src 'none'; frame-ancestors 'none'"
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Attach hardening headers to every response.
 
     These are mostly relevant for browsers, but a misconfigured client
     or an attacker-driven embed can hit the API too — the headers are
     cheap and the floor is "no worse than no header".
+
+    Path-aware CSP: the SPA mount at `/app` gets a policy that lets its
+    own bundle and Google sign-in run; the JSON surface keeps the strict
+    deny-everything policy.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -126,11 +149,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
-        # Locks the API down for any HTML the browser might try to
-        # render from an error response (FastAPI's default 422 page).
+        path = request.url.path
+        is_spa = path == "/app" or path.startswith("/app/")
         response.headers.setdefault(
             "Content-Security-Policy",
-            "default-src 'none'; frame-ancestors 'none'",
+            _SPA_CSP if is_spa else _API_CSP,
         )
         return response
 

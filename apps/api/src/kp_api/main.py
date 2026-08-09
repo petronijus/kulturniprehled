@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from slowapi import _rate_limit_exceeded_handler
@@ -29,6 +30,7 @@ from kp_api.observability import (
     configure_logging,
     limiter,
 )
+from kp_api.web import SPAStaticFiles
 
 
 @asynccontextmanager
@@ -75,6 +77,9 @@ def create_app() -> FastAPI:
     app.include_router(feedback.router)
     app.include_router(digest.router)
     app.include_router(season.router)
+    web_dist = Path(settings.web_dist_dir)
+    if web_dist.is_dir():
+        app.mount("/app", SPAStaticFiles(directory=web_dist, html=True), name="spa")
     return app
 
 

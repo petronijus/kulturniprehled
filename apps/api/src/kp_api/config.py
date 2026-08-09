@@ -99,6 +99,12 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    # Season-planner SPA bundle. Relative paths resolve against the process
+    # working directory (/app in the container). When the directory is
+    # missing — tests, bare dev runs, image built without the web stage —
+    # the mount is skipped and the API serves JSON only.
+    web_dist_dir: str = "web/dist"
+
     # Rate limiting — IP-based via slowapi. Tests turn this off so they
     # can hammer endpoints without tripping the limiter.
     rate_limit_enabled: bool = True

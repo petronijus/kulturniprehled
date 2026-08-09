@@ -17,8 +17,18 @@ cd "$(dirname "$0")/.."
 REG="ghcr.io/petronijus/kulturniprehled-api"
 TAG="${KP_API_TAG:-$(git rev-parse --short HEAD)}"
 
+# The SPA bakes the Google Web OAuth client id in at build time. Pull it
+# from 1Password unless the caller already exported it; an empty value
+# still builds (sign-in button errors at runtime until provided).
+if [ -z "${VITE_KP_GOOGLE_CLIENT_ID:-}" ] && command -v op-cache >/dev/null 2>&1; then
+  VITE_KP_GOOGLE_CLIENT_ID="$(op-cache "Kulturni prehled google Web OAuth client" "client ID" 2>/dev/null || true)"
+fi
+[ -n "${VITE_KP_GOOGLE_CLIENT_ID:-}" ] || echo "WARN: VITE_KP_GOOGLE_CLIENT_ID empty — SPA login will not work"
+
 echo "→ building ${REG}:${TAG} (+ latest)  [context: apps/api]"
-docker build -t "${REG}:${TAG}" -t "${REG}:latest" -f apps/api/Dockerfile apps/api
+docker build -t "${REG}:${TAG}" -t "${REG}:latest" \
+  --build-arg VITE_KP_GOOGLE_CLIENT_ID="${VITE_KP_GOOGLE_CLIENT_ID:-}" \
+  -f apps/api/Dockerfile apps/api
 docker push "${REG}:${TAG}"
 docker push "${REG}:latest"
 echo "✓ pushed ${REG}:{${TAG},latest}"

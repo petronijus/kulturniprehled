@@ -47,18 +47,14 @@ Primary (club sites — Petrovy kluby, kandidáti odsud jsou vždy fér):
 - https://archaplus.cz/program/ — Archa+ <!-- TODO(Petr): verify URL (bývalé Divadlo Archa) -->
 - https://www.meetfactory.cz/cs/program — MeetFactory <!-- TODO(Petr): verify URL -->
 
-Secondary (aggregators — Resident Advisor, GoOut, Songkick). **STRICT
-RULE**: aggregators serve (a) date/availability verification and
-(b) catching favourite-artist shows at venues without their own
-programme page (Basinski @ Gabriel Loci). A candidate sourced ONLY from
-an aggregator must match `## Favourite artists / labels` or score ≥ 0.7
-on genre fit — venue-only discoveries are noise, never emit them.
+Secondary (aggregator — robust when a club site breaks or a venue has
+no programme page; good finds live here, e.g. Basinski @ Gabriel Loci.
+Dedup against primary sources by dedup_key):
 
-- https://ra.co/events/cz/prague — Resident Advisor Praha (403 for curl; try WebFetch)
 - https://goout.net/cs/praha/koncerty/?tags=electronic — GoOut elektronika
 
 **Venue veto**: Cross Club, Ankali, Roxy (Petr tam nechodí — 2026-08-10).
-Favourite-artist exception applies i tady: kdyby v Ankali hrál někdo
-z Favourite artists, smí projít — samotné venue kandidáta nekvalifikuje.
+Kdyby tam ale hrál někdo z Favourite artists, smí projít — veto je na
+běžný program, ne na výjimečné koncerty.
 
 *(přidávej dle libosti: Lethargy, Sonic Visions, Fuchs2, …)*

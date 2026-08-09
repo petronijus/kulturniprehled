@@ -29,6 +29,7 @@ export function PlannerPage() {
   const [previewScenarioId, setPreviewScenarioId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [hoveredCandidate, setHoveredCandidate] = useState<Candidate | null>(null);
+  const [pinnedCandidate, setPinnedCandidate] = useState<Candidate | null>(null);
 
   const pool = useMemo(() => poolQuery.data ?? [], [poolQuery.data]);
   const scenarios = useMemo(() => scenariosQuery.data ?? [], [scenariosQuery.data]);
@@ -57,19 +58,25 @@ export function PlannerPage() {
     [season],
   );
 
-  // Esc exits scenario preview.
+  // Esc exits scenario preview, else clears the pinned card.
   useEffect(() => {
-    if (!previewMode) {
-      return;
-    }
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key !== "Escape") {
+        return;
+      }
+      if (previewMode) {
         setPreviewScenarioId(null);
+      } else {
+        setPinnedCandidate(null);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [previewMode]);
+
+  const togglePin = useCallback((candidate: Candidate) => {
+    setPinnedCandidate((current) => (current?.id === candidate.id ? null : candidate));
+  }, []);
 
   const setStatus = useCallback(
     (candidate: Candidate, status: PlanStatus) => {
@@ -148,17 +155,18 @@ export function PlannerPage() {
               violations={violations}
               blockedDays={NO_BLOCKED_DAYS}
               dragTargetDate={dragTargetDate}
-              highlightCandidate={
-                hoveredCandidate === null
-                  ? null
-                  : { id: hoveredCandidate.id, date: candidateDate(hoveredCandidate) }
-              }
+              highlightCandidate={(() => {
+                const active = hoveredCandidate ?? pinnedCandidate;
+                return active === null ? null : { id: active.id, date: candidateDate(active) };
+              })()}
             />
             <CandidatePool
               pool={pool}
               months={months}
               onSetStatus={setStatus}
               onHoverChange={setHoveredCandidate}
+              pinnedId={pinnedCandidate?.id ?? null}
+              onTogglePin={togglePin}
               actionsDisabled={previewMode}
             />
           </div>

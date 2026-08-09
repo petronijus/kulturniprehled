@@ -16,6 +16,8 @@ interface CandidatePoolProps {
   months: IsoMonth[];
   onSetStatus: (candidate: Candidate, status: PlanStatus) => void;
   onHoverChange: (candidate: Candidate | null) => void;
+  pinnedId: string | null;
+  onTogglePin: (candidate: Candidate) => void;
   actionsDisabled: boolean;
 }
 
@@ -26,6 +28,8 @@ export function CandidatePool({
   months,
   onSetStatus,
   onHoverChange,
+  pinnedId,
+  onTogglePin,
   actionsDisabled,
 }: CandidatePoolProps) {
   const [filters, setFilters] = useState<PoolFilterState>(defaultFilters);
@@ -89,6 +93,8 @@ export function CandidatePool({
             onReject={() => onSetStatus(candidate, "rejected")}
             onUndecide={() => onSetStatus(candidate, "undecided")}
             onHoverChange={onHoverChange}
+            pinned={candidate.id === pinnedId}
+            onTogglePin={() => onTogglePin(candidate)}
             actionsDisabled={actionsDisabled}
           />
         ))}

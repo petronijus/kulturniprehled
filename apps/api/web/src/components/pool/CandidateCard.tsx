@@ -14,6 +14,8 @@ interface CandidateCardProps {
   onReject: () => void;
   onUndecide: () => void;
   onHoverChange: (candidate: Candidate | null) => void;
+  pinned: boolean;
+  onTogglePin: () => void;
   actionsDisabled: boolean;
 }
 
@@ -30,6 +32,8 @@ export function CandidateCard({
   onReject,
   onUndecide,
   onHoverChange,
+  pinned,
+  onTogglePin,
   actionsDisabled,
 }: CandidateCardProps) {
   const draggable = candidate.plan_status !== "selected" && !actionsDisabled;
@@ -49,6 +53,9 @@ export function CandidateCard({
   if (isDragging) {
     classes.push(styles.dragging);
   }
+  if (pinned) {
+    classes.push(styles.pinned);
+  }
 
   const program = (candidate.program ?? [])
     .map((entry) => {
@@ -66,6 +73,12 @@ export function CandidateCard({
       onMouseLeave={() => onHoverChange(null)}
       onFocus={() => onHoverChange(candidate)}
       onBlur={() => onHoverChange(null)}
+      onClick={(event) => {
+        // Buttons and links inside the card keep their own actions.
+        if ((event.target as HTMLElement).closest("button, a") === null) {
+          onTogglePin();
+        }
+      }}
       {...listeners}
       {...attributes}
     >

@@ -28,7 +28,24 @@ SCOPE_FEEDBACK_SIGN = "feedback:sign"
 # email that fixed address — never an arbitrary one.
 SCOPE_DIGEST_SEND = "digest:send"
 
-ALL_SCOPES = frozenset({SCOPE_DIGEST_READ, SCOPE_FEEDBACK_SIGN, SCOPE_DIGEST_SEND})
+# Read the season-planner surface: pool, scenarios, plan summary, novelties.
+# Held by the weekly novelty routine in the cloud.
+SCOPE_SEASON_READ = "season:read"
+
+# Write the season-planner surface: bulk pool/scenario upserts, plan-state
+# mutations, novelty-cursor acks. The weekly routine needs it to keep the
+# pool topped up; a leak cannot touch events, tickets or costs.
+SCOPE_SEASON_WRITE = "season:write"
+
+ALL_SCOPES = frozenset(
+    {
+        SCOPE_DIGEST_READ,
+        SCOPE_FEEDBACK_SIGN,
+        SCOPE_DIGEST_SEND,
+        SCOPE_SEASON_READ,
+        SCOPE_SEASON_WRITE,
+    }
+)
 
 
 def parse_scopes(raw: str | None) -> frozenset[str] | None:

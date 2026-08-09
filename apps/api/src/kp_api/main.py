@@ -16,6 +16,7 @@ from kp_api.api.v1 import (
     events,
     feedback,
     healthz,
+    season,
     stats,
     sync,
     tickets,
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     app.include_router(watchlist.router)
     app.include_router(feedback.router)
     app.include_router(digest.router)
+    app.include_router(season.router)
     return app
 
 

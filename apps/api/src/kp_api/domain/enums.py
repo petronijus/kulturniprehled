@@ -58,3 +58,23 @@ class WatchlistKind(StrEnum):
 class FeedbackRating(StrEnum):
     UP = "up"
     DOWN = "down"
+
+
+class SeasonStatus(StrEnum):
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+
+
+class SeasonLane(StrEnum):
+    # Values match the LANE_CATEGORY keys in api/v1/digest.py — the season
+    # pool and the digest pipeline speak the same lane vocabulary.
+    KLASIKA = "klasika"
+    ELEKTRONIKA = "elektronika"
+    DIVADLO = "divadlo"
+    FILM = "film"
+
+
+class PlanStatus(StrEnum):
+    UNDECIDED = "undecided"
+    SELECTED = "selected"
+    REJECTED = "rejected"

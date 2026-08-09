@@ -8,6 +8,7 @@ can change without breaking external clients.
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,6 +19,9 @@ from kp_api.domain.enums import (
     EventCategory,
     EventSource,
     EventStatus,
+    PlanStatus,
+    SeasonLane,
+    SeasonStatus,
     WatchlistKind,
 )
 
@@ -315,3 +319,202 @@ class StatsResponse(BaseModel):
     by_month: list[StatsByMonth]
     top_venues: list[StatsTopVenue]
     total_cost_cents: int
+
+
+class SeasonCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(min_length=1, max_length=20)
+    starts_on: date
+    ends_on: date
+    archive_current: bool = False
+
+
+class SeasonResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    workspace_id: UUID
+    label: str
+    starts_on: date
+    ends_on: date
+    status: SeasonStatus
+    novelty_ack_at: datetime | None
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class SeasonListResponse(BaseModel):
+    items: list[SeasonResponse]
+    total: int
+
+
+class CandidateUpsert(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dedup_key: str = Field(pattern=r"^[0-9a-f]{16,64}$")
+    lane: SeasonLane
+    title: str = Field(min_length=1, max_length=255)
+    starts_at: datetime
+    ends_at: datetime | None = None
+    venue: str | None = Field(default=None, max_length=255)
+    url: str | None = Field(default=None, max_length=1024)
+    price_czk: str | None = Field(default=None, max_length=40)
+    program: list[dict[str, object]] | None = None
+    detail: dict[str, object] | None = None
+    enriched_at: datetime | None = None
+    score: float | None = Field(default=None, ge=0.0, le=1.0)
+    why_cs: str | None = None
+    source_type: str | None = Field(default=None, max_length=20)
+    source_name: str | None = Field(default=None, max_length=120)
+    season_event: bool = False
+    tickets_available: bool | None = None
+
+
+class SeasonPoolPutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[CandidateUpsert] = Field(max_length=1000)
+
+
+class SeasonPoolPutResult(BaseModel):
+    created: int
+    updated: int
+    unchanged: int
+    total: int
+
+
+class CandidateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    season_id: UUID
+    workspace_id: UUID
+    dedup_key: str
+    lane: SeasonLane
+    title: str
+    starts_at: datetime
+    ends_at: datetime | None
+    venue: str | None
+    url: str | None
+    price_czk: str | None
+    program: list[dict[str, object]] | None
+    detail: dict[str, object] | None
+    enriched_at: datetime | None
+    score: float | None
+    why_cs: str | None
+    source_type: str | None
+    source_name: str | None
+    season_event: bool
+    tickets_available: bool | None
+    plan_status: PlanStatus
+    plan_status_at: datetime | None
+    note: str | None
+    first_seen_at: datetime
+    last_seen_at: datetime
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class CandidatePoolListResponse(BaseModel):
+    items: list[CandidateResponse]
+    total: int
+
+
+class CandidatePatch(BaseModel):
+    """Partial update of the user-owned plan fields on a candidate.
+
+    `note` distinguishes "absent" (leave alone) from explicit null (clear):
+    the router inspects `model_fields_set`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: int = Field(ge=1, description="Last seen version; server rejects on mismatch.")
+    plan_status: PlanStatus | None = None
+    note: str | None = None
+
+
+class ReservedSlot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lane: SeasonLane
+    month: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+    note_cs: str | None = None
+
+
+class ScenarioUpsert(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    description_cs: str | None = None
+    rank: int = Field(ge=1)
+    generated_at: datetime
+    candidate_keys: list[str] = Field(max_length=200)
+    reserved_slots: list[ReservedSlot] | None = None
+
+
+class ScenariosPutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scenarios: list[ScenarioUpsert] = Field(max_length=12)
+    replace: bool = True
+
+
+class ScenarioResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    season_id: UUID
+    name: str
+    description_cs: str | None
+    rank: int
+    candidate_ids: list[UUID]
+    reserved_slots: list[ReservedSlot] | None
+    generated_at: datetime
+    applied_at: datetime | None
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class ScenarioListResponse(BaseModel):
+    items: list[ScenarioResponse]
+
+
+class ScenarioApplyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["replace", "merge"] = "replace"
+
+
+class PlanCounts(BaseModel):
+    selected: int
+    rejected: int
+    undecided: int
+
+
+class PlanWeek(BaseModel):
+    iso_week: str
+    count: int
+
+
+class PlanSummaryResponse(BaseModel):
+    selected: list[CandidateResponse]
+    counts: PlanCounts
+    weeks: list[PlanWeek]
+    applied_scenario_id: UUID | None
+
+
+class NoveltiesResponse(BaseModel):
+    items: list[CandidateResponse]
+    since_used: datetime
+    now: datetime
+
+
+class NoveltyAckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    through: datetime

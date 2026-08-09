@@ -2,9 +2,10 @@
 
 The cloud Gmail connector can only create drafts, so the digest routine
 hands its finished HTML to `POST /v1/digest/send` and the backend relays
-it over SMTP. Provider-agnostic — the env points `smtp_host` at Gmail
-SMTP, a self-hosted server, or a transactional service; the code is the
-same.
+it over SMTP. Provider-agnostic — the env points `smtp_host` at a
+transactional relay, a self-hosted server, or plain provider SMTP; the code
+is the same. Production uses Resend, which authenticates as the literal
+username "resend" with the API key as the password.
 
 `smtplib` is synchronous, so the send runs in a worker thread to keep the
 request handler off the event loop (the project forbids blocking calls in

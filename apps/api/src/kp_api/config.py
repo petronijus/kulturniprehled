@@ -79,9 +79,11 @@ class Settings(BaseSettings):
 
     # SMTP relay for the digest email. The cloud Gmail connector can only draft,
     # so POST /v1/digest/send relays the rendered HTML over SMTP. Provider-
-    # agnostic (Gmail SMTP, a self-hosted server, a transactional service —
-    # whatever the env points at). `digest_mail_to` is the ONLY recipient the
-    # send endpoint will target, so a leaked digest:send token can't spam.
+    # agnostic (a self-hosted server, a transactional service — whatever the env
+    # points at); production points it at Resend, where `smtp_user` is the
+    # literal string "resend" and the password is the API key. `digest_mail_to`
+    # is the ONLY recipient the send endpoint will target, so a leaked
+    # digest:send token can't spam.
     # Empty `smtp_host` → the endpoint 503s (feature disabled).
     smtp_host: str = ""
     smtp_port: int = 587

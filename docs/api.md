@@ -21,7 +21,7 @@ the API.
 | `/v1/stats/*`        | Year-in-review aggregates                              | `api/v1/stats.py` |
 | `/v1/sync/*`         | Change-log pull + outbox apply                         | `api/v1/sync.py` |
 | `/v1/season/*`       | Season planner: plans, candidate pool (bulk upsert + plan state), scenarios (upsert/apply), novelty cursor | `api/v1/season.py` |
-| `/app`               | Season-planner SPA (static bundle, history-API fallback, relaxed CSP) | `web.py` + `web/dist` |
+| `/app`               | Season-planner SPA (static bundle, history-API fallback, relaxed CSP). **Home-only**: with `WEB_PUBLIC=false` (default) Cloudflare-proxied requests get 404 — reachable only via LAN / Tailscale | `web.py` + `web/dist` |
 
 Season endpoints are gated by the `season:read` / `season:write` PAT
 scopes (interactive JWTs and unscoped PATs pass everywhere). Key

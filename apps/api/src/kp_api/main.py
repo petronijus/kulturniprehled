@@ -79,7 +79,11 @@ def create_app() -> FastAPI:
     app.include_router(season.router)
     web_dist = Path(settings.web_dist_dir)
     if web_dist.is_dir():
-        app.mount("/app", SPAStaticFiles(directory=web_dist, html=True), name="spa")
+        app.mount(
+            "/app",
+            SPAStaticFiles(directory=web_dist, html=True, public=settings.web_public),
+            name="spa",
+        )
     return app
 
 

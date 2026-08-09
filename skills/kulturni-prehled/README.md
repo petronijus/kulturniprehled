@@ -5,8 +5,11 @@ Two flows feed *Kulturní Přehled* the app:
 1. **Season planning** (`/kulturni-sezona`, local, ~once per season) —
    scrapes the whole Sep–Jun season, pushes the candidate pool + ~5
    scenario dramaturgies to the backend, and hands off to the web
-   planner at `https://kulturniprehled.example.com/app` where Petr
-   finalizes his plan (drag & drop, scenario preview/apply).
+   planner at `/app` where Petr finalizes his plan (drag & drop,
+   scenario preview/apply). The planner is **home-only**: the API blocks
+   `/app` on the public Cloudflare path (`WEB_PUBLIC=false`), so reach
+   it via LAN (`http://192.168.20.101:18000/app`) or the Tailscale
+   HTTPS hostname (see One-time setup below).
 2. **Novelty watching** (`/kulturni-prehled`, weekly, Saturday 11:00
    via `/schedule`) — re-scrapes, diffs against the pool, pushes
    updates, and emails **only newly announced events** with a
@@ -90,9 +93,20 @@ divadlo template + symlink + uncomment. No aggregator changes.
    ./scripts/mint-pat.sh   # then update the routine's stored KP_DIGEST_TOKEN
    ```
 
-3. **SPA OAuth origin** — the Google Web OAuth client needs
-   `https://kulturniprehled.example.com` (and `http://localhost:5173`
-   for dev) among its authorized JavaScript origins.
+3. **SPA access + OAuth origin** — the planner is home-only. Google
+   rejects private-IP origins, so Google login needs the VM's Tailscale
+   HTTPS hostname:
+
+   ```bash
+   # on the VM (192.168.20.101), one-time:
+   sudo tailscale serve --bg https / http://127.0.0.1:18000
+   tailscale serve status   # → https://<vm>.<tailnet>.ts.net
+   ```
+
+   Then add `https://<vm>.<tailnet>.ts.net` (and `http://localhost:5173`
+   for dev) to the Web OAuth client's authorized JavaScript origins.
+   Plain LAN `http://192.168.20.101:18000/app` works for everything
+   except the Google sign-in redirect.
 
 4. The `/schedule` routine (Sat 11:00 Europe/Prague) runs
    [`cloud-routine.md`](./cloud-routine.md) — it survives this rework

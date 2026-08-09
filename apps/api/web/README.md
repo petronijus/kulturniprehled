@@ -5,6 +5,12 @@ backend at `/app`. Petr finalizes his cultural-season plan here:
 calendar left, candidate cards right, scenario tabs on top, drag & drop
 (or the ✓/✕ buttons — full keyboard-accessible equivalent).
 
+**Home-only**: with `WEB_PUBLIC=false` (default) the backend refuses
+`/app` requests that came through the Cloudflare Tunnel — the planner is
+reachable only via LAN (`http://192.168.20.101:18000/app`) or the VM's
+Tailscale HTTPS hostname. Google sign-in works only on the Tailscale
+hostname (or `localhost` in dev); Google rejects private-IP origins.
+
 ## Commands
 
 ```bash
@@ -26,7 +32,8 @@ npm run build    # type-check + production bundle into dist/
   ```
 
   and make sure `http://localhost:5173` is among the client's
-  authorized JavaScript origins.
+  authorized JavaScript origins (plus the Tailscale hostname for the
+  deployed planner — see `skills/kulturni-prehled/README.md`).
 
 ## Architecture notes
 

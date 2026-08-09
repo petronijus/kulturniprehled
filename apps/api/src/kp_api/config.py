@@ -104,6 +104,11 @@ class Settings(BaseSettings):
     # missing — tests, bare dev runs, image built without the web stage —
     # the mount is skipped and the API serves JSON only.
     web_dist_dir: str = "web/dist"
+    # The planner is a home tool: with the default False, /app refuses
+    # requests that arrived through the Cloudflare Tunnel (detected via the
+    # CF-Connecting-IP header) and serves only direct LAN / Tailscale
+    # access. The JSON API stays public either way.
+    web_public: bool = False
 
     # Rate limiting — IP-based via slowapi. Tests turn this off so they
     # can hammer endpoints without tripping the limiter.

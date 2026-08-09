@@ -9,6 +9,10 @@
 #     '~/Documents/Dev/kulturniprehled/infra/claudebox/run-sezona.sh'
 set -euo pipefail
 
+# Manual ssh runs come in with a bare non-login PATH — make claude et al.
+# resolvable regardless of how we were invoked.
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 CFG_DIR="${CFG_DIR:-$HOME/.config/kulturni-prehled}"

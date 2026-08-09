@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useApplyScenario, usePatchCandidate } from "../api/mutations";
 import { useBookedEvents, useCurrentSeason, usePool, useScenarios } from "../api/queries";
 import type { Candidate, PlanStatus } from "../api/types";
-import { selectedIdsOf, toPlannedItems } from "../domain/planState";
+import { candidateDate, selectedIdsOf, toPlannedItems } from "../domain/planState";
 import type { IsoDate } from "../domain/season";
 import { monthsBetween } from "../domain/season";
 import { computeViolations } from "../domain/violations";
@@ -28,6 +28,7 @@ export function PlannerPage() {
 
   const [previewScenarioId, setPreviewScenarioId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [hoveredCandidate, setHoveredCandidate] = useState<Candidate | null>(null);
 
   const pool = useMemo(() => poolQuery.data ?? [], [poolQuery.data]);
   const scenarios = useMemo(() => scenariosQuery.data ?? [], [scenariosQuery.data]);
@@ -147,11 +148,17 @@ export function PlannerPage() {
               violations={violations}
               blockedDays={NO_BLOCKED_DAYS}
               dragTargetDate={dragTargetDate}
+              highlightCandidate={
+                hoveredCandidate === null
+                  ? null
+                  : { id: hoveredCandidate.id, date: candidateDate(hoveredCandidate) }
+              }
             />
             <CandidatePool
               pool={pool}
               months={months}
               onSetStatus={setStatus}
+              onHoverChange={setHoveredCandidate}
               actionsDisabled={previewMode}
             />
           </div>

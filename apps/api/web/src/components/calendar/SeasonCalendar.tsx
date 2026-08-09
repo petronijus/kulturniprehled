@@ -21,6 +21,8 @@ interface SeasonCalendarProps {
   blockedDays: ReadonlySet<IsoDate>;
   /** The dragged candidate's own date, or null when no drag is active. */
   dragTargetDate: IsoDate | null;
+  /** Card being hovered in the pool — its date cell (and chip) light up. */
+  highlightCandidate: { id: string; date: IsoDate } | null;
 }
 
 export function SeasonCalendar({
@@ -34,6 +36,7 @@ export function SeasonCalendar({
   violations,
   blockedDays,
   dragTargetDate,
+  highlightCandidate,
 }: SeasonCalendarProps) {
   const months = useMemo(
     () => monthsBetween(season.starts_on, season.ends_on),
@@ -191,6 +194,20 @@ export function SeasonCalendar({
     section?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [dragTargetDate]);
 
+  // Hovered card → bring its month into view (debounced so scanning the
+  // card list doesn't make the calendar jump around).
+  useEffect(() => {
+    if (highlightCandidate === null) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      scrollRef.current
+        ?.querySelector(`[data-month="${monthOf(highlightCandidate.date)}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [highlightCandidate]);
+
   const jumpTo = (month: IsoMonth) => {
     scrollRef.current
       ?.querySelector(`[data-month="${month}"]`)
@@ -215,6 +232,7 @@ export function SeasonCalendar({
             diffOf={diffOf}
             violatedIds={violatedIds}
             previewMode={previewMode}
+            highlightCandidate={highlightCandidate}
           />
         ))}
       </div>

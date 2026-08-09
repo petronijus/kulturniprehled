@@ -64,3 +64,9 @@
   gap: 2px;
   min-width: 0;
 }
+
+.highlighted {
+  outline: 2px solid var(--highlight-ring);
+  outline-offset: -2px;
+  background: var(--highlight-bg);
+}

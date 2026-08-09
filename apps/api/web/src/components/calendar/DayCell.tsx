@@ -16,6 +16,9 @@ interface DayCellProps {
   diffOf: (candidateId: string) => "none" | "added" | "removed";
   violatedIds: ReadonlySet<string>;
   previewMode: boolean;
+  /** Pool-card hover: this cell is the hovered candidate's date. */
+  highlighted: boolean;
+  highlightCandidateId: string | null;
 }
 
 export function DayCell({
@@ -29,6 +32,8 @@ export function DayCell({
   diffOf,
   violatedIds,
   previewMode,
+  highlighted,
+  highlightCandidateId,
 }: DayCellProps) {
   const isTarget = dragTargetDate === date;
   const { setNodeRef, isOver } = useDroppable({
@@ -53,6 +58,9 @@ export function DayCell({
   if (isTarget && isOver) {
     classes.push(styles.over);
   }
+  if (highlighted) {
+    classes.push(styles.highlighted);
+  }
 
   return (
     <div ref={setNodeRef} className={classes.join(" ")} data-date={date}>
@@ -68,6 +76,7 @@ export function DayCell({
             diff={diffOf(candidate.id)}
             violated={violatedIds.has(candidate.id)}
             dragDisabled={previewMode}
+            highlighted={candidate.id === highlightCandidateId}
           />
         ))}
       </div>

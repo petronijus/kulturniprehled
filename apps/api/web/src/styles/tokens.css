@@ -55,6 +55,19 @@
   --lane-film: light-dark(#3f5aa8, #8ba7ef);
   --lane-film-bg: light-dark(#e5ebfa, #1f2942);
 
+  /* Source badges — same scheme as the digest e-mails:
+     festival = orange, sezónní těleso = grey, objev = green. */
+  --source-festival: light-dark(#e65100, #ffb74d);
+  --source-festival-bg: light-dark(#fff3e0, #402a10);
+  --source-sezona: light-dark(#616161, #b6b6ba);
+  --source-sezona-bg: light-dark(#f5f5f5, #2c2c2f);
+  --source-objev: light-dark(#2e7d32, #81c784);
+  --source-objev-bg: light-dark(#e8f5e9, #1d3320);
+
+  /* Card-hover → calendar highlight */
+  --highlight-ring: light-dark(#2563eb, #60a5fa);
+  --highlight-bg: light-dark(#eaf1fe, #1c2740);
+
   /* Semantic states */
   --ok: light-dark(#1f7a3d, #57bd7c);
   --ok-bg: light-dark(#e2f3e8, #16321f);

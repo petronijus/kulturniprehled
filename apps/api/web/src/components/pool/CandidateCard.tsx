@@ -6,12 +6,14 @@ import { cs } from "../../i18n/cs";
 import { isNew } from "../../state/newSince";
 import styles from "./CandidateCard.module.css";
 import { LaneBadge } from "./LaneBadge";
+import { SourceBadge } from "./SourceBadge";
 
 interface CandidateCardProps {
   candidate: Candidate;
   onSelect: () => void;
   onReject: () => void;
   onUndecide: () => void;
+  onHoverChange: (candidate: Candidate | null) => void;
   actionsDisabled: boolean;
 }
 
@@ -27,6 +29,7 @@ export function CandidateCard({
   onSelect,
   onReject,
   onUndecide,
+  onHoverChange,
   actionsDisabled,
 }: CandidateCardProps) {
   const draggable = candidate.plan_status !== "selected" && !actionsDisabled;
@@ -56,9 +59,19 @@ export function CandidateCard({
     .filter((line): line is string => line !== null);
 
   return (
-    <article ref={setNodeRef} className={classes.join(" ")} {...listeners} {...attributes}>
+    <article
+      ref={setNodeRef}
+      className={classes.join(" ")}
+      onMouseEnter={() => onHoverChange(candidate)}
+      onMouseLeave={() => onHoverChange(null)}
+      onFocus={() => onHoverChange(candidate)}
+      onBlur={() => onHoverChange(null)}
+      {...listeners}
+      {...attributes}
+    >
       <header className={styles.header}>
         <LaneBadge lane={candidate.lane} />
+        <SourceBadge sourceType={candidate.source_type} sourceName={candidate.source_name} />
         {candidate.season_event && (
           <span className={styles.seasonBadge}>★ {cs.seasonEventBadge}</span>
         )}

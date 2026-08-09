@@ -15,12 +15,19 @@ interface CandidatePoolProps {
   pool: Candidate[];
   months: IsoMonth[];
   onSetStatus: (candidate: Candidate, status: PlanStatus) => void;
+  onHoverChange: (candidate: Candidate | null) => void;
   actionsDisabled: boolean;
 }
 
 const STATUS_ORDER: Record<PlanStatus, number> = { undecided: 0, selected: 1, rejected: 2 };
 
-export function CandidatePool({ pool, months, onSetStatus, actionsDisabled }: CandidatePoolProps) {
+export function CandidatePool({
+  pool,
+  months,
+  onSetStatus,
+  onHoverChange,
+  actionsDisabled,
+}: CandidatePoolProps) {
   const [filters, setFilters] = useState<PoolFilterState>(defaultFilters);
   const { setNodeRef, isOver } = useDroppable({ id: "pool", data: { kind: "pool" } });
 
@@ -81,6 +88,7 @@ export function CandidatePool({ pool, months, onSetStatus, actionsDisabled }: Ca
             onSelect={() => onSetStatus(candidate, "selected")}
             onReject={() => onSetStatus(candidate, "rejected")}
             onUndecide={() => onSetStatus(candidate, "undecided")}
+            onHoverChange={onHoverChange}
             actionsDisabled={actionsDisabled}
           />
         ))}

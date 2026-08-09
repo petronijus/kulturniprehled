@@ -67,3 +67,8 @@
   color: var(--text-secondary);
   cursor: default;
 }
+
+.highlighted {
+  border-color: var(--highlight-ring);
+  box-shadow: 0 0 0 1px var(--highlight-ring);
+}

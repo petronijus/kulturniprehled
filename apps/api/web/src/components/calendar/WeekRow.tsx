@@ -19,6 +19,7 @@ interface WeekRowProps {
   diffOf: (candidateId: string) => "none" | "added" | "removed";
   violatedIds: ReadonlySet<string>;
   previewMode: boolean;
+  highlightCandidate: { id: string; date: IsoDate } | null;
 }
 
 export function WeekRow({
@@ -33,6 +34,7 @@ export function WeekRow({
   diffOf,
   violatedIds,
   previewMode,
+  highlightCandidate,
 }: WeekRowProps) {
   const weekId = isoWeek(week.start);
   const load = weekLoad.get(weekId) ?? 0;
@@ -66,6 +68,8 @@ export function WeekRow({
           diffOf={diffOf}
           violatedIds={violatedIds}
           previewMode={previewMode}
+          highlighted={highlightCandidate?.date === date}
+          highlightCandidateId={highlightCandidate?.id ?? null}
         />
       ))}
     </div>

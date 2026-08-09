@@ -10,10 +10,17 @@ interface EventChipProps {
   diff: "none" | "added" | "removed";
   violated: boolean;
   dragDisabled: boolean;
+  highlighted: boolean;
 }
 
 /** A selected candidate on its calendar day. Draggable out to deselect. */
-export function EventChip({ candidate, diff, violated, dragDisabled }: EventChipProps) {
+export function EventChip({
+  candidate,
+  diff,
+  violated,
+  dragDisabled,
+  highlighted,
+}: EventChipProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `chip-${candidate.id}`,
     data: { kind: "chip", candidate },
@@ -32,6 +39,9 @@ export function EventChip({ candidate, diff, violated, dragDisabled }: EventChip
   }
   if (isDragging) {
     classes.push(styles.dragging);
+  }
+  if (highlighted) {
+    classes.push(styles.highlighted);
   }
 
   return (

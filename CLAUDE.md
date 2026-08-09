@@ -211,10 +211,12 @@ First install needs "Install unknown apps" toggled on for the browser.
 
 ### 6. Backend deploy (only when API changed)
 
-The Proxmox VM builds the API image from source on each upgrade — no GHCR
-push needed.
+The image is built **locally** and pushed to GHCR; the VM only pulls
+(`scripts/build-push.sh`, then `upgrade.sh` — never `--build` on the VM;
+see ai-config `docs/DEPLOY-STANDARD.md`).
 
 ```bash
+./scripts/build-push.sh
 ssh petronijus@192.0.2.101 '/opt/kp/infra/deploy/upgrade.sh'
 ```
 

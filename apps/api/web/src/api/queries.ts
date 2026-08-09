@@ -57,6 +57,9 @@ export function usePool(seasonId: string | undefined) {
     },
     enabled: seasonId !== undefined,
     staleTime: 60_000,
+    // While the pool is empty (fresh season, scrape still running) keep
+    // polling so the page fills in by itself once /kulturni-sezona lands.
+    refetchInterval: (query) => ((query.state.data?.length ?? 0) === 0 ? 30_000 : false),
   });
 }
 

@@ -6,6 +6,7 @@ import {
   isoWeek,
   monthGrid,
   monthsBetween,
+  seasonWindowFor,
   weekday,
   weekStart,
 } from "./season";
@@ -54,6 +55,30 @@ describe("isoToLocalDate", () => {
     expect(isoToLocalDate("2026-09-15T17:30:00Z")).toBe("2026-09-15");
     // Winter: UTC+1.
     expect(isoToLocalDate("2026-12-01T23:30:00Z")).toBe("2026-12-02");
+  });
+});
+
+describe("seasonWindowFor", () => {
+  it("targets the upcoming season from July onward", () => {
+    expect(seasonWindowFor("2026-08-09")).toEqual({
+      label: "2026/27",
+      startsOn: "2026-09-01",
+      endsOn: "2027-06-30",
+    });
+    expect(seasonWindowFor("2026-07-01")).toEqual({
+      label: "2026/27",
+      startsOn: "2026-09-01",
+      endsOn: "2027-06-30",
+    });
+  });
+
+  it("stays in the running season before July", () => {
+    expect(seasonWindowFor("2027-02-15")).toEqual({
+      label: "2026/27",
+      startsOn: "2026-09-01",
+      endsOn: "2027-06-30",
+    });
+    expect(seasonWindowFor("2027-06-30").label).toBe("2026/27");
   });
 });
 

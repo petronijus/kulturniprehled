@@ -20,6 +20,17 @@ the API.
 | `/v1/costs/*`        | Per-event cost rows                                    | `api/v1/costs.py` |
 | `/v1/stats/*`        | Year-in-review aggregates                              | `api/v1/stats.py` |
 | `/v1/sync/*`         | Change-log pull + outbox apply                         | `api/v1/sync.py` |
+| `/v1/season/*`       | Season planner: plans, candidate pool (bulk upsert + plan state), scenarios (upsert/apply), novelty cursor | `api/v1/season.py` |
+| `/app`               | Season-planner SPA (static bundle, history-API fallback, relaxed CSP) | `web.py` + `web/dist` |
+
+Season endpoints are gated by the `season:read` / `season:write` PAT
+scopes (interactive JWTs and unscoped PATs pass everywhere). Key
+invariants: pool upsert is idempotent by `(season_id, dedup_key)` with a
+server-side content hash (identical re-push bumps nothing) and never
+touches the user-owned plan fields (`plan_status`, `plan_status_at`,
+`note`, `first_seen_at`); exactly one season per workspace is `active`;
+`novelty_ack_at` is a monotonic cursor for the weekly novelty routine.
+The season tables are web-only — they do not participate in `/v1/sync`.
 
 Full request/response schemas live in OpenAPI — fetch
 `https://kulturniprehled.example.com/openapi.json` for prod, or

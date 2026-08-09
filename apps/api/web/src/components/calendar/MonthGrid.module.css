@@ -1,0 +1,54 @@
+.month {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border-block-end: 1px solid var(--border);
+}
+
+.title {
+  font-size: var(--text-md);
+  font-weight: 650;
+  text-transform: capitalize;
+}
+
+.year {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.reserved {
+  display: flex;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: 1.25rem repeat(7, 1fr);
+  border-block-end: 1px solid var(--border);
+  background: var(--surface-sunken);
+}
+
+.gutterSpacer {
+  border-inline-end: 1px solid var(--border);
+}
+
+.weekday {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  text-align: center;
+  padding: 2px 0;
+}

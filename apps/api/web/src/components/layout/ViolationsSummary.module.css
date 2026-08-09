@@ -1,0 +1,47 @@
+.wrapper {
+  position: relative;
+}
+
+.clean {
+  font-size: var(--text-sm);
+  color: var(--ok);
+}
+
+.badge {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  border-radius: 999px;
+  padding: 2px var(--space-3);
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  inset-inline-end: 0;
+  z-index: 10;
+  width: 22rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-drag);
+  padding: var(--space-3);
+}
+
+.popoverTitle {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  margin-block-end: var(--space-2);
+}
+
+.list {
+  margin: 0;
+  padding-inline-start: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}

@@ -1,0 +1,74 @@
+/* Design tokens — the single place Petr tunes the planner's look.
+   All components consume these custom properties; no component file
+   defines a raw color, font size or spacing value of its own. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Type scale */
+  --font-sans:
+    -apple-system, "SF Pro Text", "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --text-xs: 0.6875rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+
+  /* Spacing rhythm */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  /* Radii + shadow */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.09), 0 4px 14px rgb(0 0 0 / 0.05);
+  --shadow-drag: 0 8px 30px rgb(0 0 0 / 0.22);
+
+  /* Surface + text */
+  --bg: light-dark(#f6f5f2, #131313);
+  --surface: light-dark(#ffffff, #1d1d1e);
+  --surface-raised: light-dark(#ffffff, #262628);
+  --surface-sunken: light-dark(#edece8, #0e0e0f);
+  --border: light-dark(#e2e0da, #333336);
+  --border-strong: light-dark(#c9c6bd, #48484c);
+  --text: light-dark(#191919, #ececec);
+  --text-secondary: light-dark(#5c5a55, #a3a3a6);
+  --text-faint: light-dark(#94918a, #6d6d71);
+  --accent: light-dark(#191919, #ececec);
+  --accent-contrast: light-dark(#ffffff, #131313);
+  --focus-ring: light-dark(#2563eb, #60a5fa);
+
+  /* Lane palette — one hue per lane, echoed in badges, chips, dots. */
+  --lane-klasika: light-dark(#8a5a00, #e0a93e);
+  --lane-klasika-bg: light-dark(#f7ecd8, #3a2f16);
+  --lane-elektronika: light-dark(#0f6f74, #4cc4cb);
+  --lane-elektronika-bg: light-dark(#dff2f3, #12363a);
+  --lane-divadlo: light-dark(#8c2f4e, #e07b9c);
+  --lane-divadlo-bg: light-dark(#f9e4eb, #3d1d29);
+  --lane-film: light-dark(#3f5aa8, #8ba7ef);
+  --lane-film-bg: light-dark(#e5ebfa, #1f2942);
+
+  /* Semantic states */
+  --ok: light-dark(#1f7a3d, #57bd7c);
+  --ok-bg: light-dark(#e2f3e8, #16321f);
+  --warn: light-dark(#a05a00, #e5a44c);
+  --warn-bg: light-dark(#f9edda, #3a2c14);
+  --danger: light-dark(#b3282d, #ef6b6f);
+  --danger-bg: light-dark(#fae3e4, #3c1a1b);
+  --new-dot: light-dark(#2563eb, #60a5fa);
+
+  /* Calendar specifics */
+  --cell-blocked: repeating-linear-gradient(
+    -45deg,
+    transparent 0 6px,
+    light-dark(rgb(0 0 0 / 0.045), rgb(255 255 255 / 0.05)) 6px 12px
+  );
+  --booked-chip: light-dark(#e7e5e0, #2e2e31);
+}

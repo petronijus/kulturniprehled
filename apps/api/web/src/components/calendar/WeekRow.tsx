@@ -1,0 +1,73 @@
+import type { BookedEvent, Candidate } from "../../api/types";
+import type { IsoDate, MonthGridWeek } from "../../domain/season";
+import { isoWeek, monthOf } from "../../domain/season";
+import { DayCell } from "./DayCell";
+import styles from "./WeekRow.module.css";
+
+const WEEK_CAP = 2;
+
+interface WeekRowProps {
+  week: MonthGridWeek;
+  month: string;
+  today: IsoDate;
+  blockedDays: ReadonlySet<IsoDate>;
+  dragTargetDate: IsoDate | null;
+  plannedByDate: ReadonlyMap<IsoDate, Candidate[]>;
+  bookedByDate: ReadonlyMap<IsoDate, BookedEvent[]>;
+  /** Plan-wide events per ISO week (selected + booked) for the budget dots. */
+  weekLoad: ReadonlyMap<string, number>;
+  diffOf: (candidateId: string) => "none" | "added" | "removed";
+  violatedIds: ReadonlySet<string>;
+  previewMode: boolean;
+}
+
+export function WeekRow({
+  week,
+  month,
+  today,
+  blockedDays,
+  dragTargetDate,
+  plannedByDate,
+  bookedByDate,
+  weekLoad,
+  diffOf,
+  violatedIds,
+  previewMode,
+}: WeekRowProps) {
+  const weekId = isoWeek(week.start);
+  const load = weekLoad.get(weekId) ?? 0;
+  const over = load > WEEK_CAP;
+  const dots = Array.from({ length: Math.max(load, WEEK_CAP) }, (_, i) => i < load);
+
+  return (
+    <div className={styles.row}>
+      <div
+        className={`${styles.gutter} ${over ? styles.gutterOver : ""}`}
+        title={`${weekId}: ${load}/${WEEK_CAP}`}
+      >
+        {dots.map((filled, i) => (
+          <span
+            // biome-ignore lint/suspicious/noArrayIndexKey: dots are positional by nature
+            key={i}
+            className={`${styles.dot} ${filled ? styles.dotFilled : ""}`}
+          />
+        ))}
+      </div>
+      {week.days.map((date) => (
+        <DayCell
+          key={date}
+          date={date}
+          inMonth={monthOf(date) === month}
+          today={date === today}
+          blocked={blockedDays.has(date)}
+          dragTargetDate={dragTargetDate}
+          planned={plannedByDate.get(date) ?? []}
+          booked={bookedByDate.get(date) ?? []}
+          diffOf={diffOf}
+          violatedIds={violatedIds}
+          previewMode={previewMode}
+        />
+      ))}
+    </div>
+  );
+}

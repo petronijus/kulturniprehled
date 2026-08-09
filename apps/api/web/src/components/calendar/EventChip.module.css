@@ -1,0 +1,69 @@
+.chip {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-1);
+  cursor: grab;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.chip:active {
+  cursor: grabbing;
+}
+
+.time {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.season {
+  color: var(--warn);
+  flex-shrink: 0;
+}
+
+.added {
+  border-style: dashed;
+  background: var(--ok-bg);
+}
+
+.removed {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.violated {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 1px var(--danger);
+}
+
+.dragging {
+  opacity: 0.35;
+}
+
+.booked {
+  background: var(--booked-chip);
+  border-inline-start-color: var(--text-faint);
+  cursor: default;
+  color: var(--text-secondary);
+}
+
+.reserved {
+  border-style: dashed;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: default;
+}

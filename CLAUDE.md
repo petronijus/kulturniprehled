@@ -60,9 +60,10 @@ resize step.
 
 ```
 apps/api/          FastAPI service
+apps/api/web/      Season-planner SPA (React + Vite, served by the API at /app)
 apps/mobile/       Flutter app (Android + iOS)
 packages/          Shared specs / generated clients
-skills/            Claude Code skill source (ticket parser)
+skills/            Claude Code skill source (ticket parser, digest experts, season planner)
 assets-source/     Brand masters (logo, launcher, notif), user-authored
 infra/             Docker Compose, Cloudflare Tunnel, backup scripts
 docs/              Architecture, API, sync, deployment, handover docs
@@ -133,6 +134,13 @@ uv run pytest -q          # 60+ tests, ~1 min with warm testcontainer
 dart format --output=none --set-exit-if-changed .
 flutter analyze --fatal-infos --fatal-warnings
 flutter test                    # 9+ widget + unit tests
+```
+
+**Web** (from `apps/api/web/` — the season-planner SPA):
+
+```bash
+npm run check                   # biome lint+format + tsc --noEmit
+npm run test                    # vitest (domain logic: ISO weeks, violations)
 ```
 
 If any of those is red, fix before merging — no human is going to catch it

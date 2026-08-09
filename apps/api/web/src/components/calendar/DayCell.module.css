@@ -1,0 +1,66 @@
+.cell {
+  position: relative;
+  min-height: 3.25rem;
+  padding: var(--space-1);
+  border-inline-end: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cell:last-child {
+  border-inline-end: none;
+}
+
+.dayNumber {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  width: 1.4em;
+  height: 1.4em;
+  display: inline-grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.outside {
+  background: var(--surface-sunken);
+}
+
+.outside .dayNumber {
+  color: var(--text-faint);
+}
+
+.today .dayNumber {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-radius: 50%;
+}
+
+.blocked {
+  background-image: var(--cell-blocked);
+}
+
+.target {
+  outline: 2px dashed var(--focus-ring);
+  outline-offset: -2px;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.over {
+  background: var(--ok-bg);
+  animation: none;
+}
+
+@keyframes pulse {
+  50% {
+    outline-color: transparent;
+  }
+}
+
+.chips {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}

@@ -10,3 +10,5 @@ __pycache__
 .ruff_cache
 tests/
 **/__pycache__
+web/node_modules
+web/dist

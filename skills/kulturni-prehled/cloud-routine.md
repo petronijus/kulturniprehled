@@ -1,8 +1,11 @@
 # Kulturní přehled — cloud routine playbook
 
-Self-contained playbook for the **weekly digest running as a remote
-`/schedule` routine** (Anthropic cloud), as opposed to the local
-`kulturni-prehled` skill that runs on Petr's PC.
+Self-contained playbook for the **weekly novelty watcher running as a
+remote `/schedule` routine** (Anthropic cloud), as opposed to the local
+`kulturni-prehled` skill that runs on Petr's PC. **Season planning
+(`/kulturni-sezona`) is local-only** — it needs `op`, the
+`ensembles/*.sh` scrapers and a full-power PAT; this routine never
+attempts it.
 
 The difference is the environment. The remote agent has **only** a git
 checkout of this repo plus the claude.ai connectors — **no** `op`
@@ -13,18 +16,21 @@ the local skill did through those is replaced here by:
 
 | Local skill used… | Cloud routine uses instead… |
 | --- | --- |
-| `op` token + raw `/v1/events`, `/v1/feedback/history`, `jq`/`date` math | **`GET /v1/digest/context`** — server precomputes balance, booked list, feedback sentiment |
-| `op` Discogs token + `api.discogs.com` pagination | **`discogs` field of `/v1/digest/context`** — server fetches + caches the collection; no Discogs token or `api.discogs.com` egress needed here |
-| `ssh` to prod for `API_JWT_SECRET` to sign feedback links | **`POST /v1/feedback/sign`** — server signs them |
-| `Skill` tool → `klasika-expert` | read `skills/klasika-expert/SKILL.md` + `preferences.md` and **execute its logic inline** |
-| local `google-workspace` MCP | claude.ai **Gmail** + **Google Calendar** connectors |
+| `op` token | `KP_DIGEST_TOKEN` from the task message |
+| `Skill` tool → experts | read each expert's `SKILL.md` + `preferences.md` and **execute its weekly-mode logic inline** |
+| local `google-workspace` MCP (calendar + Gmail) | claude.ai **Google Calendar** connector; email via **`POST /v1/digest/send`** |
 | Spotify via local config | claude.ai **Spotify** connector |
+| `ssh` to prod for `API_JWT_SECRET` | **`POST /v1/feedback/sign`** — server signs the 👍/👎 links |
+| `api.discogs.com` (klasika taste anchor) | **`discogs` field of `GET /v1/digest/context`** — never fetch discogs directly, it's unreachable here |
+| local `python3 …/kp_validate.py` | same file from the **git checkout**: `python3 skills/kulturni-sezona/bin/kp_validate.py` (stdlib-only, runs anywhere) |
 
 ## Inputs handed to you in the task message
 
-- `KP_DIGEST_TOKEN` — a bearer PAT scoped to **only** `digest:read`,
-  `feedback:sign`, and `digest:send`. It cannot read or mutate anything
-  else. Send it as `Authorization: Bearer $KP_DIGEST_TOKEN`.
+- `KP_DIGEST_TOKEN` — a bearer PAT scoped to `digest:read`,
+  `feedback:sign`, `digest:send`, `season:read`, `season:write`.
+  The season scopes cover the pool read/refresh and the novelty
+  cursor; everything else on the API 403s. Send as
+  `Authorization: Bearer $KP_DIGEST_TOKEN`.
 - `KP_API_BASE` — `https://kulturniprehled.example.com` (public via
   Cloudflare Tunnel; reachable from the cloud).
 
@@ -32,120 +38,79 @@ Never print the token to chat, never write it to a repo file.
 
 ## Steps
 
-### 1. Pull the precomputed context
+Follow `skills/kulturni-prehled/SKILL.md` (the novelty-watcher flow) with
+these substitutions:
+
+### 1. Season + context
+
+- `GET /v1/season/plans/current` — 404 → report „Žádná aktivní sezóna"
+  and stop (no email).
+- Page through `GET /v1/season/plans/{id}/pool?limit=1000` for the pool,
+  `GET …/plan` + `GET …/scenarios` for the standing plan and the applied
+  scenario's `reserved_slots`.
+- `GET /v1/digest/context?horizon_days=180&lookback_days=180` for
+  `booked[]`, `feedback.lane_sentiment`, `recent_downvoted_titles`,
+  `balance.hint` and the `discogs` taste map (for inline expert
+  ranking).
+
+### 2. Run the active experts inline (weekly mode)
+
+Read `skills/kulturni-prehled/active-experts.txt` for the active lanes.
+For each, read its `SKILL.md` + `preferences.md` and perform its
+candidate gathering inline in **weekly mode** (default — the rolling
+window, 8–12 candidates): Spotify connector for taste, `WebFetch` for
+programme URLs **and** the static-scraper targets (fetch them the same
+way — `ensembles/*.sh` don't run here), pool-aware enrichment (skip
+detail fetches for dedup keys already enriched in the pool). Emit the
+expert's documented JSON shape. An expert yielding nothing → log and
+continue.
+
+### 3. Diff, push, watchdog
+
+Exactly as SKILL.md step 4: compute dedup keys (recipe in
+`skills/kulturni-sezona/SKILL.md`), novelties = keys missing from the
+pool, push the whole scraped set via `PUT …/pool` (chunks ≤100),
+collect ticket-watchdog flips (`selected` + `false→true`).
+
+### 4. Score + fit
+
+As SKILL.md step 5, with the validator from the checkout:
 
 ```bash
-curl -sS -H "Authorization: Bearer $KP_DIGEST_TOKEN" \
-  "$KP_API_BASE/v1/digest/context?horizon_days=180&lookback_days=180"
+python3 skills/kulturni-sezona/bin/kp_validate.py fit \
+  --candidate novelty.json --plan plan.json \
+  --context context.json --blocked blocked.json
 ```
 
-Returns: `digest_week` (e.g. `CW22`), `balance.multiplier` per lane,
-`balance.hint` (Czech), `booked[]` (title + starts_at + category for the
-next 180 days), `feedback.lane_sentiment` (per-lane multiplier),
-`feedback.recent_downvoted_titles`, and **`discogs`** — Petr's vinyl
-collection taste map (`{username, release_count, artists[], releases[]}`
-with `releases[] = {title, artists[], year}`), or `null` when the
-backend has no Discogs token. **This replaces steps 3, 3b, the
-booked-dates fetch, and the expert's own Discogs fetch (4b) of the local
-skill.** Don't recompute any of it.
+`blocked.json` comes from the **Google Calendar connector** (shared
+Kocourek&Prdelčička calendar, same classification rules); connector
+unavailable → empty blocked set + a footer note.
 
-### 2. Run the active experts inline
+### 5. Compose + sign + send
 
-Read `skills/kulturni-prehled/active-experts.txt` for the active lanes
-(currently just `klasika-expert`). For each, **read its `SKILL.md` +
-`preferences.md` and perform its candidate-gathering inline**:
+- Email content per SKILL.md step 6 (novelties only, fit lines,
+  watchdog section, ≤3 notable mentions, zero-novelty → no email).
+- Sign links via `POST /v1/feedback/sign` (never compute HMACs here).
+- **Send via `POST /v1/digest/send`** (subject
+  `Kulturní přehled — novinky, týden CW{week}`; recipient is
+  server-side). `503`/`502` → Gmail **draft** via the connector + dump
+  the HTML to the run log, and treat the send as FAILED for step 6.
 
-- Taste profile → claude.ai **Spotify** connector (search/library) plus
-  the hand-edited `preferences.md`, plus the **`discogs` field from step
-  1** as `$DISCOGS_TASTE` (the long-term anchor — `artists[]` for
-  composer presence, `releases[]` for specific work matches). **Skip the
-  expert's SKILL.md step 4b `api.discogs.com` fetch entirely** — it's
-  unreachable here and already served by the context. Treat the Discogs
-  profile qualitatively, never as scores. If `discogs` is `null`, note it
-  as a missing source and rank on Spotify + preferences alone.
-- Concert listings → `WebFetch` the orchestra / festival URLs the expert
-  SKILL lists (and its static-scraper targets — fetch them the same way).
-- Exclude anything already in `booked[]` from step 1 (dedup).
-- Produce the same ranked candidate JSON shape the expert documents
-  (`title`, `starts_at`, `score`, `why_cs`, `venue`, `url`,
-  `season_event`, `source_name`/`source_type`, …).
+### 6. Ack
 
-If an expert yields nothing, log it and continue — a short email beats a
-broken one.
+Successful send (or a genuine zero-novelty week) →
+`POST /v1/season/plans/{id}/novelties/ack {"through": <now iso>}`.
+Failed send → **no ack**, the novelties resurface next week.
 
-### 3. Merge + score
+### 7. Report
 
-For each candidate compute
-`weighted_score = score × balance.multiplier[lane] × feedback.lane_sentiment[lane].multiplier`.
-If the title is in `feedback.recent_downvoted_titles`, multiply by 0.2.
-Sort descending.
-
-### 4. Calendar conflict check (Google Calendar connector)
-
-Pull the shared **Kocourek&Prdelčička** calendar over the next 180 days
-via the claude.ai Google Calendar connector (account that owns the
-calendar). Drop candidates that fall on an all-day/holiday-blocked day or
-overlap a timed event (`[start−2h, end+1h]`). Apply the same vacation
-title heuristic as the local skill's step 4b. If the connector isn't
-available, **skip this step gracefully** and note it in the email footer.
-
-### 5. Spacing rule + cap
-
-Identical to the local skill step 5, using `booked[]` as the existing
-events: **≤ 2 picks per ISO week** (no season override on the cap),
-**≥ 2 calendar-day gap** between any two (`season_event: true` overrides
-only the gap, never the cap), **global cap 5**. Strong candidates
-(score ≥ 0.70) dropped by step 4 or 5 become **notable mentions** (max 3)
-with a Czech `drop_reason`.
-
-### 6. Sign feedback links
-
-```bash
-curl -sS -X POST -H "Authorization: Bearer $KP_DIGEST_TOKEN" \
-  -H "Content-Type: application/json" \
-  "$KP_API_BASE/v1/feedback/sign" \
-  -d '{"week":"CW22","items":[{"title":"…","lane":"klasika"}, …]}'
-```
-
-Returns `url_up` / `url_down` per item. This replaces the local skill's
-step 7 (no JWT secret needed here).
-
-### 7. Render + send the email
-
-Reuse the **exact HTML template and subject** from
-`skills/kulturni-prehled/SKILL.md` step 8 (`Kulturní přehled — týden
-CW{week}`, `balance.hint` in the subheader, the per-pick card with the
-signed 👍/👎 links, notable-mentions block).
-
-**Send via the KP API, not the Gmail connector** — the cloud Gmail
-connector can only create drafts, so the backend relays the email over
-SMTP to the fixed recipient (`petronijus@example.com`, server-side
-config — you don't pass a `to`):
-
-```bash
-curl -sS -X POST -H "Authorization: Bearer $KP_DIGEST_TOKEN" \
-  -H "Content-Type: application/json" \
-  "$KP_API_BASE/v1/digest/send" \
-  -d "$(jq -n --arg s "Kulturní přehled — týden CW${WEEK}" --arg h "$HTML" \
-        '{subject: $s, html_body: $h}')"
-```
-
-Expect `200 {"status":"sent","to":"petronijus@example.com"}`. **Fallback:**
-if it returns `503` (relay not configured) or `502` (send failed), create
-a Gmail **draft** via the connector instead **and** write the rendered
-HTML to the run log so the digest isn't lost — then tell Petr to send the
-draft by hand.
-
-### 8. Report
-
-Print a one-line summary: how many picks sent, the lane mix, and
-`balance.hint`. Communicate in Czech in any chat output.
+One Czech line: novelty count, sent count, pool delta, watchdog count,
+`balance.hint`.
 
 ## Guardrails
 
-- Narrow token: you can call `GET /v1/digest/context`,
-  `POST /v1/feedback/sign`, and `POST /v1/digest/send` — nothing else on
-  the KP API; other endpoints 403.
-- One email per run, max ~5 picks, never relax the spacing rule to pad
-  the list.
+- Narrow token: digest + season scopes only; other endpoints 403.
+- One email per run; only novelties — never re-recommend the pool.
+- The season pool upsert is additive — the routine can never delete or
+  touch Petr's plan state (the API enforces it, but don't try either).
 - Don't run more than once per day (external scrapes + connectors).

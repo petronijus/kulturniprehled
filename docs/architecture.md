@@ -11,15 +11,35 @@ production-grade microservice template.
 [Mobile iOS/Android] ──HTTPS──┐
                               │
 [Claude skill on desktop] ────┼──> [Cloudflare Tunnel] ──> [kulturniprehled.example.com] FastAPI
+                              │                       │      └── /app  Season-planner SPA (same-origin,
+[Browser: season planner] ────┘                       │           React bundle baked into the API image)
                               │                       └──> [kulturniprehled-tickets.example.com] MinIO (signed URLs)
                               │
                               └── (no APNs / FCM — see "Push, deliberately omitted" below)
 
-FastAPI ──> PostgreSQL  (events, watchlist, sync log, users, costs, recommendations)
+FastAPI ──> PostgreSQL  (events, watchlist, sync log, users, costs, recommendations,
+        │                season plans / candidate pool / scenarios — web-only, not synced)
         ──> MinIO       (ticket PDFs, posters, venue photos)
         ──> Anthropic   (ticket parsing, future embeddings)
         ──> Google Cal  (one-way sync, idempotent via extendedProperties.kp_event_id)
 ```
+
+The season planner (`/app`) is a fourth client surface: a React SPA served
+by FastAPI itself. It is **home-only and login-less** — the network is the
+auth. With `WEB_PUBLIC=false` (default) the API refuses `/app` requests
+that arrived through the Cloudflare Tunnel (detected via the
+`CF-Connecting-IP` header cloudflared injects into every proxied request);
+with `WEB_TRUSTED_LAN=true` a direct header-less request — which can only
+originate on the LAN or the tailnet, the tunnel being the sole public path
+— is authenticated as the workspace owner restricted to the `season:*`
+scopes. That default-deny scope restriction keeps every other endpoint
+token-only, so the public JSON API surface for the mobile apps and the
+cloud routine is unchanged. The `kulturni-sezona` skill fills the
+candidate pool and scenarios via `/v1/season/*` (`season:read` /
+`season:write` PAT scopes); the weekly `kulturni-prehled` routine diffs
+new announcements against the pool and emails only novelties. Season
+tables deliberately stay out of the mobile sync protocol — the plan is a
+desktop-browser workflow.
 
 ## Why this shape
 

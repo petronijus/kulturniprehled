@@ -1,0 +1,15 @@
+.toggle {
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+}
+
+.toggle:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}

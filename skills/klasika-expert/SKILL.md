@@ -6,21 +6,32 @@ description: Domain-expert agent for vážná hudba (klasika + soudobá vážná
 ## Task
 
 Build a ranked list of upcoming **vážná hudba** events Petr should
-consider this week. Write the result as JSON to a known location;
-**never send email**. The `kulturni-prehled` aggregator picks up the
-file, merges with other experts, applies cross-domain rules
-(balance, spacing, "udalost sezony" exceptions), and sends one
-combined email.
+consider. Write the result as JSON to a known location; **never send
+email**. Two callers consume the file: the weekly `kulturni-prehled`
+novelty watcher and the once-per-season `kulturni-sezona` orchestrator.
+
+## Modes
+
+The caller passes the mode via the Skill tool's `args` parameter
+(`Skill(skill: "klasika-expert", args: "mode=season season=2026-27")`).
+No args → `weekly`, so standalone `/klasika-expert` chat use is unchanged.
+Env vars are NOT used — shell state resets between Bash calls.
+
+| | `weekly` (default) | `season` |
+|---|---|---|
+| Candidate window | rolling 180 days | fixed season: Sep 1 – Jun 30 of `season=` (run in Jul/Aug → the upcoming season) |
+| Output file | `/tmp/kp-digest-CW<n>/klasika.json` (`<n>` = `date +%V`) | `/tmp/kp-season-<season>/klasika.json` |
+| Candidate count (step 7) | 8–12 | 30–60, **no trimming** — every above-threshold event |
+| Detail enrichment (step 5d) | cap 50, skip candidates already enriched in the backend pool | cap 60, same pool skip |
+| History dedup | as written | same rules over the whole season |
+
+Everything not listed behaves identically in both modes.
 
 ### 0. Output contract — write this file at the end
 
-```
-/tmp/kp-digest-CW<n>/klasika.json
-```
-
-`<n>` = ISO week number, from `date +%V`. The aggregator looks here
-after invoking the expert and refuses to send anything if the file
-is missing or malformed.
+Write to the mode's output path (table above). The caller looks there
+after invoking the expert and skips the lane if the file is missing or
+malformed.
 
 The JSON shape:
 
@@ -230,21 +241,23 @@ filter exactly, instead of guessing today's date from the page).
 Append the LLM's JSON to `$CANDIDATES`. On WebFetch failure: log
 `WARN: WebFetch <url> failed` and continue.
 
-#### 5c. Filter to the 6-month rolling horizon
+#### 5c. Filter to the mode's window
 
 ```bash
 NOW=$(python3 -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds'))")
+# weekly: rolling 180 days
 HORIZON=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc).astimezone()+timedelta(days=180)).isoformat(timespec='seconds'))")
+# season: the fixed season window instead (from `season=YYYY-YY` arg)
+#   WINDOW_FROM=<YYYY>-09-01T00:00:00+02:00   WINDOW_TO=<YYYY+1>-06-30T23:59:59+02:00
+#   (lower bound: max(NOW, season start) — never emit past events)
 CANDIDATES=$(printf '%s' "$CANDIDATES" | jq --arg now "$NOW" --arg h "$HORIZON" \
   '[.[] | select(.starts_at >= $now and .starts_at <= $h)]')
 ```
 
-Rolling 180 days from "now" — each weekly run rolls forward; exact
-month-end alignment isn't required.
-
-A 6-month horizon brings autumn festivals (Dvořákova Praha — September,
-Struny podzimu / Prague Sounds — November) into scope, plus the next
-season's first-half subscriptions for ČF / PKF / FOK / SOČR.
+Weekly's rolling 180 days brings autumn festivals (Dvořákova Praha —
+September, Struny podzimu / Prague Sounds — November) into scope, plus
+the next season's first-half subscriptions for ČF / PKF / FOK / SOČR.
+Season mode covers the whole Sep–Jun window in one pass.
 
 #### 5d. Enrich top candidates with program detail (composers + works)
 
@@ -253,11 +266,28 @@ is almost always a marketing string ("LSO • Pappano") that hides the actual
 program. Before ranking, fetch each candidate's detail page via WebFetch and
 extract the program into `{composer, work}` pairs.
 
-Cap at the top 50 candidates by simple pre-rank (ensemble bias + date
-proximity + composer-in-title hits) to keep WebFetch usage bounded.
-With a 6-month horizon the scraped pool is typically 200+ events;
-50 covers all favourite-ensemble subscriptions + festival headliners
-without burning hundreds of WebFetch calls per weekly run.
+**Check the backend pool first — enrichment is paid once per event ever.**
+Fetch the season pool keys and skip WebFetch for candidates whose
+`dedup_key` already carries `enriched_at`; merge the stored `program` /
+`detail` / `price_czk` / `tickets_available` instead:
+
+```bash
+SEASON_UUID=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
+  "$KP_API_BASE/v1/season/plans/current" | jq -r '.id // empty')
+[ -n "$SEASON_UUID" ] && POOL=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
+  "$KP_API_BASE/v1/season/plans/$SEASON_UUID/pool?limit=1000")
+# dedup_key recipe: sha256("<lane>|<normalized_title>|<YYYY-MM-DD>")[:64] —
+# canonical definition in skills/kulturni-sezona/SKILL.md.
+```
+
+No active season (404) → skip the check and enrich normally.
+
+Cap fresh WebFetch enrichment at the top 50 candidates (weekly) / 60
+(season) by simple pre-rank (ensemble bias + date proximity +
+composer-in-title hits) to keep WebFetch usage bounded. With a 6-month
+horizon the scraped pool is typically 200+ events; the cap covers all
+favourite-ensemble subscriptions + festival headliners without burning
+hundreds of WebFetch calls per run.
 
 For each surviving candidate, call WebFetch with this prompt:
 
@@ -353,7 +383,9 @@ Reason over:
 - `$CANDIDATES` — every upcoming event, enriched by step 5d with `program`
 - `$THIS_YEAR_EVENTS` / `$LAST_YEAR_EVENTS` — history dedup (step 6)
 
-Pick **8–12** ranked candidates. Per item:
+Pick **8–12** ranked candidates in weekly mode; **30–60 with no
+trimming** in season mode (the SPA and the scenario generator want the
+full above-threshold field, not a shortlist). Per item:
 
 - **Composer + work match with Discogs is the PRIMARY signal.** Check
   whether the composers in `program[]` appear in Petr's Discogs
@@ -406,8 +438,10 @@ Pick **8–12** ranked candidates. Per item:
 ### 8. Write output JSON
 
 ```bash
+# weekly:
 WEEK=$(date +%V)
 DIGEST_DIR=/tmp/kp-digest-CW${WEEK}
+# season: DIGEST_DIR=/tmp/kp-season-<season>
 mkdir -p "$DIGEST_DIR"
 # Construct the output object inline from the ranked list you just produced.
 # Use jq to build it cleanly; never write the file via echo if it could be

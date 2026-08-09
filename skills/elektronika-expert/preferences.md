@@ -39,5 +39,18 @@ Edit freely — the skill rereads it on every run.
 The skill hits these via WebFetch in step 4. LLM extracts upcoming
 events (next 4 weeks) since these line-ups change frequently.
 
+Primary (club sites):
+
 - https://www.palacakropolis.cz — Palác Akropolis
-- *(přidávej dle libosti: Cross, Roxy, Ankali, Punctum, Lethargy, Sonic Visions, …)*
+- https://www.crossclub.cz/cs/program/ — Cross Club <!-- TODO(Petr): verify URL -->
+- https://www.roxy.cz/program — Roxy <!-- TODO(Petr): verify URL -->
+- https://ankali.bio — Ankali <!-- TODO(Petr): verify URL (domain has changed before; RA fallback below covers it) -->
+- https://punctum.cz — Punctum / Krásovka <!-- TODO(Petr): verify URL -->
+
+Secondary (aggregators — robust when a club site breaks; the caller
+dedups against primary sources by dedup_key):
+
+- https://ra.co/events/cz/prague — Resident Advisor Praha
+- https://goout.net/cs/praha/koncerty/?tags=electronic — GoOut elektronika
+
+*(přidávej dle libosti: Lethargy, Sonic Visions, Fuchs2, …)*

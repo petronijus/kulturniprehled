@@ -44,6 +44,9 @@ from kp_api.domain.enums import (
     EventSource,
     EventStatus,
     FeedbackRating,
+    PlanStatus,
+    SeasonLane,
+    SeasonStatus,
     UserRole,
     WatchlistKind,
 )
@@ -468,6 +471,215 @@ class AppliedOp(Base):
     )
     response: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
     created_at: Mapped[datetime] = _created_at()
+
+
+class SeasonPlan(Base):
+    """One cultural season ("2026/27", Sep 1 to Jun 30) being planned.
+
+    Exactly one season per workspace may be `active` (enforced by a partial
+    unique index) so `/v1/season/plans/current` is unambiguous. Rolling into
+    a new season is an explicit archive-then-create step, never implicit.
+
+    `novelty_ack_at` is the weekly novelty-watcher's server-side cursor:
+    candidates with `first_seen_at` after it are "news". Keeping the cursor
+    here lets the cloud routine stay stateless across runs.
+
+    Season tables are a web-only surface (like `recommendation_feedback`);
+    they deliberately do not participate in the mobile sync protocol.
+    """
+
+    __tablename__ = "season_plans"
+    __table_args__ = (
+        Index(
+            "uq_season_label",
+            "workspace_id",
+            "label",
+            unique=True,
+            postgresql_where="deleted_at IS NULL",
+        ),
+        Index(
+            "uq_season_active",
+            "workspace_id",
+            unique=True,
+            postgresql_where="status = 'active' AND deleted_at IS NULL",
+        ),
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    label: Mapped[str] = mapped_column(String(20), nullable=False)
+    starts_on: Mapped[date] = mapped_column(Date, nullable=False)
+    ends_on: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[SeasonStatus] = mapped_column(
+        String(20), nullable=False, default=SeasonStatus.ACTIVE
+    )
+    novelty_ack_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SeasonCandidate(Base):
+    """A scraped candidate event in a season's pool, plus Petr's decision.
+
+    Plan state lives directly on the row (single user, one plan per season —
+    a separate plan table would only add a join and a second version counter).
+
+    Identity across re-scrapes is `dedup_key`, computed by the skills as
+    `sha256(lane|normalized_title|starts_at.date())[:64]`; the server only
+    validates its shape. `content_hash` is server-computed over the scraped
+    fields so an identical re-push is detected as unchanged and bumps
+    neither `version` nor `updated_at` — only `last_seen_at`.
+
+    Ingest never touches `first_seen_at`, `plan_status`, `plan_status_at`
+    or `note`; those belong to the user.
+    """
+
+    __tablename__ = "season_candidates"
+    __table_args__ = (
+        Index(
+            "uq_candidate_dedup",
+            "season_id",
+            "dedup_key",
+            unique=True,
+            postgresql_where="deleted_at IS NULL",
+        ),
+        Index(
+            "ix_season_candidates_starts",
+            "season_id",
+            "starts_at",
+            postgresql_where="deleted_at IS NULL",
+        ),
+        Index(
+            "ix_season_candidates_plan_status",
+            "season_id",
+            "plan_status",
+            postgresql_where="deleted_at IS NULL",
+        ),
+        Index(
+            "ix_season_candidates_first_seen",
+            "season_id",
+            "first_seen_at",
+            postgresql_where="deleted_at IS NULL",
+        ),
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    season_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("season_plans.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    dedup_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    lane: Mapped[SeasonLane] = mapped_column(String(20), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Free text on purpose — pool candidates are speculative and must not
+    # pollute the curated `venues` table used by booked events.
+    venue: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    price_czk: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    program: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB, nullable=True)
+    # Lane-specific enrichment (soloists/conductor for klasika, director/
+    # production for divadlo, director/year for film, …).
+    detail: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
+    enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    score: Mapped[float | None] = mapped_column(nullable=True)
+    why_cs: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    source_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    season_event: Mapped[bool] = mapped_column(nullable=False, default=False)
+    tickets_available: Mapped[bool | None] = mapped_column(nullable=True)
+    plan_status: Mapped[PlanStatus] = mapped_column(
+        String(20), nullable=False, default=PlanStatus.UNDECIDED
+    )
+    plan_status_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    first_seen_at: Mapped[datetime] = _created_at()
+    last_seen_at: Mapped[datetime] = _created_at()
+    created_by: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SeasonScenario(Base):
+    """A skill-generated season dramaturgy ("Velká symfonika", …).
+
+    Scenarios are immutable artifacts of an orchestrator run: replaced
+    wholesale on re-push (upsert by name), read whole, applied whole. That
+    is why membership is a JSONB UUID array rather than a join table — there
+    is no relational query over it, and a join table would need diff/prune
+    logic on every re-push for nothing. Readers must tolerate ids of
+    soft-deleted candidates (skip silently).
+
+    `reserved_slots` marks {lane, month} placeholders for lanes whose
+    sources publish too late for the season scrape (clubs, cinemas).
+
+    Applying a scenario mutates candidates' `plan_status`; `applied_at` is
+    informational — the plan's truth always lives on the candidates.
+    """
+
+    __tablename__ = "season_scenarios"
+    __table_args__ = (
+        Index(
+            "uq_scenario_name",
+            "season_id",
+            "name",
+            unique=True,
+            postgresql_where="deleted_at IS NULL",
+        ),
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    season_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("season_plans.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    description_cs: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    candidate_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    reserved_slots: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB, nullable=True)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class RecommendationFeedback(Base):

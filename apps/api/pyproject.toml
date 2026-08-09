@@ -31,6 +31,9 @@ dependencies = [
   "structlog>=24.4",
   "uuid-utils>=0.10",
   "sentry-sdk[fastapi]>=2.18",
+  # zoneinfo fallback — python:3.12-slim ships no system tz database, and the
+  # season planner buckets events into Europe/Prague ISO weeks.
+  "tzdata>=2024.2",
 ]
 
 [project.optional-dependencies]

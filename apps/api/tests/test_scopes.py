@@ -18,7 +18,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from kp_api.adapters.auth import mint_pat
 from kp_api.config import Settings
 from kp_api.domain.models import User
-from kp_api.domain.scopes import SCOPE_DIGEST_READ, SCOPE_FEEDBACK_SIGN
+from kp_api.domain.scopes import (
+    SCOPE_DIGEST_READ,
+    SCOPE_FEEDBACK_SIGN,
+    SCOPE_SEASON_READ,
+    SCOPE_SEASON_WRITE,
+)
 from tests.conftest import auth_header, login_as
 
 
@@ -117,3 +122,75 @@ async def test_feedback_sign_scope_signs_links(
     rate = urlsplit(data[0]["url_up"])
     confirm = await client.get(f"{rate.path}?{rate.query}")
     assert confirm.status_code == 200
+
+
+_SEASON_PAYLOAD = {"label": "2026/27", "starts_on": "2025-09-01", "ends_on": "2026-06-30"}
+
+
+@pytest.mark.asyncio
+async def test_season_read_scope_reads_but_cannot_write(
+    client: AsyncClient, settings: Settings, db_session: AsyncSession
+) -> None:
+    user = await _known_user(client, db_session)
+    reader = await mint_pat(
+        db_session, user, name="routine", settings=settings, scopes=[SCOPE_SEASON_READ]
+    )
+    writer = await mint_pat(
+        db_session, user, name="routine-w", settings=settings, scopes=[SCOPE_SEASON_WRITE]
+    )
+    await db_session.commit()
+
+    denied_create = await client.post(
+        "/v1/season/plans", json=_SEASON_PAYLOAD, headers=auth_header(reader)
+    )
+    assert denied_create.status_code == 403
+
+    created = await client.post(
+        "/v1/season/plans", json=_SEASON_PAYLOAD, headers=auth_header(writer)
+    )
+    assert created.status_code == 201, created.text
+    season_id = created.json()["id"]
+
+    assert (
+        await client.get("/v1/season/plans/current", headers=auth_header(reader))
+    ).status_code == 200
+    assert (
+        await client.get(f"/v1/season/plans/{season_id}/pool", headers=auth_header(reader))
+    ).status_code == 200
+    denied_put = await client.put(
+        f"/v1/season/plans/{season_id}/pool", json={"items": []}, headers=auth_header(reader)
+    )
+    assert denied_put.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_digest_scope_cannot_reach_season(
+    client: AsyncClient, settings: Settings, db_session: AsyncSession
+) -> None:
+    user = await _known_user(client, db_session)
+    pat = await mint_pat(
+        db_session, user, name="routine", settings=settings, scopes=[SCOPE_DIGEST_READ]
+    )
+    await db_session.commit()
+
+    assert (
+        await client.get("/v1/season/plans/current", headers=auth_header(pat))
+    ).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_unrestricted_credentials_pass_season_endpoints(
+    client: AsyncClient, settings: Settings, db_session: AsyncSession
+) -> None:
+    user = await _known_user(client, db_session)
+    pat = await mint_pat(db_session, user, name="desktop", settings=settings)  # no scopes
+    await db_session.commit()
+
+    created = await client.post("/v1/season/plans", json=_SEASON_PAYLOAD, headers=auth_header(pat))
+    assert created.status_code == 201, created.text
+
+    pair = await login_as(client, "petr@example.com")
+    jwt_read = await client.get(
+        "/v1/season/plans/current", headers=auth_header(pair["access_token"])
+    )
+    assert jwt_read.status_code == 200

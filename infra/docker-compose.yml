@@ -100,6 +100,11 @@ services:
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-prod}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Season planner (home-only SPA at /app): WEB_PUBLIC=false blocks it
+      # on the Cloudflare path; WEB_TRUSTED_LAN=true lets direct LAN /
+      # Tailscale requests use it without login (season scopes only).
+      WEB_PUBLIC: ${WEB_PUBLIC:-false}
+      WEB_TRUSTED_LAN: ${WEB_TRUSTED_LAN:-false}
     ports:
       - "${API_HOST_PORT:-8000}:8000"
     depends_on:

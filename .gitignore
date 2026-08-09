@@ -106,3 +106,6 @@ apps/mobile/assets/brand/launcher_master.png
 
 # Private overlay (clone of github.com/petronijus/kulturniprehled-private)
 /private/
+
+# Web SPA (apps/api/web)
+node_modules/

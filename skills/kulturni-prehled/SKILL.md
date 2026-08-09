@@ -1,15 +1,27 @@
 ---
 name: kulturni-prehled
-description: Weekly culture-aggregator for Petr. Invokes every domain-expert skill (klasika-expert, elektronika-expert, divadlo-expert, film-expert) inline, merges their ranked candidate lists, applies cross-domain rules (balance signal — boost lanes Petr has been neglecting, ~1-event-per-week spacing with `season_event` exceptions, global cap of ~5 picks total), renders one Czech HTML email and sends it via Gmail. **This is the only skill in the suite that sends email.** Designed to be invoked weekly by the /schedule skill.
+description: Weekly novelty watcher for Petr's season plan. Runs every active domain-expert skill in weekly mode, diffs the scrape against the backend season pool, pushes pool updates, and emails ONLY newly announced events with a fit-suggestion against the standing plan (kp_validate.py fit). Also watches ticket availability on planned events. **This is the only skill in the suite that sends email.** Designed to be invoked weekly by the /schedule skill; season planning itself lives in /kulturni-sezona.
 ---
 
 ## Task
 
-Compose Petr's weekly culture digest by orchestrating every available
-domain expert and sending **one email** with the merged + balanced
-top picks. The experts produce raw candidate lists; this skill
-applies the cross-cutting rules that turn N×8 candidates into a
-single ~5-item curated email.
+Petr's season plan lives in the backend (built by `/kulturni-sezona`,
+finalized in the SPA at `/app`). This weekly run answers one question:
+**what got announced since last week, and where would it fit?** It never
+re-recommends the existing pool — the plan is Petr's, the watcher only
+brings news.
+
+### API contract (single edit point)
+
+- `GET  /v1/season/plans/current` → `{id, label, novelty_ack_at, …}`; 404 = no season
+- `GET  /v1/season/plans/{id}/pool?limit=1000&offset=N` → full pool (dedup keys + enrichment + plan_status)
+- `GET  /v1/season/plans/{id}/plan` → `{selected[], counts, weeks}`
+- `GET  /v1/season/plans/{id}/scenarios` → for the applied scenario's `reserved_slots`
+- `PUT  /v1/season/plans/{id}/pool` → idempotent upsert `{created, updated, unchanged}`
+- `GET  /v1/season/plans/{id}/novelties` → candidates first seen after `novelty_ack_at`
+- `POST /v1/season/plans/{id}/novelties/ack` `{through}` → advance the cursor (only after a successful send!)
+- `GET  /v1/digest/context` → balance hint + feedback sentiment + booked[]
+- `dedup_key` recipe: canonical definition in `skills/kulturni-sezona/SKILL.md`
 
 ### 0. Discover experts
 
@@ -21,398 +33,159 @@ EXPERTS=$(grep -v '^#' "$AGGREGATOR_DIR/active-experts.txt" 2>/dev/null \
 echo "Active experts: $EXPERTS"
 ```
 
-The file `skills/kulturni-prehled/active-experts.txt` lists one expert
-per line. Comment lines (`#`) are ignored. To enable a new expert, add
-its name; to disable, remove or comment it out.
+One expert per line; `#` comments ignored. To enable a new expert, add
+its name — no aggregator changes needed.
 
-Current active:
-
-- `klasika-expert`
-
-Paused (uncomment when tuned):
-
-- `# elektronika-expert`
-- `# divadlo-expert`
-- `# film-expert`
-
-### 1. Compute the week's digest directory
-
-```bash
-WEEK=$(date +%V)
-DIGEST_DIR=/tmp/kp-digest-CW${WEEK}
-rm -rf "$DIGEST_DIR" && mkdir -p "$DIGEST_DIR"
-```
-
-A fresh dir per run guarantees we never serve stale data from a
-previous week.
-
-### 2. Invoke each expert (Skill tool, in-process)
-
-For each `<expert>` in `$EXPERTS`, call the `Skill` tool with
-`skill: "<expert>"`. The expert runs inline in this Claude session;
-it writes its ranked candidates to
-`$DIGEST_DIR/<lane>.json` and reports a short summary to chat.
-
-`<lane>` derives from `<expert>` by dropping the `-expert` suffix:
-`klasika-expert → klasika.json`, etc.
-
-After each invocation, verify the file landed:
-
-```bash
-LANE=${EXPERT%-expert}
-[ -s "$DIGEST_DIR/$LANE.json" ] || {
-  echo "WARN: $EXPERT did not write $LANE.json — skipping in digest"
-}
-```
-
-If an expert fails or produces an empty list, log it and continue —
-the email still goes out with whatever lanes did succeed.
-
-### 3. Compute balance signal (cross-domain)
+### 1. Resolve auth + season + week dir
 
 ```bash
 KP_API_BASE="${KP_API_BASE:-https://kulturniprehled.example.com}"
 KP_TOKEN="$(op item get 'Kulturni Prehled API Token' --fields label=credential --reveal 2>/dev/null)"
-NOW=$(python3 -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds'))")
-SINCE=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc).astimezone()-timedelta(days=180)).isoformat(timespec='seconds'))")
-EVENTS=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
-  "$KP_API_BASE/v1/events?starts_from=$SINCE&starts_to=$NOW&limit=500")
+WEEK=$(date +%V)
+DIGEST_DIR=/tmp/kp-digest-CW${WEEK}
+rm -rf "$DIGEST_DIR" && mkdir -p "$DIGEST_DIR"
 
-days_since_cat() {
-  local CAT=$1
-  local LAST=$(printf '%s' "$EVENTS" | jq -r --arg c "$CAT" \
-    '[.items[] | select(.category==$c)] | sort_by(.starts_at) | last.starts_at // empty')
-  [ -z "$LAST" ] && { echo 999; return; }
-  echo $(( ( $(date +%s) - $(date -d "$LAST" +%s) ) / 86400 ))
-}
-DSC=$(days_since_cat concert)
-DST=$(days_since_cat theatre)
-DSF=$(days_since_cat cinema)
-BALANCE_HINT="${DSC} dní bez koncertu, ${DST} bez divadla, ${DSF} bez kina"
+SEASON=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
+  "$KP_API_BASE/v1/season/plans/current")
+SEASON_UUID=$(printf '%s' "$SEASON" | jq -r '.id // empty')
 ```
 
-Map domain → category, then compute a per-lane **balance multiplier**
-that the merge step uses:
+**No active season → stop.** Print „Žádná aktivní sezóna — spusť
+`/kulturni-sezona`" and exit; do not email.
 
-| Domain (lane) | Mapped category | Balance multiplier |
-|---------------|-----------------|--------------------|
-| klasika       | concert         | `1.0 + (DSC - 30) / 60` (clamp 0.5–1.8) |
-| elektronika   | concert         | shares DSC with klasika |
-| divadlo       | theatre         | `1.0 + (DST - 30) / 60` (clamp 0.5–1.8) |
-| film          | cinema          | `1.0 + (DSF - 30) / 60` (clamp 0.5–1.8) |
+### 2. Assemble context
 
-So if Petr has been to a concert 5 days ago, multiplier ~0.6 (we damp
-down further concerts). If 60 days, multiplier ~1.5 (we lean into them).
+Into `$DIGEST_DIR`:
 
-### 3b. Fetch past feedback (preference signal)
+- `pool.json` ← page through `GET …/pool?limit=1000` (all statuses).
+- `plan.json` ← `GET …/plan`, then attach `reserved_slots` from the
+  applied scenario (`GET …/scenarios`, pick `applied_scenario_id` from
+  the plan response; fall back to rank 1 if none applied yet).
+- `context.json` ← `GET /v1/digest/context?horizon_days=180&lookback_days=180`
+  (`booked`, `feedback.lane_sentiment`, `feedback.recent_downvoted_titles`,
+  `balance.hint` for the email footer).
+- `blocked.json` ← the shared **Kocourek&Prdelčička** calendar
+  (`c_9a5bbccc4605dfbee65ff6ec08e3259596e8fc63bb131db50438b28e9cfece87@group.calendar.google.com`)
+  over the next 180 days via the workspace MCP
+  (`mcp__workspace-mcp__get_events`, `user_google_email`
+  `petronijus@example.com` — the work account cannot see this calendar).
+  Classify: all-day events → every covered date into `blocked_days`;
+  multi-day titles matching
+  `(dovolená|holiday|pryč|away|cottage|šumperák|chalupa)` (case-insensitive)
+  likewise; timed events → `conflicts` `{start_iso, end_iso, title}`.
+  Calendar unavailable → empty `blocked.json` + a footer note in the email.
 
-Pull all feedback history from the API. Use it as a scoring modifier
-in the merge step — thumbs-down on a title/lane/venue dampens similar
-future recommendations; thumbs-up boosts them.
+### 3. Run experts (weekly mode)
+
+For each expert, call the `Skill` tool with `skill: "<expert>"` (no
+args — weekly is the default). Each writes
+`$DIGEST_DIR/<lane>.json`; missing/empty file → warn and continue.
+Experts do pool-aware enrichment themselves (they skip WebFetch detail
+for already-enriched dedup keys), so a weekly run is cheap.
+
+### 4. Diff against the pool
 
 ```bash
-FEEDBACK=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
-  "$KP_API_BASE/v1/feedback/history")
+POOL_KEYS=$(jq -r '.[].dedup_key' "$DIGEST_DIR/pool.json" | sort -u)
 ```
 
-Compute per-lane sentiment: for each lane, count ups vs downs in the
-last 90 days. Convert to a multiplier:
+Compute `dedup_key` for every scraped candidate (recipe in
+`kulturni-sezona/SKILL.md`). Split:
 
-```python
-# lane_feedback_mult = 1.0 + 0.1 * (ups - downs)  # clamp 0.6–1.4
-```
+- **Novelties** — keys not in `$POOL_KEYS`.
+- **Updates** — keys already present; interesting only for the
+  **ticket watchdog**: a pool candidate with `plan_status == "selected"`
+  and `tickets_available == false` whose fresh scrape says `true`
+  becomes a „lístky se uvolnily" line in the email.
 
-Apply this multiplier alongside the balance multiplier from step 3
-when computing `weighted_score` in step 4.
+Enrich novelties that still lack `program` (cap ~15 per lane), then
+**push the entire scraped set** via `PUT …/pool` in chunks of ~100 —
+content hashing makes unchanged rows free, `last_seen_at` stays fresh,
+and this is what grows elektronika/film coverage all season. User-owned
+plan fields are never touched by the upsert.
 
-Also check for title-level signals: if a specific event title got a
-thumbs-down in a prior week and reappears as a candidate (e.g. a
-recurring series), demote it heavily (×0.2).
+### 5. Score + fit-check novelties
 
-### 4. Merge + score across lanes
+Per novelty:
+
+1. Expert score × feedback dampening: title in
+   `recent_downvoted_titles` → ×0.2; lane sentiment multiplier from
+   `feedback.lane_sentiment`.
+2. Drop below 0.6.
+3. Fit check:
 
 ```bash
-ALL='[]'
-for L in $(ls "$DIGEST_DIR"/*.json 2>/dev/null); do
-  LANE_JSON=$(cat "$L")
-  LANE_NAME=$(printf '%s' "$LANE_JSON" | jq -r '.lane')
-  # Apply balance multiplier to each item's score; carry through metadata.
-  MULT=$(...compute per the table above...)
-  TWEAKED=$(printf '%s' "$LANE_JSON" | jq --arg mult "$MULT" --arg lane "$LANE_NAME" '
-    .items | map(. + {
-      "lane": $lane,
-      "label": ($lane | gsub("klasika";"Vážná hudba") | gsub("elektronika";"Elektronika")
-                      | gsub("divadlo";"Divadlo") | gsub("film";"Film")),
-      "weighted_score": ((.score // 0.5) * ($mult | tonumber))
-    })')
-  ALL=$(jq -n --argjson a "$ALL" --argjson b "$TWEAKED" '$a + $b')
-done
-# Sort by weighted score descending
-ALL=$(printf '%s' "$ALL" | jq 'sort_by(-.weighted_score)')
+python3 "$SKILLS_DIR/kulturni-sezona/bin/kp_validate.py" fit \
+  --candidate "$DIGEST_DIR/novelty-<key>.json" \
+  --plan "$DIGEST_DIR/plan.json" \
+  --context "$DIGEST_DIR/context.json" \
+  --blocked "$DIGEST_DIR/blocked.json" > "$DIGEST_DIR/fit-<key>.json"
 ```
 
-### 4b. Calendar conflict check (Kocourek&Prdelčička)
+`{fits, week, fills_reserved_slot, reasons_cs}` drives the email line:
 
-Petr + Běla share the **Kocourek&Prdelčička** Google Calendar for
-vacations, away days, dinner plans, and existing bookings outside KP.
-Pull events in the digest horizon and drop / flag conflicting candidates
-**before** the spacing rule runs.
+- fits + fills a reserved slot → „🧩 Zaplní rezervované místo v plánu:
+  elektronika, listopad."
+- fits → „✅ Sedlo by do týdne {week} (volný)."
+- doesn't fit → „⛔ Nesedí — {reasons_cs}." If the production has other
+  dates (`alt_dates` from the expert), check the best alternative and
+  mention it: „…; alternativní termín {date} volný."
 
-```bash
-KP_CAL_ID='c_9a5bbccc4605dfbee65ff6ec08e3259596e8fc63bb131db50438b28e9cfece87@group.calendar.google.com'
-HORIZON_6M=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc)+timedelta(days=180)).isoformat(timespec='seconds'))")
-```
+### 6. Compose the email — novelties only
 
-List events via the workspace MCP. The shared calendar is only visible
-to `petronijus@example.com` — Petr's work address (`petr@example.com`)
-doesn't have it on its calendar list. Use the workspace MCP, not the
-Google Calendar MCP, because the latter only sees the work account.
+**Zero fitting novelties and zero watchdog lines → no email.** Print
+„Žádné novinky tento týden" to the run log and still ack (step 8).
 
-```
-mcp__workspace-mcp__get_events(
-  user_google_email = "petronijus@example.com",
-  calendar_id       = KP_CAL_ID,
-  time_min          = NOW,
-  time_max          = HORIZON_6M,
-  max_results       = 250,
-  detailed          = true
-)
-```
+Selection: top ~5 fitting novelties (across lanes, by damped score) +
+up to 3 notable non-fitting (score ≥ 0.70) as „Notable mentions" with
+their `drop_reason` = fit reasons. Ticket-watchdog lines go in a short
+section above the footer.
 
-For each calendar event, classify:
+#### Feedback tokens
 
-- **All-day event spanning ≥1 day** → treat every covered date as
-  blocked (Petr is on holiday / out of Prague). Candidates with
-  `starts_at` falling on any blocked date are dropped from `$ALL`.
-- **Timed event** (has `start.dateTime`) → compute overlap with each
-  candidate's `starts_at`. If candidate falls within `[event.start − 2h,
-  event.end + 1h]` → drop the candidate.
-- **Title heuristic** — if the all-day or multi-day event title matches
-  `(dovolená|holiday|pryč|away|cottage|šumperák|chalupa)` case-insensitive,
-  the date span is treated as blocked even if it lacks the all-day flag.
-
-Edge case: events Petr already booked through KP (concerts/theatre with
-tickets) appear here too because `concert-tickets-flow` creates them on
-this calendar. Those are also already in the KP API and get caught by
-step 6's existing-event exclusion in each expert — double-coverage is
-fine, drops are idempotent.
-
-Implementation sketch:
-
-```bash
-CAL_EVENTS_JSON='[ ... result of list_events ... ]'
-BLOCKED=$(echo "$CAL_EVENTS_JSON" | python3 - <<'PY'
-import json, sys, re
-from datetime import datetime, timedelta
-evs = json.load(sys.stdin)
-blocked_days, conflicts = set(), []
-vacation_rx = re.compile(r'(dovolen|holiday|pryč|away|cottage|šumperák|chalupa)', re.I)
-for e in evs:
-    title = (e.get('summary') or '').strip()
-    start = e.get('start', {})
-    end = e.get('end', {})
-    if 'date' in start:                            # all-day
-        d0 = datetime.fromisoformat(start['date'])
-        d1 = datetime.fromisoformat(end['date'])  # exclusive
-        cur = d0
-        while cur < d1:
-            blocked_days.add(cur.date().isoformat()); cur += timedelta(days=1)
-    elif vacation_rx.search(title):                # title-keyed multi-day
-        d0 = datetime.fromisoformat(start['dateTime'])
-        d1 = datetime.fromisoformat(end['dateTime'])
-        cur = d0
-        while cur.date() <= d1.date():
-            blocked_days.add(cur.date().isoformat()); cur += timedelta(days=1)
-    else:                                          # timed conflict
-        conflicts.append({
-            'start_iso': start.get('dateTime'),
-            'end_iso':   end.get('dateTime'),
-            'title':     title,
-        })
-json.dump({'blocked_days': sorted(blocked_days), 'conflicts': conflicts}, sys.stdout)
-PY
-)
-
-ALL=$(printf '%s' "$ALL" | jq --argjson b "$BLOCKED" '
-  [ .[] | . as $c |
-    ($c.starts_at[0:10]) as $d |
-    if ($b.blocked_days | index($d)) then
-      empty
-    elif (
-      $b.conflicts | any(
-        ($c.starts_at | fromdateiso8601) as $cs |
-        (.start_iso  | fromdateiso8601) as $es |
-        (.end_iso    | fromdateiso8601) as $ee |
-        ($cs >= $es - 7200) and ($cs <= $ee + 3600)
-      )
-    ) then
-      empty
-    else $c end
-  ]')
-```
-
-Log how many were dropped + the calendar titles that caused it so the
-final email's footer can mention it ("Pominul jsem 2 doporučení kvůli
-plánům v kalendáři: 'Dovolená Itálie 8–14. 6.'").
-
-### 5. Apply spacing rule (≤ 2 picks / ISO week, ≥ 2-day gap)
-
-Petr's rule: in any given week, 1 — max 2 — cultural events, and they
-shouldn't be back to back. Enforced as two independent constraints over
-the union of BOOKED (existing KP events) + SELECTED (already accepted
-picks):
-
-- **Per ISO week cap = 2**, counts BOOKED + SELECTED. **No SEASON
-  override** — a busy week stays busy.
-- **Min gap ≥ 2 days** between any two events ("hned za sebou" = 1 day
-  apart, which is forbidden; 2 days means a Tue pick can sit next to a
-  Thu pick at the closest). `season_event: true` overrides this — a
-  Vienna Phil visit on a fixed date can break the gap rule, but never
-  the week-cap rule.
-
-```bash
-HORIZON_PLUS=$(python3 -c "from datetime import datetime,timezone,timedelta; print((datetime.now(timezone.utc).astimezone()+timedelta(days=180)).isoformat(timespec='seconds'))")
-BOOKED_DATES=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
-  --data-urlencode "starts_from=$NOW" \
-  --data-urlencode "starts_to=$HORIZON_PLUS" \
-  --data-urlencode "limit=500" \
-  -G "$KP_API_BASE/v1/events" \
-  | jq -r '.items[].starts_at')
-
-SELECTED=$(echo "$ALL" | python3 - "$BOOKED_DATES" <<'PY'
-import json, sys
-from datetime import datetime
-
-all_cands = json.load(sys.stdin)
-booked = [s.strip() for s in sys.argv[1].splitlines() if s.strip()]
-
-CAP, MIN_GAP_DAYS, WEEK_CAP = 5, 2, 2
-
-selected = []
-existing = [datetime.fromisoformat(s) for s in booked]
-week_counts = {}
-for d in existing:
-    w = d.strftime('%G-W%V')
-    week_counts[w] = week_counts.get(w, 0) + 1
-
-for cand in all_cands:
-    if len(selected) >= CAP:
-        break
-    cw = datetime.fromisoformat(cand['starts_at'])
-    w = cw.strftime('%G-W%V')
-    is_season = bool(cand.get('season_event', False))
-
-    if week_counts.get(w, 0) >= WEEK_CAP:
-        continue                              # week is full, season can't help
-
-    # Calendar-day diff, not timestamp diff — "Tue 20:00 vs Thu 19:00"
-    # is 2 calendar days apart, not 1.96, and Petr considers that fine.
-    min_gap_days = 999
-    others = existing + [datetime.fromisoformat(s['starts_at']) for s in selected]
-    for d in others:
-        gap = abs((cw.date() - d.date()).days)
-        if gap < min_gap_days:
-            min_gap_days = gap
-
-    if not is_season and min_gap_days < MIN_GAP_DAYS:
-        continue                              # back-to-back, forbidden
-
-    selected.append(cand)
-    week_counts[w] = week_counts.get(w, 0) + 1
-
-print(json.dumps(selected, ensure_ascii=False))
-PY
-)
-```
-
-### 6. Send what we have + collect notable mentions
-
-Don't relax the rules if the pool ends up small — Petr asked for at
-most 2 per week, no back-to-back, and that's the contract. An email
-with 1–5 picks is fine; better short than a violation. With the
-6-month horizon this fallback rarely triggers.
-
-**Notable mentions:** Candidates that were strong (score ≥ 0.70) but
-got dropped by the calendar check (step 4b) or spacing rule (step 5)
-go into a `notable_mentions` array. Each entry carries:
-- `title`, `date_human`, `url` — what, when, and link to detail
-- `drop_reason` — short Czech explanation why it was dropped, e.g.
-  "Koliduje s UX Monday (17:30–21:00)" or "Příliš blízko Wien Phil
-  (2 dny)" or "Blokováno Krétou (10.–17. 6.)"
-
-Cap at 3 notable mentions — don't overwhelm. Pick the highest-scoring
-dropped ones.
-
-### 7. Generate feedback tokens
-
-For each selected event, generate HMAC-signed feedback tokens so the
-email can include clickable 👍/👎 links. The token encodes event title,
-lane, digest week, and the rating — verified server-side without login.
-
-The HMAC secret **must** match the production `API_JWT_SECRET` — the
-local `.env` has a placeholder that won't verify on the server. Fetch
-from production:
+For each emailed item, HMAC-signed 👍/👎 links. The secret must match
+production `API_JWT_SECRET`:
 
 ```bash
 KP_JWT_SECRET="$(ssh petronijus@192.0.2.101 'grep ^API_JWT_SECRET= /opt/kp/.env' | cut -d= -f2)"
-[ -n "$KP_JWT_SECRET" ] || { echo "WARN: no prod JWT secret, feedback links disabled"; }
+[ -n "$KP_JWT_SECRET" ] || echo "WARN: no prod JWT secret, feedback links disabled"
 ```
-
-Token generation (Python, inline):
 
 ```python
 import hashlib, hmac, json
 from base64 import urlsafe_b64encode
 
 def make_token(title, lane, week, rating, secret):
-    payload = json.dumps(
-        {"t": title, "l": lane, "w": week, "r": rating},
-        ensure_ascii=False, separators=(",", ":")
-    ).encode()
+    payload = json.dumps({"t": title, "l": lane, "w": week, "r": rating},
+                         ensure_ascii=False, separators=(",", ":")).encode()
     sig = hmac.new(secret.encode(), payload, hashlib.sha256).digest()[:16]
     return urlsafe_b64encode(payload + sig).rstrip(b"=").decode()
+# url_up  = f"{KP_API_BASE}/v1/feedback/rate?t={make_token(..., 'up', secret)}"
+# url_down = f"{KP_API_BASE}/v1/feedback/rate?t={make_token(..., 'down', secret)}"
 ```
 
-For each item in `$SELECTED`, compute:
-- `token_up = make_token(title, lane, f"CW{WEEK}", "up", secret)`
-- `token_down = make_token(title, lane, f"CW{WEEK}", "down", secret)`
-- `url_up = f"{KP_API_BASE}/v1/feedback/rate?t={token_up}"`
-- `url_down = f"{KP_API_BASE}/v1/feedback/rate?t={token_down}"`
-
-### 8. Render + send the email
+#### Template
 
 ```bash
 KP_TO=petronijus@example.com
-KP_FROM=petronijus@example.com
-SUBJECT="Kulturní přehled — týden CW${WEEK}"
+SUBJECT="Kulturní přehled — novinky, týden CW${WEEK}"
 ```
-
-HTML template (inline CSS, single-column, mobile-friendly):
 
 ```html
 <div style="font-family:-apple-system,Segoe UI,sans-serif;color:#111;max-width:600px;margin:0 auto;padding:24px;">
-  <h1 style="font-size:20px;margin:0 0 4px;">Kulturní přehled</h1>
-  <p style="color:#666;margin:0 0 24px;">Týden CW{{week}} · {{balance_hint}}</p>
+  <h1 style="font-size:20px;margin:0 0 4px;">Kulturní přehled — novinky</h1>
+  <p style="color:#666;margin:0 0 24px;">Týden CW{{week}} · nové akce od minulého týdne · {{balance_hint}}</p>
 
-  {{#each selected}}
+  {{#each novelties}}
   <div style="border-top:1px solid #eee;padding:18px 0;">
     <p style="margin:0 0 4px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">
-      {{label}}{{#if season_event}} · událost sezóny{{/if}}
+      {{label}}{{#if season_event}} · událost sezóny{{/if}} · NOVÉ
     </p>
     <h2 style="font-size:17px;margin:0 0 6px;">{{title}}</h2>
     <p style="margin:0 0 4px;color:#444;font-size:14px;">
-      {{date_human}}
-      {{#if venue}} · {{venue}}{{/if}}
-      {{#if ensemble}} · {{ensemble}}{{/if}}
-      {{#if price_czk}} · {{price_czk}} Kč{{/if}}
+      {{date_human}}{{#if venue}} · {{venue}}{{/if}}{{#if price_czk}} · {{price_czk}} Kč{{/if}}
     </p>
-    {{#if source_name}}
-    <span style="display:inline-block;margin:6px 0;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:0.3px;
-      {{#if (eq source_type 'festival')}}background:#FFF3E0;color:#E65100;{{/if}}
-      {{#if (eq source_type 'sezona')}}background:#F5F5F5;color:#616161;{{/if}}
-      {{#if (eq source_type 'objev')}}background:#E8F5E9;color:#2E7D32;{{/if}}
-    ">{{source_name}}</span>
-    {{/if}}
+    <p style="margin:6px 0;font-size:13px;">{{fit_line}}</p>
     <p style="margin:8px 0 12px;font-style:italic;color:#222;font-size:14px;">{{why_cs}}</p>
     <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
       <a href="{{url}}" style="display:inline-block;padding:8px 14px;background:#111;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;">Detail + lístky →</a>
@@ -422,14 +195,19 @@ HTML template (inline CSS, single-column, mobile-friendly):
   </div>
   {{/each}}
 
+  {{#if watchdog}}
+  <div style="border-top:2px solid #eee;margin-top:28px;padding-top:18px;">
+    <p style="margin:0 0 12px;color:#888;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Hlídací pes</p>
+    {{#each watchdog}}
+    <p style="margin:0 0 8px;font-size:13px;color:#444;">🎟 <strong>{{title}}</strong> — lístky se uvolnily. <a href="{{url}}">Koupit →</a></p>
+    {{/each}}
+  </div>
+  {{/if}}
+
   {{#if notable_mentions}}
   <div style="border-top:2px solid #eee;margin-top:28px;padding-top:18px;">
-    <p style="margin:0 0 12px;color:#888;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">
-      Notable mentions
-    </p>
-    <p style="margin:0 0 12px;color:#999;font-size:12px;">
-      Zajímavé akce, co vypadly kvůli konfliktu nebo rozestupu:
-    </p>
+    <p style="margin:0 0 12px;color:#888;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Notable mentions</p>
+    <p style="margin:0 0 12px;color:#999;font-size:12px;">Zajímavé novinky, co se do plánu nevešly:</p>
     {{#each notable_mentions}}
     <p style="margin:0 0 8px;font-size:13px;color:#444;">
       <a href="{{url}}" style="color:#111;text-decoration:underline;"><strong>{{title}}</strong></a> · {{date_human}}
@@ -439,61 +217,55 @@ HTML template (inline CSS, single-column, mobile-friendly):
   </div>
   {{/if}}
 
-  {{#if dropped_count}}
   <p style="color:#999;font-size:12px;margin-top:24px;">
-    Z {{total_candidates}} kandidátů jsem vybral {{selected_count}}.
+    {{novelty_total}} novinek tento týden, {{pushed_count}} přidáno do poolu.
+    Plán upravíš na {{app_url}}.
   </p>
-  {{/if}}
 </div>
 ```
 
-Render inline via string interpolation, then send:
+`date_human` computed programmatically (Czech weekday map, never
+guessed) as in `klasika-expert/SKILL.md` step 0.
+
+Send via the workspace MCP (real send, not draft):
 
 ```
 mcp__google-workspace__send_gmail_message(
   user_google_email = "petronijus@example.com",
   to = ["petronijus@example.com"],
-  subject = SUBJECT,
-  html_body = RENDERED_HTML
-)
+  subject = SUBJECT, html_body = RENDERED_HTML)
 ```
 
-**Real send, not draft.** If the send fails, write the rendered HTML
-to `$DIGEST_DIR/_fallback.html` so the run isn't lost.
+On failure write `$DIGEST_DIR/_fallback.html` and DO NOT ack.
 
-### 9. Cleanup + report
+### 7. Ack the novelty cursor
+
+Only after a successful send (or a legitimate zero-novelty week):
 
 ```bash
-# Keep $DIGEST_DIR for one week so debugging stays possible; the next run
-# blows it away in step 1.
-echo "Odesláno $(printf '%s' "$SELECTED" | jq 'length') doporučení."
-echo "Lane mix: $(printf '%s' "$SELECTED" | jq -r 'group_by(.lane) | map("\(.[0].lane)×\(length)") | join(", ")')"
-echo "Balance: $BALANCE_HINT"
+NOW_ISO=$(python3 -c "from datetime import datetime,timezone; print(datetime.now(timezone.utc).isoformat())")
+curl -sS -A 'kp-skill/1.0' -X POST -H "Authorization: Bearer $KP_TOKEN" \
+  -H 'Content-Type: application/json' -d "{\"through\": \"$NOW_ISO\"}" \
+  "$KP_API_BASE/v1/season/plans/$SEASON_UUID/novelties/ack"
+```
+
+A failed send leaves the cursor untouched, so the same novelties
+resurface next Saturday.
+
+### 8. Report
+
+```bash
+echo "Novinky: <n> (posláno <m>, notable <k>), pool +<created>/~<updated>."
+echo "Watchdog: <w> uvolněných lístků. Balance: $BALANCE_HINT"
 ```
 
 ## When to use
 
-- **Primary**: weekly via `/schedule` (Saturday 11:00). This is the
-  entry point.
-- **Manual**: `/kulturni-prehled` whenever Petr wants a fresh digest
-  immediately.
+- **Primary**: weekly via `/schedule` (Saturday 11:00).
+- **Manual**: `/kulturni-prehled` for an immediate novelty check.
 
 ## When NOT to use
 
-- Don't call individual experts directly through this skill — that's
-  what the auto-discovery loop is for. Just drop a new
-  `skills/<name>-expert/SKILL.md` and the aggregator picks it up.
-- Don't run more than once per day — Discogs rate limits + external
-  scrapes get cumulatively rude.
-
-## Adding a new expert (e.g. divadlo)
-
-1. Create `skills/divadlo-expert/SKILL.md` following the
-   `klasika-expert` template (input gathering, ranking, write
-   `$DIGEST_DIR/divadlo.json`, exit). The file must include
-   `name: divadlo-expert` in frontmatter.
-2. Create `skills/divadlo-expert/preferences.md` for the hand-edited
-   profile.
-3. Symlink it into `~/.claude/skills/divadlo-expert`.
-4. No changes to this aggregator needed. It auto-discovers via the
-   `skills/*-expert` glob.
+- Season planning / scenario generation → `/kulturni-sezona`.
+- Don't run more than once per day (external scrape politeness), and
+  never bypass the ack discipline — double-send is worse than late.

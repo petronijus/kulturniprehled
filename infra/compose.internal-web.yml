@@ -1,0 +1,31 @@
+# Optional overlay: HTTPS front for the home-only season planner.
+#
+#   docker compose -f docker-compose.yml -f compose.internal-web.yml up -d caddy
+#
+# Publishes :443 on the VM for https://${KP_INTERNAL_HOSTNAME} (internal
+# split-horizon DNS name, e.g. kulturniprehled-plan.bastla.com). The cert
+# comes from Let's Encrypt via DNS-01 (CLOUDFLARE_DNS_API_TOKEN needs
+# Zone:DNS:Edit on the bastla.com zone). upgrade.sh never touches this
+# service — it only rolls `api`; caddy restarts on its own (restart:always)
+# and picks up nothing from API deploys.
+
+services:
+  caddy:
+    build: ./caddy
+    restart: always
+    ports:
+      - "443:443"
+    environment:
+      KP_INTERNAL_HOSTNAME: ${KP_INTERNAL_HOSTNAME:?internal planner hostname, e.g. kulturniprehled-plan.bastla.com}
+      CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN:?Cloudflare token with Zone:DNS:Edit for the zone}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  caddy-data:
+  caddy-config:

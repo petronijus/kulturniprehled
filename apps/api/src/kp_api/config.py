@@ -101,6 +101,25 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    # Season-planner SPA bundle. Relative paths resolve against the process
+    # working directory (/app in the container). When the directory is
+    # missing — tests, bare dev runs, image built without the web stage —
+    # the mount is skipped and the API serves JSON only.
+    web_dist_dir: str = "web/dist"
+    # The planner is a home tool: with the default False, /app refuses
+    # requests that arrived through the Cloudflare Tunnel (detected via the
+    # CF-Connecting-IP header) and serves only direct LAN / Tailscale
+    # access. The JSON API stays public either way.
+    web_public: bool = False
+    # Trusted-LAN auth for the planner: a request with NO Authorization
+    # header that did NOT come through the Cloudflare Tunnel is treated as
+    # the workspace owner restricted to the season:* scopes — the SPA needs
+    # no login at home, while every other endpoint stays token-only
+    # (scoped principals are default-denied on the general surface).
+    # Only safe when the tunnel is the sole public path to this process;
+    # therefore off by default — prod enables it explicitly.
+    web_trusted_lan: bool = False
+
     # Rate limiting — IP-based via slowapi. Tests turn this off so they
     # can hammer endpoints without tripping the limiter.
     rate_limit_enabled: bool = True

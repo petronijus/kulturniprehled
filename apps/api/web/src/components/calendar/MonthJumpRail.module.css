@@ -1,0 +1,27 @@
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: var(--space-3);
+  align-self: flex-start;
+}
+
+.stop {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  padding: 2px var(--space-1);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.stop:hover {
+  color: var(--text);
+  background: var(--surface-raised);
+}
+
+.active {
+  color: var(--text);
+  font-weight: 650;
+  background: var(--surface-raised);
+}

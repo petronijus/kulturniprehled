@@ -1,3 +1,15 @@
+# Stage 1 — season-planner SPA bundle
+FROM node:22-slim AS webbuild
+
+WORKDIR /web
+
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+
+COPY web ./
+RUN npm run build
+
+# Stage 2 — API image (serves the SPA bundle at /app)
 FROM python:3.12-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -16,6 +28,8 @@ COPY src ./src
 COPY alembic ./alembic
 
 RUN pip install -e .
+
+COPY --from=webbuild /web/dist ./web/dist
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

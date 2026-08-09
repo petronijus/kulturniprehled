@@ -1,176 +1,138 @@
-# `kulturni-prehled` — operator notes
+# Kulturní přehled skill suite — operator notes
 
-Weekly culture-aggregator skill. Mirrors the name of the app on
-purpose — *Kulturní Přehled* the agent feeds *Kulturní Přehled* the
-app, by emailing Petr the curated short-list every Saturday late
-morning so he can buy tickets over the weekend.
+Two flows feed *Kulturní Přehled* the app:
 
-The aggregator is the **only skill in the suite that sends email**.
-Domain experts (`klasika-expert`, `elektronika-expert`, eventually
-`divadlo-expert` + `film-expert`) produce ranked candidate JSON; the
-aggregator merges, balances, applies the 1-event-per-week spacing
-rule, and renders the single email.
-
-The mechanics are in [`SKILL.md`](./SKILL.md). This file covers the
-**one-time operator steps** that aren't part of the skill itself.
+1. **Season planning** (`/kulturni-sezona`, local, ~once per season) —
+   scrapes the whole Sep–Jun season, pushes the candidate pool + ~5
+   scenario dramaturgies to the backend, and hands off to the web
+   planner at `/app` where Petr finalizes his plan (drag & drop,
+   scenario preview/apply). The planner is **home-only**: the API blocks
+   `/app` on the public Cloudflare path (`WEB_PUBLIC=false`); reach it at
+   `https://kulturniprehled-plan.bastla.com/app` (internal split-horizon
+   name — see One-time setup below).
+2. **Novelty watching** (`/kulturni-prehled`, weekly, Saturday 11:00
+   via `/schedule`) — re-scrapes, diffs against the pool, pushes
+   updates, and emails **only newly announced events** with a
+   fit-suggestion against the standing plan. It is the only skill in
+   the suite that sends email.
 
 ## Architecture at a glance
 
 ```
-/schedule (Sat 11:00) ─→ /kulturni-prehled (aggregator)
-                            │
-                            ├─→ Skill /klasika-expert     → /tmp/kp-digest-CW<n>/klasika.json
-                            ├─→ Skill /elektronika-expert → /tmp/kp-digest-CW<n>/elektronika.json
-                            ├─→ Skill /divadlo-expert     → divadlo.json   (future)
-                            └─→ Skill /film-expert        → film.json      (future)
-                                              │
-                                              ▼
-                            merge + balance + spacing + send Gmail
+ONCE PER SEASON (local)
+/kulturni-sezona
+   ├─ Skill /<expert> mode=season … → /tmp/kp-season-<id>/<lane>.json
+   ├─ merge + dedup_key → PUT /v1/season/plans/{id}/pool
+   ├─ scenarios per archetypes.md → bin/kp_validate.py scenario (gate)
+   ├─ PUT /v1/season/plans/{id}/scenarios
+   └─ POST …/novelties/ack   (so week 1 isn't spammed)
+                     │
+                     ▼
+        Petr finalizes in the SPA (/app) — plan_status on candidates
+
+WEEKLY (cloud /schedule, Sat 11:00 — cloud-routine.md)
+/kulturni-prehled (novelty watcher)
+   ├─ experts in weekly mode (pool-aware enrichment = cheap)
+   ├─ diff by dedup_key → novelties; ticket watchdog on plan events
+   ├─ PUT pool (grows elektronika/film coverage all season)
+   ├─ bin/kp_validate.py fit → „kam by to sedlo"
+   ├─ email novelties (HMAC 👍/👎, /v1/digest/send in cloud)
+   └─ POST …/novelties/ack   (only after a successful send)
 ```
 
-Cross-domain rules the aggregator owns (and the experts deliberately
-don't):
+## The constraint canon
 
-- **Balance signal** — pull last-event-per-category from the KP API,
-  compute days-since-X, boost lanes that have been neglected.
-- **Spacing** — ideal cadence ≈ 1 cultural event per week. Walk
-  candidates in score order; reject anything within ±3 days of an
-  already-booked or already-selected event. **Exception**:
-  `season_event: true` (set by the expert) always passes.
-- **Global cap** — at most 5 picks across all lanes per week.
-- **Backfill** — if spacing leaves us with <3, relax to ±1 day; if
-  still <3, accept top 3 regardless of spacing.
+Every rule lives in **one** place:
+[`../kulturni-sezona/bin/kp_validate.py`](../kulturni-sezona/bin/kp_validate.py).
+The SPA mirrors it client-side (`apps/api/web/src/domain/violations.ts`)
+— change the canon first, mirror second.
 
-## Folder layout
+| Rule | Value | season_event exempts? |
+| --- | --- | --- |
+| Week cap (incl. booked events) | ≤ 2 / ISO week | **never** |
+| Min gap between events | ≥ 2 calendar days | yes (gap only) |
+| Same work per season | never twice | — |
+| Same work, same calendar year (history) | hard veto | — |
+| Same work, last year | warn („jen pokud výjimečné") | — |
+| Price (VIP-clamped midpoint) | > 3000 Kč out, 2000–3000 warn | — |
+| Blocked days / timed conflicts | `[start−2h, end+1h]` | — |
 
-```
-skills/kulturni-prehled/
-├── SKILL.md          # aggregator orchestration
-└── README.md         # this file
+Violations are hard gates for scenarios; in the SPA they are advisory
+(Petr overrules by design).
 
-skills/klasika-expert/
-├── SKILL.md
-├── preferences.md
-└── ensembles/        # static scrapers
-    ├── ceska-filharmonie.sh
-    ├── fok.sh
-    ├── pkf.sh
-    ├── socr.sh
-    └── berg.sh
+## Experts
 
-skills/elektronika-expert/
-├── SKILL.md
-└── preferences.md
-```
+| Expert | Sources | Season coverage | Status |
+| --- | --- | --- | --- |
+| `klasika-expert` | 5 static scrapers (`ensembles/*.sh`) + festival WebFetch + Spotify + Discogs | deep (full season) | active |
+| `elektronika-expert` | WebFetch only (clubs + RA/GoOut fallback) | ~60 days rolling → reserved slots | active |
+| `divadlo-expert` | WebFetch only (theatre programmes) | deep (full season) | **disabled — fill preferences.md TODOs** |
+| `film-expert` | WebFetch only (art cinemas + festivals) | 2–4 weeks → reserved slots | **disabled — fill preferences.md TODOs** |
 
-Each `*-expert` skill is fully usable standalone (`/klasika-expert`
-in chat returns ranked JSON without sending anything), and is also
-called by the aggregator in scheduled runs.
+Enable/disable in [`active-experts.txt`](./active-experts.txt) — one
+name per line, `#` comments. Experts take
+`args: "mode=season season=<id>"` from the orchestrator; no args =
+weekly. Adding a new expert = new `skills/<lane>-expert/` per the
+divadlo template + symlink + uncomment. No aggregator changes.
 
 ## One-time setup
 
-### 1. Symlink all four skills into `~/.claude/skills/` (once per machine)
+1. Symlinks (per dev machine):
 
-```bash
-cd ~/Documents/Dev/kulturniprehled
-for S in kulturni-prehled klasika-expert elektronika-expert; do
-  ln -sfn "$(pwd)/skills/$S" ~/.claude/skills/$S
-done
-```
-
-Re-run after `git pull` is a no-op.
-
-### 2. Create the Discogs API key (once)
-
-The klasika expert augments its taste profile with the user's Discogs
-collection. 1Password item `Discogs API key`, field `credential`.
-
-1. <https://www.discogs.com/settings/developers> → Generate new token.
-2. Pipe straight into 1Password — never echo:
    ```bash
-   read -rs TOK && op item create --category="API Credential" --title='Discogs API key' \
-     --vault=API credential="$TOK" && unset TOK
+   for s in kulturni-prehled kulturni-sezona klasika-expert \
+            elektronika-expert divadlo-expert film-expert; do
+     ln -sfn ~/Documents/Dev/kulturniprehled/skills/$s ~/.claude/skills/$s
+   done
    ```
-3. Confirm Discogs username (top-right → Profile). Edit
-   `skills/klasika-expert/preferences.md` → `## Discogs username`
-   if it's not `petronijus`.
 
-Skip and the klasika expert still runs but flags `MISSING_DISCOGS`.
+2. **Cloud PAT** for the /schedule routine — scopes
+   `digest:read feedback:sign digest:send season:read season:write`:
 
-### 3. Mint a Kulturní Přehled PAT (once, if not already present)
+   ```bash
+   ./scripts/mint-pat.sh   # then update the routine's stored KP_DIGEST_TOKEN
+   ```
 
-```bash
-./scripts/mint-pat.sh petr@example.com 'kulturni-prehled'
-# wrapper writes the token straight into 1Password
-```
+3. **SPA access** — the planner is home-only and **login-less**: set
+   `WEB_TRUSTED_LAN=true` in `/opt/kp/.env` (direct requests from the
+   home network authenticate automatically with season-only scopes;
+   Cloudflare-tunneled requests never do). Reach it at
+   `http://192.168.20.101:18000/app`, over Tailscale, or — optional
+   HTTPS niceness — `https://kulturniprehled-plan.bastla.com/app`:
 
-Skip if `op item list | grep -i 'Kulturni Prehled API Token'` already
-shows the item.
+   - OPNsense host override `kulturniprehled-plan.bastla.com` →
+     192.168.20.101 (done 2026-08-09; internal-only, no public record).
+   - On the VM: `docker compose -f docker-compose.yml -f
+     compose.internal-web.yml up -d caddy` with `KP_INTERNAL_HOSTNAME` +
+     `CLOUDFLARE_DNS_API_TOKEN` in `/opt/kp/.env` (LE cert via DNS-01).
+   - Away from home the name resolves as long as the tailnet uses the
+     home DNS (split DNS / subnet router); otherwise use the LAN URL
+     over Tailscale directly.
 
-### 4. Wire up `/schedule`
+   No Google OAuth involvement anywhere — the network is the auth.
 
-In a Claude Code session run `/schedule`:
+4. The `/schedule` routine (Sat 11:00 Europe/Prague) runs
+   [`cloud-routine.md`](./cloud-routine.md) — it survives this rework
+   unchanged as an entry, only the playbook content changed.
 
-- **Name**: `kulturni-prehled`
-- **When**: Saturday 11:00 Europe/Prague (cron: `0 9 * * 6` UTC; 1 h DST drift in winter is fine for a weekly digest)
-- **Task**: `/kulturni-prehled`
+## Operator calendar
 
-The aggregator picks up the experts automatically — no need to
-schedule them individually.
+- **Spring / late August**: run `/kulturni-sezona` for the coming
+  season; review scenarios in the SPA; apply + tune the plan.
+- **Anytime**: adjust the plan in the SPA; the weekly email reflects it
+  next Saturday.
+- **Saturday 11:00**: novelty email arrives automatically. 👍/👎 links
+  feed the feedback loop (`/v1/feedback/history`).
+- **June/September handover**: creating the new season archives the old
+  one (`archive_current: true`) — deliberate, the orchestrator asks
+  first.
 
-## Day-to-day operator life
+## Day-to-day recipes
 
-### "I'd like the digest right now"
-
-`/kulturni-prehled` in any Claude Code session. ~2–3 min, then check
-inbox.
-
-### "I just want to see what the klasika expert thinks, no email"
-
-`/klasika-expert` (or `/elektronika-expert`) directly. Returns the
-ranked JSON in chat; nothing leaves the machine.
-
-### "The picks are too clustered / too sparse"
-
-Edit `skills/kulturni-prehled/SKILL.md` step 5 — the spacing window
-(±3 days) and global cap (5) are constants. Adjust to taste.
-
-### "A specific lane keeps recommending stuff I'd skip"
-
-Edit the expert's `preferences.md`. The aggregator never sees the
-expert's reasoning — only the ranked JSON output — so all tuning
-happens at the expert level.
-
-### "I bought a ticket — make sure the aggregator doesn't keep suggesting it"
-
-You don't need to do anything. Every expert filters against already-
-booked events (queried from the KP API). Once
-`kulturni-prehled-ingest` registers the new event the aggregator
-silently drops it from future digests.
-
-## Why this shape
-
-Why split experts from aggregator?
-
-1. **Domain depth** — a klasika expert can reason richly about
-   Mahler symphonies and Czech philharmonic conductors; an
-   elektronika expert about Warp Records' roster and live-modular
-   scene specifics. One mega-prompt mixing all of that loses focus.
-2. **Single email constraint** — Petr wants one email per week, not
-   four. The aggregator is the only place that knows about *all*
-   lanes' candidates at once, so it's the right place to enforce
-   spacing.
-3. **Independent operability** — Petr can call any expert directly
-   when he wants a snapshot in chat without spamming his inbox.
-4. **Trivial to add lanes** — drop a new `skills/<x>-expert/`, the
-   aggregator auto-discovers it. Zero changes to existing files.
-
-## Follow-ups
-
-- `divadlo-expert` — Národní divadlo, Divadlo Husa na provázku,
-  Studio Hrdinů, festivals (Příští vlna, Divadlo Plzeň).
-- `film-expert` — Aero, Lucerna, Světozor, Kino 35; periodical RSS
-  scrape (A2, Aktuálně Film, Full Moon).
-- Feedback loop: track "I bought / skipped" so future runs learn.
-  Probably overkill for two users — wait until it actually feels
-  needed.
+- Novelty check right now: `/kulturni-prehled`.
+- Lane snapshot in chat, no email: `/klasika-expert` (or any expert).
+- Re-scrape the season after fixing a scraper: `/kulturni-sezona`
+  (idempotent — plan state survives, scenarios re-validate).
+- Broken scraper symptom: a lane's novelty count collapses while the
+  site works in a browser → check `/tmp/kp-klasika-<ensemble>.err`,
+  fix the parser in `../klasika-expert/ensembles/<e>.sh`.

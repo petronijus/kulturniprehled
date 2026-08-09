@@ -940,6 +940,7 @@ dependencies = [
     { name = "slowapi" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "structlog" },
+    { name = "tzdata" },
     { name = "uuid-utils" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -986,6 +987,7 @@ requires-dist = [
     { name = "structlog", specifier = ">=24.4" },
     { name = "testcontainers", extras = ["postgres", "minio"], marker = "extra == 'dev'", specifier = ">=4.8" },
     { name = "types-python-jose", marker = "extra == 'dev'" },
+    { name = "tzdata", specifier = ">=2024.2" },
     { name = "uuid-utils", specifier = ">=0.10" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]

@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly Claude kulturni-prehled novelty run (Sat 11:00 Prague)
+
+[Timer]
+OnCalendar=Sat *-*-* 11:00:00 Europe/Prague
+Persistent=true
+RandomizedDelaySec=600
+
+[Install]
+WantedBy=timers.target

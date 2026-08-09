@@ -1,0 +1,16 @@
+[Unit]
+Description=Claude kulturni-prehled weekly novelty watcher (headless)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Scrapes + WebFetch enrichment + e-mail; generous but bounded.
+TimeoutStartSec=90m
+ExecStart=%h/Documents/Dev/kulturniprehled/infra/claudebox/run-weekly.sh
+# claude, python3, jq, curl must resolve for the service user.
+Environment=PATH=%h/.local/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+Nice=10
+
+[Install]
+WantedBy=default.target

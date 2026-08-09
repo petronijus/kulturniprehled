@@ -1,0 +1,14 @@
+# Tool allow-list for the headless kulturni-prehled runs (weekly + sezona).
+# Comma-joined by the run scripts. Deliberately absent: Edit/Write to the
+# repo is fine (scratch under /tmp), but there is no git push, no gh, no
+# email connector — the only send path is the KP API itself.
+Bash
+Read
+Write
+Edit
+Glob
+Grep
+WebFetch
+WebSearch
+Skill
+TodoWrite

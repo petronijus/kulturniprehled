@@ -99,6 +99,25 @@ export function monthsBetween(from: IsoDate, to: IsoDate): IsoMonth[] {
   return months;
 }
 
+export interface SeasonWindow {
+  /** e.g. "2026/27" */
+  label: string;
+  startsOn: IsoDate;
+  endsOn: IsoDate;
+}
+
+/** The cultural season a given date belongs to (July+ → the upcoming one). */
+export function seasonWindowFor(today: IsoDate): SeasonWindow {
+  const year = Number(today.slice(0, 4));
+  const month = Number(today.slice(5, 7));
+  const startYear = month >= 7 ? year : year - 1;
+  return {
+    label: `${startYear}/${String(startYear + 1).slice(2)}`,
+    startsOn: `${startYear}-09-01`,
+    endsOn: `${startYear + 1}-06-30`,
+  };
+}
+
 export interface MonthGridWeek {
   /** Monday date of this row. */
   start: IsoDate;

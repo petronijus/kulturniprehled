@@ -54,6 +54,21 @@ export function CandidatePool({ pool, months, onSetStatus, actionsDisabled }: Ca
       });
   }, [pool, filters]);
 
+  if (pool.length === 0) {
+    // The season exists but the scrape hasn't filled it yet — explain the
+    // one manual step instead of showing a bare "no results".
+    return (
+      <div className={styles.pool}>
+        <div className={styles.scrapeNotice}>
+          <h2 className={styles.scrapeTitle}>{cs.emptyPool.title}</h2>
+          <p className={styles.scrapeBody}>{cs.emptyPool.body}</p>
+          <code className={styles.scrapeCommand}>{cs.emptyPool.command}</code>
+          <p className={styles.scrapeHint}>{cs.emptyPool.hint}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={setNodeRef} className={`${styles.pool} ${isOver ? styles.dropTarget : ""}`}>
       <PoolFilters filters={filters} months={months} onChange={setFilters} />

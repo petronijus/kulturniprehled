@@ -6,7 +6,21 @@ export const cs = {
   loadFailed: "Načtení selhalo. Zkus to znovu.",
   notHome: "Plánovač je dostupný jen z domácí sítě (LAN / Tailscale).",
   retry: "Zkusit znovu",
-  noSeason: "Žádná aktivní sezóna. Spusť /kulturni-sezona a vrať se sem.",
+  onboarding: {
+    title: "Naplánuj si kulturní sezónu",
+    lead: "Kalendář celé sezóny vlevo, kandidáti vpravo, nahoře hotové scénáře dramaturgie. Přetahuj (nebo klikej), dokud plán nesedí.",
+    create: (label: string) => `Založit sezónu ${label}`,
+    creating: "Zakládám…",
+    createFailed: "Založení sezóny selhalo. Zkus to znovu.",
+    window: (label: string) =>
+      `září ${label.slice(0, 4)} – červen ${label.slice(0, 2)}${label.slice(5)}`,
+  },
+  emptyPool: {
+    title: "Sezóna je založená, kandidáti zatím chybí",
+    body: "Kandidáty a scénáře dodá sezónní scrape. V Claude Code spusť:",
+    command: "/kulturni-sezona",
+    hint: "Scrape projde orchestry, festivaly, kluby i divadla, naplní pool kandidátů a vygeneruje scénáře. Pak se sem vrať — stránka se obnoví sama.",
+  },
   myPlan: "Můj plán",
   scenarioPreview: "Náhled scénáře",
   applyScenario: "Použít scénář",

@@ -3,6 +3,10 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
+  /* Children of the scrolling flex column must never shrink — the
+     default flex-shrink: 1 was compressing every month to a fraction
+     of its height and clipping the week rows. */
+  flex-shrink: 0;
 }
 
 .header {

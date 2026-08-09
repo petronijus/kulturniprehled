@@ -1,6 +1,6 @@
 .cell {
   position: relative;
-  min-height: 3.25rem;
+  min-height: 4.25rem;
   padding: var(--space-1);
   border-inline-end: 1px solid var(--border);
   display: flex;

@@ -11,7 +11,6 @@ import { SeasonCalendar } from "./calendar/SeasonCalendar";
 import { PlannerDnd } from "./dnd/PlannerDnd";
 import { HeaderBar } from "./layout/HeaderBar";
 import { ScenarioTabs } from "./layout/ScenarioTabs";
-import { Onboarding } from "./Onboarding";
 import styles from "./PlannerPage.module.css";
 import { CandidatePool } from "./pool/CandidatePool";
 import { Toast } from "./ui/Toast";
@@ -101,9 +100,6 @@ export function PlannerPage() {
       seasonQuery.error instanceof Error && "status" in seasonQuery.error
         ? (seasonQuery.error as { status: number }).status
         : null;
-    if (status === 404) {
-      return <Onboarding />;
-    }
     return (
       <div className={styles.centered}>
         {status === 401 ? (
@@ -124,7 +120,7 @@ export function PlannerPage() {
     );
   }
   if (season === undefined) {
-    return <Onboarding />;
+    return <div className={styles.centered}>{cs.loading}</div>;
   }
 
   return (

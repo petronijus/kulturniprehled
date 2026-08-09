@@ -3,7 +3,8 @@
  * state, not server round-trips. */
 
 import { useQuery } from "@tanstack/react-query";
-import { api } from "./client";
+import { isoToLocalDate, seasonWindowFor } from "../domain/season";
+import { ApiError, api } from "./client";
 import type {
   BookedEvent,
   Candidate,
@@ -21,10 +22,42 @@ export const queryKeys = {
   booked: (seasonId: string) => ["booked", seasonId] as const,
 };
 
+/** Get the active season, bootstrapping it when none exists.
+
+The season row is an internal container (pool + scenarios + novelty
+cursor) — never a user decision. First visit of a fresh deployment
+creates the current cultural-season window silently; a lost creation
+race (two tabs) resolves by re-reading `current`. */
+async function getOrCreateSeason(): Promise<Season> {
+  try {
+    return await api<Season>("/v1/season/plans/current");
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) {
+      throw error;
+    }
+  }
+  const window = seasonWindowFor(isoToLocalDate(new Date().toISOString()));
+  try {
+    return await api<Season>("/v1/season/plans", {
+      method: "POST",
+      body: JSON.stringify({
+        label: window.label,
+        starts_on: window.startsOn,
+        ends_on: window.endsOn,
+      }),
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 409) {
+      return api<Season>("/v1/season/plans/current");
+    }
+    throw error;
+  }
+}
+
 export function useCurrentSeason() {
   return useQuery({
     queryKey: queryKeys.season,
-    queryFn: () => api<Season>("/v1/season/plans/current"),
+    queryFn: getOrCreateSeason,
     retry: (failureCount, error) =>
       failureCount < 2 && !(error instanceof Error && "status" in error),
     staleTime: 5 * 60_000,

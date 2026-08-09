@@ -76,7 +76,14 @@ async def _ensure_user(session: AsyncSession, settings: Settings, email: str, na
             workspace = Workspace(name="Kulturní Přehled")
             session.add(workspace)
             await session.flush()
-        is_owner = email == next(iter(settings.allowed_emails_set), None)
+        # First-LISTED allowed email becomes the owner. The parsed
+        # `allowed_emails_set` is a frozenset and has no stable order —
+        # iterating it here made owner assignment depend on the hash seed.
+        first_allowed = next(
+            (e.strip().lower() for e in settings.allowed_emails.split(",") if e.strip()),
+            None,
+        )
+        is_owner = email == first_allowed
         user = User(
             email=email,
             name=name,

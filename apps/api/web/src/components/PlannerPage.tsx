@@ -96,14 +96,16 @@ export function PlannerPage() {
     return <div className={styles.centered}>{cs.loading}</div>;
   }
   if (seasonQuery.isError) {
-    const notFound =
-      seasonQuery.error instanceof Error &&
-      "status" in seasonQuery.error &&
-      (seasonQuery.error as { status: number }).status === 404;
+    const status =
+      seasonQuery.error instanceof Error && "status" in seasonQuery.error
+        ? (seasonQuery.error as { status: number }).status
+        : null;
     return (
       <div className={styles.centered}>
-        {notFound ? (
+        {status === 404 ? (
           <p>{cs.noSeason}</p>
+        ) : status === 401 ? (
+          <p>{cs.notHome}</p>
         ) : (
           <>
             <p>{cs.loadFailed}</p>

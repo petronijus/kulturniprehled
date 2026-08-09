@@ -1,11 +1,6 @@
 # Stage 1 — season-planner SPA bundle
 FROM node:22-slim AS webbuild
 
-# Google Web OAuth client id baked into the bundle (Vite build-time env).
-# Without it the SPA builds fine but the sign-in button errors at runtime.
-ARG VITE_KP_GOOGLE_CLIENT_ID=""
-ENV VITE_KP_GOOGLE_CLIENT_ID=${VITE_KP_GOOGLE_CLIENT_ID}
-
 WORKDIR /web
 
 COPY web/package.json web/package-lock.json ./

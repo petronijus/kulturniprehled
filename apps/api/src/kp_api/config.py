@@ -109,6 +109,14 @@ class Settings(BaseSettings):
     # CF-Connecting-IP header) and serves only direct LAN / Tailscale
     # access. The JSON API stays public either way.
     web_public: bool = False
+    # Trusted-LAN auth for the planner: a request with NO Authorization
+    # header that did NOT come through the Cloudflare Tunnel is treated as
+    # the workspace owner restricted to the season:* scopes — the SPA needs
+    # no login at home, while every other endpoint stays token-only
+    # (scoped principals are default-denied on the general surface).
+    # Only safe when the tunnel is the sole public path to this process;
+    # therefore off by default — prod enables it explicitly.
+    web_trusted_lan: bool = False
 
     # Rate limiting — IP-based via slowapi. Tests turn this off so they
     # can hammer endpoints without tripping the limiter.

@@ -518,3 +518,16 @@ class NoveltyAckRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     through: datetime
+
+
+class SeasonBookedItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    category: EventCategory
+    starts_at: datetime
+
+
+class SeasonBookedResponse(BaseModel):
+    items: list[SeasonBookedItem]

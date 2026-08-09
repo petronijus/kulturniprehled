@@ -1,0 +1,15 @@
+# TLS front for the home-only season planner.
+#
+# The hostname exists ONLY in the home DNS (OPNsense Unbound host override
+# -> the VM's LAN IP) — there is no public DNS record. The certificate is
+# obtained via ACME DNS-01 through the Cloudflare API, which works for
+# names that never resolve publicly. Everything is proxied to the API
+# container; requests through this path carry no CF-Connecting-IP header,
+# so /app serves normally while the Cloudflare-tunnel path keeps 404ing it.
+
+{$KP_INTERNAL_HOSTNAME} {
+	tls {
+		dns cloudflare {$CLOUDFLARE_DNS_API_TOKEN}
+	}
+	reverse_proxy api:8000
+}

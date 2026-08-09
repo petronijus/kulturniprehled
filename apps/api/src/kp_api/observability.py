@@ -102,18 +102,15 @@ def configure_limiter(settings: Settings) -> None:
     limiter.enabled = settings.rate_limit_enabled
 
 
-# The SPA document at /app needs Google Identity Services: the GIS script,
-# its button iframe, and its token endpoints all live on accounts.google.com.
-# Everything the SPA itself loads is same-origin ('self' — Vite production
-# builds emit no inline scripts). Every other path keeps the API lockdown
-# CSP below.
+# The SPA is fully self-contained (login-less, no third-party scripts;
+# Vite production builds emit no inline scripts), so its CSP is pure
+# same-origin. Every other path keeps the API lockdown CSP below.
 _SPA_CSP = (
     "default-src 'self'; "
     "img-src 'self' data:; "
     "style-src 'self'; "
-    "script-src 'self' https://accounts.google.com; "
-    "connect-src 'self' https://accounts.google.com; "
-    "frame-src https://accounts.google.com; "
+    "script-src 'self'; "
+    "connect-src 'self'; "
     "frame-ancestors 'none'; "
     "base-uri 'none'"
 )

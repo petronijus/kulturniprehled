@@ -2,10 +2,9 @@
 export const cs = {
   appTitle: "Kulturní Přehled",
   appSubtitle: "Plánovač sezóny",
-  signIn: "Přihlásit se přes Google",
-  signOut: "Odhlásit",
   loading: "Načítám…",
   loadFailed: "Načtení selhalo. Zkus to znovu.",
+  notHome: "Plánovač je dostupný jen z domácí sítě (LAN / Tailscale).",
   retry: "Zkusit znovu",
   noSeason: "Žádná aktivní sezóna. Spusť /kulturni-sezona a vrať se sem.",
   myPlan: "Můj plán",

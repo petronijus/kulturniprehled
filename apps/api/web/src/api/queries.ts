@@ -7,11 +7,11 @@ import { api } from "./client";
 import type {
   BookedEvent,
   Candidate,
-  EventListResponse,
   PoolListResponse,
   Scenario,
   ScenarioListResponse,
   Season,
+  SeasonBookedResponse,
 } from "./types";
 
 export const queryKeys = {
@@ -77,7 +77,8 @@ export function useScenarios(seasonId: string | undefined) {
 }
 
 /** Booked KP events over the season window — they participate in the
- * week-cap and gap rules and render as immutable chips. */
+ * week-cap and gap rules and render as immutable chips. Served under the
+ * season scope so the login-less trusted-LAN principal can read them. */
 export function useBookedEvents(season: Season | undefined) {
   return useQuery({
     queryKey: queryKeys.booked(season?.id ?? "none"),
@@ -85,10 +86,7 @@ export function useBookedEvents(season: Season | undefined) {
       if (season === undefined) {
         throw new Error("no season");
       }
-      const from = `${season.starts_on}T00:00:00Z`;
-      const to = `${season.ends_on}T23:59:59Z`;
-      const params = new URLSearchParams({ starts_from: from, starts_to: to, limit: "500" });
-      return api<EventListResponse>(`/v1/events?${params.toString()}`).then(
+      return api<SeasonBookedResponse>(`/v1/season/plans/${season.id}/booked`).then(
         (r): BookedEvent[] => r.items,
       );
     },

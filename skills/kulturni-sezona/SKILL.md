@@ -169,11 +169,10 @@ all of them in one request with `replace: true`.
 - One line per scenario: name, event count, reserved slots, validator
   iterations used.
 - Source health warnings from step 2.
-- Finish with the SPA link. **The planner is home-only** (`WEB_PUBLIC=false`
-  blocks it on the public Cloudflare path): LAN
-  `http://192.168.20.101:18000/app`, or the Tailscale HTTPS hostname
-  (`tailscale serve` on the VM) — the only origin Google login works on
-  away from `localhost`.
+- Finish with the SPA link: `https://kulturniprehled-plan.bastla.com/app`
+  (**home-only** — split-horizon DNS name, works on LAN and over
+  Tailscale-with-home-DNS; the public Cloudflare path 404s `/app` by
+  design).
 
 ## When to use
 

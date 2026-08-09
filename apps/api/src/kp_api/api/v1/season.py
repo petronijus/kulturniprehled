@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from kp_api.api.deps import SessionDep, require_scope
 from kp_api.domain.enums import PlanStatus, SeasonLane, SeasonStatus
 from kp_api.domain.models import (
+    Event,
     SeasonCandidate,
     SeasonPlan,
     SeasonScenario,
@@ -51,6 +52,8 @@ from kp_api.domain.schemas import (
     ScenarioListResponse,
     ScenarioResponse,
     ScenariosPutRequest,
+    SeasonBookedItem,
+    SeasonBookedResponse,
     SeasonCreate,
     SeasonListResponse,
     SeasonPoolPutRequest,
@@ -478,6 +481,36 @@ async def plan_summary(
     workspace = await _user_workspace(session, user)
     season = await _get_active_season(session, workspace, season_id)
     return await _plan_summary(session, season)
+
+
+@router.get("/plans/{season_id}/booked", response_model=SeasonBookedResponse)
+async def booked_events(
+    season_id: UUID,
+    session: SessionDep,
+    user: SeasonReader,
+) -> SeasonBookedResponse:
+    """Already-booked KP events inside the season window.
+
+    Served under the season scope so the login-less planner (trusted-LAN
+    principal) can feed the week-cap and gap rules without access to the
+    general `/v1/events` surface.
+    """
+
+    workspace = await _user_workspace(session, user)
+    season = await _get_active_season(session, workspace, season_id)
+    window_start = datetime.combine(season.starts_on, time.min, tzinfo=_PRAGUE)
+    window_end = datetime.combine(season.ends_on, time.max, tzinfo=_PRAGUE)
+    rows = await session.scalars(
+        select(Event)
+        .where(
+            Event.workspace_id == workspace.id,
+            Event.deleted_at.is_(None),
+            Event.starts_at >= window_start,
+            Event.starts_at <= window_end,
+        )
+        .order_by(Event.starts_at.asc())
+    )
+    return SeasonBookedResponse(items=[SeasonBookedItem.model_validate(e) for e in rows.all()])
 
 
 @router.patch("/candidates/{candidate_id}", response_model=CandidateResponse)

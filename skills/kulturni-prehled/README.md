@@ -7,9 +7,9 @@ Two flows feed *Kulturní Přehled* the app:
    scenario dramaturgies to the backend, and hands off to the web
    planner at `/app` where Petr finalizes his plan (drag & drop,
    scenario preview/apply). The planner is **home-only**: the API blocks
-   `/app` on the public Cloudflare path (`WEB_PUBLIC=false`), so reach
-   it via LAN (`http://192.168.20.101:18000/app`) or the Tailscale
-   HTTPS hostname (see One-time setup below).
+   `/app` on the public Cloudflare path (`WEB_PUBLIC=false`); reach it at
+   `https://kulturniprehled-plan.bastla.com/app` (internal split-horizon
+   name — see One-time setup below).
 2. **Novelty watching** (`/kulturni-prehled`, weekly, Saturday 11:00
    via `/schedule`) — re-scrapes, diffs against the pool, pushes
    updates, and emails **only newly announced events** with a
@@ -93,20 +93,23 @@ divadlo template + symlink + uncomment. No aggregator changes.
    ./scripts/mint-pat.sh   # then update the routine's stored KP_DIGEST_TOKEN
    ```
 
-3. **SPA access + OAuth origin** — the planner is home-only. Google
-   rejects private-IP origins, so Google login needs the VM's Tailscale
-   HTTPS hostname:
+3. **SPA access** — the planner is home-only and **login-less**: set
+   `WEB_TRUSTED_LAN=true` in `/opt/kp/.env` (direct requests from the
+   home network authenticate automatically with season-only scopes;
+   Cloudflare-tunneled requests never do). Reach it at
+   `http://192.168.20.101:18000/app`, over Tailscale, or — optional
+   HTTPS niceness — `https://kulturniprehled-plan.bastla.com/app`:
 
-   ```bash
-   # on the VM (192.168.20.101), one-time:
-   sudo tailscale serve --bg https / http://127.0.0.1:18000
-   tailscale serve status   # → https://<vm>.<tailnet>.ts.net
-   ```
+   - OPNsense host override `kulturniprehled-plan.bastla.com` →
+     192.168.20.101 (done 2026-08-09; internal-only, no public record).
+   - On the VM: `docker compose -f docker-compose.yml -f
+     compose.internal-web.yml up -d caddy` with `KP_INTERNAL_HOSTNAME` +
+     `CLOUDFLARE_DNS_API_TOKEN` in `/opt/kp/.env` (LE cert via DNS-01).
+   - Away from home the name resolves as long as the tailnet uses the
+     home DNS (split DNS / subnet router); otherwise use the LAN URL
+     over Tailscale directly.
 
-   Then add `https://<vm>.<tailnet>.ts.net` (and `http://localhost:5173`
-   for dev) to the Web OAuth client's authorized JavaScript origins.
-   Plain LAN `http://192.168.20.101:18000/app` works for everything
-   except the Google sign-in redirect.
+   No Google OAuth involvement anywhere — the network is the auth.
 
 4. The `/schedule` routine (Sat 11:00 Europe/Prague) runs
    [`cloud-routine.md`](./cloud-routine.md) — it survives this rework

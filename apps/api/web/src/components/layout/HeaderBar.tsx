@@ -1,5 +1,4 @@
 import type { Candidate, Season } from "../../api/types";
-import { useAuth } from "../../auth/AuthProvider";
 import type { Violation } from "../../domain/violations";
 import { cs } from "../../i18n/cs";
 import styles from "./HeaderBar.module.css";
@@ -13,7 +12,6 @@ interface HeaderBarProps {
 }
 
 export function HeaderBar({ season, pool, violations }: HeaderBarProps) {
-  const { signOut } = useAuth();
   const selected = pool.filter((candidate) => candidate.plan_status === "selected").length;
   const undecided = pool.filter((candidate) => candidate.plan_status === "undecided").length;
 
@@ -28,9 +26,6 @@ export function HeaderBar({ season, pool, violations }: HeaderBarProps) {
       <div className={styles.tools}>
         <ViolationsSummary violations={violations} pool={pool} />
         <ThemeToggle />
-        <button type="button" className={styles.signOut} onClick={() => void signOut()}>
-          {cs.signOut}
-        </button>
       </div>
     </header>
   );

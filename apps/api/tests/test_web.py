@@ -54,8 +54,8 @@ async def test_spa_gets_relaxed_csp_api_stays_locked(spa_client: AsyncClient) ->
     index = await spa_client.get("/app/")
     csp = index.headers["content-security-policy"]
     assert "default-src 'self'" in csp
-    assert "script-src 'self' https://accounts.google.com" in csp
-    assert "frame-src https://accounts.google.com" in csp
+    assert "script-src 'self'" in csp
+    assert "accounts.google.com" not in csp
     assert "frame-ancestors 'none'" in csp
 
     api = await spa_client.get("/healthz")
@@ -109,7 +109,5 @@ async def test_no_dist_dir_means_no_mount(tmp_path: Path) -> None:
     assert (
         response.headers["content-security-policy"]
         == "default-src 'self'; img-src 'self' data:; style-src 'self'; "
-        "script-src 'self' https://accounts.google.com; "
-        "connect-src 'self' https://accounts.google.com; "
-        "frame-src https://accounts.google.com; frame-ancestors 'none'; base-uri 'none'"
+        "script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
     )

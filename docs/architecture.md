@@ -25,13 +25,16 @@ FastAPI ──> PostgreSQL  (events, watchlist, sync log, users, costs, recommen
 ```
 
 The season planner (`/app`) is a fourth client surface: a React SPA served
-by FastAPI itself behind the same Google login. It is **home-only**: with
-`WEB_PUBLIC=false` (the default) the API refuses `/app` requests that
-arrived through the Cloudflare Tunnel (detected via the `CF-Connecting-IP`
-header cloudflared injects) — the planner is reachable only directly, over
-LAN or Tailscale (use the VM's `tailscale serve` HTTPS hostname; Google
-OAuth rejects private-IP origins). The JSON API stays public for the
-mobile apps and the cloud routine. The `kulturni-sezona` skill fills the
+by FastAPI itself. It is **home-only and login-less** — the network is the
+auth. With `WEB_PUBLIC=false` (default) the API refuses `/app` requests
+that arrived through the Cloudflare Tunnel (detected via the
+`CF-Connecting-IP` header cloudflared injects into every proxied request);
+with `WEB_TRUSTED_LAN=true` a direct header-less request — which can only
+originate on the LAN or the tailnet, the tunnel being the sole public path
+— is authenticated as the workspace owner restricted to the `season:*`
+scopes. That default-deny scope restriction keeps every other endpoint
+token-only, so the public JSON API surface for the mobile apps and the
+cloud routine is unchanged. The `kulturni-sezona` skill fills the
 candidate pool and scenarios via `/v1/season/*` (`season:read` /
 `season:write` PAT scopes); the weekly `kulturni-prehled` routine diffs
 new announcements against the pool and emails only novelties. Season

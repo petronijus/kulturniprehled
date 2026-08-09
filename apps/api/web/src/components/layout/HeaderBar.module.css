@@ -32,12 +32,3 @@
   align-items: center;
   gap: var(--space-3);
 }
-
-.signOut {
-  font-size: var(--text-sm);
-  color: var(--text-faint);
-}
-
-.signOut:hover {
-  color: var(--text);
-}

@@ -105,7 +105,7 @@ export interface PlanSummary {
   applied_scenario_id: string | null;
 }
 
-/** Booked KP event (from the general /v1/events surface). */
+/** Booked KP event (from GET /v1/season/plans/{id}/booked). */
 export interface BookedEvent {
   id: string;
   title: string;
@@ -113,14 +113,6 @@ export interface BookedEvent {
   starts_at: string;
 }
 
-export interface EventListResponse {
+export interface SeasonBookedResponse {
   items: BookedEvent[];
-  total: number;
-}
-
-export interface TokenPair {
-  access_token: string;
-  refresh_token: string;
-  access_expires_at: string;
-  refresh_expires_at: string;
 }

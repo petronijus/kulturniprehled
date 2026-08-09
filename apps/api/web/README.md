@@ -5,11 +5,12 @@ backend at `/app`. Petr finalizes his cultural-season plan here:
 calendar left, candidate cards right, scenario tabs on top, drag & drop
 (or the ✓/✕ buttons — full keyboard-accessible equivalent).
 
-**Home-only**: with `WEB_PUBLIC=false` (default) the backend refuses
-`/app` requests that came through the Cloudflare Tunnel — the planner is
-reachable only via LAN (`http://192.168.20.101:18000/app`) or the VM's
-Tailscale HTTPS hostname. Google sign-in works only on the Tailscale
-hostname (or `localhost` in dev); Google rejects private-IP origins.
+**Home-only and login-less**: with `WEB_PUBLIC=false` (default) the
+backend refuses `/app` requests that came through the Cloudflare Tunnel,
+and with `WEB_TRUSTED_LAN=true` direct requests from the home network get
+a season-scoped principal automatically — the network IS the auth. Reach
+it via LAN `http://192.168.20.101:18000/app`, over Tailscale, or (with
+the optional caddy overlay) `https://kulturniprehled-plan.bastla.com/app`.
 
 ## Commands
 
@@ -22,18 +23,10 @@ npm run build    # type-check + production bundle into dist/
 
 ## Configuration
 
-- `VITE_KP_GOOGLE_CLIENT_ID` — the Google **Web** OAuth client id
-  (same one the mobile apps use as `serverClientId`). Baked in at build
-  time; `scripts/build-push.sh` injects it into the Docker build from
-  1Password. For local dev put it in `web/.env.local`:
-
-  ```
-  VITE_KP_GOOGLE_CLIENT_ID=<client id>
-  ```
-
-  and make sure `http://localhost:5173` is among the client's
-  authorized JavaScript origins (plus the Tailscale hostname for the
-  deployed planner — see `skills/kulturni-prehled/README.md`).
+No build-time configuration — the SPA is login-less and fully
+self-contained. In dev, run the API with `WEB_TRUSTED_LAN=true` so the
+vite proxy's header-less requests authenticate as the trusted-LAN
+principal.
 
 ## Architecture notes
 
@@ -46,10 +39,10 @@ npm run build    # type-check + production bundle into dist/
 - **Scenario preview** is pure client state (diff ghosts on the
   calendar); only "Použít scénář" mutates, via
   `POST /v1/season/scenarios/{id}/apply`.
-- **Auth**: GIS button flow → `POST /v1/auth/google`; access token in
-  memory, refresh token in localStorage, single-flight refresh (the
-  backend's rotation reuse-detection makes that correctness, not
-  optimization).
+- **Auth**: none in the SPA. The backend's trusted-LAN mode
+  (`WEB_TRUSTED_LAN`) authenticates direct home-network requests as the
+  workspace owner restricted to the `season:*` scopes; a 401 renders as
+  "dostupné jen z domácí sítě".
 - **Design tokens** live in `src/styles/tokens.css` (`light-dark()`
   theming) — edit that file to retune the look; components never
   hard-code visual values.

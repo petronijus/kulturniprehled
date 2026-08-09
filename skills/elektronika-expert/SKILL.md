@@ -6,15 +6,30 @@ description: Domain-expert agent for elektronická hudba (experimental, IDM, tec
 ## Task
 
 Build a ranked list of upcoming **elektronická hudba** events Petr
-should consider this week. Write the result as JSON to a known
-location; **never send email**. The `kulturni-prehled` aggregator
-picks up the file, merges with other experts, applies cross-domain
-rules, and sends one combined email.
+should consider. Write the result as JSON to a known location;
+**never send email**. Two callers consume the file: the weekly
+`kulturni-prehled` novelty watcher and the once-per-season
+`kulturni-sezona` orchestrator.
+
+## Modes
+
+Same `args` convention as klasika-expert
+(`Skill(skill: "elektronika-expert", args: "mode=season season=2026-27")`;
+no args → `weekly`).
+
+**Horizon caveat — read this before season mode.** Clubs publish 1–2
+months ahead, so even `season` mode scrapes only the next ~60 days.
+Season mode differs from weekly in exactly two ways: it writes to
+`/tmp/kp-season-<season>/elektronika.json` and it adds
+`"coverage": "partial"` to the output envelope — the orchestrator turns
+the uncovered months into `reserved_slots`. Never extrapolate or invent
+events beyond what the sources actually announce.
 
 ### 0. Output contract — write this file at the end
 
 ```
-/tmp/kp-digest-CW<n>/elektronika.json
+weekly: /tmp/kp-digest-CW<n>/elektronika.json
+season: /tmp/kp-season-<season>/elektronika.json   (+ "coverage": "partial")
 ```
 
 Same shape as `klasika.json` (see `skills/klasika-expert/SKILL.md`
@@ -24,13 +39,14 @@ step 0 for the schema). The only differences:
 - `label`: `"Elektronika"`
 - `ensemble`: usually `null` (electronica events are typically
   artist/DJ-led, no "ensemble"); use `null` in the JSON output
-- The aggregator handles spacing across both lanes — the elektronika
-  expert just emits its own candidates without worrying about clashes
-  with klasika picks.
+- The caller handles spacing across lanes — the elektronika expert
+  just emits its own candidates without worrying about clashes with
+  klasika picks.
 
-Pick **8–12 candidates**; the aggregator trims. Mark 1–2 items
-`season_event: true` if genuinely once-a-tour (Aphex Twin live,
-Autechre live, Boiler Room special, etc.).
+Pick **8–12 candidates** (weekly) or everything above threshold
+(season — with the ~60-day window that is rarely more than 15–20).
+Mark 1–2 items `season_event: true` if genuinely once-a-tour (Aphex
+Twin live, Autechre live, Boiler Room special, etc.).
 
 ### 1. Resolve KP API base + bearer token
 

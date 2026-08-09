@@ -1,1 +1,4 @@
 klasika-expert
+elektronika-expert
+# divadlo-expert — enable after preferences.md TODO(Petr) blocks are filled
+# film-expert — enable after preferences.md TODO(Petr) blocks are filled

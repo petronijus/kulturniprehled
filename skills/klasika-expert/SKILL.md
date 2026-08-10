@@ -241,6 +241,16 @@ filter exactly, instead of guessing today's date from the page).
 Append the LLM's JSON to `$CANDIDATES`. On WebFetch failure: log
 `WARN: WebFetch <url> failed` and continue.
 
+#### 5b2. Prague-only filter (before enrichment)
+
+Ensemble scrapers emit tour dates too (PKF plays Murten, Köln, Hradec
+Králové…) and mostly without a `venue` field — so filter by evidence,
+not vibes: drop candidates whose title/description names a non-Prague
+city, and treat "Kolín" with extreme suspicion (Kölner Philharmonie has
+burned us). When the venue only becomes clear from the detail page in
+step 5d, drop the candidate there — a tour date must never reach the
+output JSON.
+
 #### 5c. Filter to the mode's window
 
 ```bash

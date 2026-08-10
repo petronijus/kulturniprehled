@@ -44,7 +44,7 @@ Primary (club sites — Petrovy kluby, kandidáti odsud jsou vždy fér):
 - https://www.palacakropolis.cz — Palác Akropolis
 - https://punctum.cz — Punctum / Krásovka <!-- TODO(Petr): verify URL — returned an empty page 2026-08 -->
 - https://lunchmeat.cz — Lunchmeat (festival + jednorázovky)
-- https://archaplus.cz/program/ — Archa+ <!-- TODO(Petr): verify URL (bývalé Divadlo Archa) -->
+- https://archaplus.cz — Archa+ (bývalé Divadlo Archa; /program/ vrací 404, homepage je JS-heavy — čti přes WebFetch, případně zkus GoOut listing venue)
 - https://www.meetfactory.cz/cs/program — MeetFactory <!-- TODO(Petr): verify URL -->
 
 Secondary (aggregator — robust when a club site breaks or a venue has

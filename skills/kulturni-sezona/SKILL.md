@@ -41,13 +41,23 @@ fallback for URL-less candidates.
 
 ```python
 import hashlib, re, unicodedata
+
+# Venues that serve the same pages under more than one hostname — map all
+# aliases to one canonical host or the key splits (found live 2026-08-10:
+# ND links both narodni-divadlo.cz and nationaltheatre.cz).
+HOST_ALIASES = {
+    "nationaltheatre.cz": "narodni-divadlo.cz",
+}
+
 def normalize(s):
     s = unicodedata.normalize("NFD", s.lower())
     s = "".join(c for c in s if unicodedata.category(c) != "Mn")
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", s)).strip()
 def canonical_url(url):
     u = url.lower().split("#")[0].split("?")[0].rstrip("/")
-    return re.sub(r"^https?://(www\.)?", "", u)
+    u = re.sub(r"^https?://(www\.)?", "", u)
+    host, _, path = u.partition("/")
+    return f"{HOST_ALIASES.get(host, host)}/{path}" if path else HOST_ALIASES.get(host, host)
 def dedup_key(lane, title, url, starts_at_date):
     ident = canonical_url(url) if url else normalize(title)
     return hashlib.sha256(f"{lane}|{ident}|{starts_at_date}".encode()).hexdigest()[:64]
@@ -56,6 +66,16 @@ def dedup_key(lane, title, url, starts_at_date):
 The date stays in the key — multi-date productions share one URL.
 **Never retitle a candidate after its key is computed; the key must be
 derived from the raw scraped record.**
+
+**Cross-source merge (one event, two URLs).** A festival page and the
+ensemble's own page publish the same concert under different URLs (ČF
+subscription night vs its Dvořákova Praha listing), so URL keys alone
+cannot merge them. Before emitting a candidate, check the pool (and the
+current run's output) for a row with the same `lane` + same local DATE
+whose normalized title shares ≥ 2 significant tokens (surnames, work
+names) — if found, reuse THAT row's `dedup_key` and keep the richer
+record's fields. When both sources are fresh in one run, prefer the
+ensemble's own URL over an aggregator/festival URL as the key basis.
 
 ### 0. Resolve season + auth
 

@@ -173,6 +173,11 @@ async def sign_feedback_links(
     production) so they paste straight into the email."""
 
     base = str(request.base_url).rstrip("/")
+    # Cloudflare terminates TLS, so the app sees plain HTTP; without this
+    # the signed links pasted into the e-mail start with http:// and bounce
+    # through a redirect (or break in strict clients).
+    if request.headers.get("x-forwarded-proto") == "https" and base.startswith("http://"):
+        base = "https://" + base.removeprefix("http://")
 
     def _url(item: SignItem, rating: str) -> str:
         token = create_feedback_token(

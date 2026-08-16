@@ -11,9 +11,31 @@ URL="https://socr.rozhlas.cz/koncerty-a-vstupenky"
 UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'
 ENSEMBLE_NAME="SOČR – Symfonický orchestr Českého rozhlasu"
 
+# Drupal pager (`?page=N`, zero-based). Page 0 is roughly the next two months,
+# so the season tail was missing until 2026-08-16.
+MAX_PAGES=20
 TMP=$(mktemp -t socr-XXXXXX.html)
-trap 'rm -f "$TMP"' EXIT
-curl -sS -L -A "$UA" --max-time 30 -o "$TMP" "$URL" 2>/dev/null || { echo '[]'; exit 0; }
+PAGE_TMP=$(mktemp -t socr-page-XXXXXX.html)
+trap 'rm -f "$TMP" "$PAGE_TMP"' EXIT
+
+page=0
+while [ "$page" -lt "$MAX_PAGES" ]; do
+    curl -sS -L -A "$UA" --max-time 30 -o "$PAGE_TMP" "$URL?page=$page" 2>/dev/null || break
+    [ ! -s "$PAGE_TMP" ] && break
+    # Count cards with the SAME pattern the parser uses below — the block's
+    # class name rotates (b-099d → b-004 sometime before 2026-08), and keying
+    # the loop on the class silently emptied the whole lane.
+    CARDS=$(python3 -c "
+import re, sys
+src = open(sys.argv[1], encoding='utf-8').read()
+print(len(re.findall(r'<h3>\s*<a\s+href=\"/[^\"]+\"', src)))
+" "$PAGE_TMP" 2>/dev/null || echo 0)
+    [ "${CARDS:-0}" -eq 0 ] && break
+    cat "$PAGE_TMP" >> "$TMP"
+    page=$((page + 1))
+    sleep 1   # politeness
+done
+
 [ ! -s "$TMP" ] && { echo '[]'; exit 0; }
 
 HTML_PATH="$TMP" ENSEMBLE="$ENSEMBLE_NAME" python3 - <<'PY'

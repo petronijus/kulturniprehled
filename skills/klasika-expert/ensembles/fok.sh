@@ -9,9 +9,24 @@ URL="https://www.fok.cz/cs/program"
 UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'
 ENSEMBLE_NAME="FOK – Symfonický orchestr hl. m. Prahy"
 
+# Paginated `?page=N`, zero-based, ~15 cards per page — page 0 alone stops
+# months short of the season end (found in the 2026-08-16 season run).
+MAX_PAGES=20
 TMP=$(mktemp -t fok-XXXXXX.html)
-trap 'rm -f "$TMP"' EXIT
-curl -sS -L -A "$UA" --max-time 30 -o "$TMP" "$URL" 2>/dev/null || { echo '[]'; exit 0; }
+PAGE_TMP=$(mktemp -t fok-page-XXXXXX.html)
+trap 'rm -f "$TMP" "$PAGE_TMP"' EXIT
+
+page=0
+while [ "$page" -lt "$MAX_PAGES" ]; do
+    curl -sS -L -A "$UA" --max-time 30 -o "$PAGE_TMP" "$URL?page=$page" 2>/dev/null || break
+    [ ! -s "$PAGE_TMP" ] && break
+    CARDS=$(grep -c 'class="Program-item ' "$PAGE_TMP" || true)
+    [ "${CARDS:-0}" -eq 0 ] && break
+    cat "$PAGE_TMP" >> "$TMP"
+    page=$((page + 1))
+    sleep 1   # politeness
+done
+
 [ ! -s "$TMP" ] && { echo '[]'; exit 0; }
 
 HTML_PATH="$TMP" ENSEMBLE="$ENSEMBLE_NAME" python3 - <<'PY'

@@ -13,9 +13,31 @@ URL="https://www.ceskafilharmonie.cz/program"
 UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'
 ENSEMBLE_NAME="Česká filharmonie"
 
+# The listing is paginated (`/program/?stranka=N`, ~20 cards per page) and the
+# season runs Sep–Jun, so page 1 alone is only the next few weeks — that is how
+# the 2026-08-16 season run ended up with 3 ČF concerts instead of 20. Walk the
+# pages until one yields no event cards, then parse the concatenation.
+MAX_PAGES=20
 TMP=$(mktemp -t cf-XXXXXX.html)
-trap 'rm -f "$TMP"' EXIT
-curl -sS -L -A "$UA" --max-time 30 -o "$TMP" "$URL" 2>/dev/null || { echo '[]'; exit 0; }
+PAGE_TMP=$(mktemp -t cf-page-XXXXXX.html)
+trap 'rm -f "$TMP" "$PAGE_TMP"' EXIT
+
+page=1
+while [ "$page" -le "$MAX_PAGES" ]; do
+    if [ "$page" -eq 1 ]; then
+        PAGE_URL="$URL"
+    else
+        PAGE_URL="$URL/?stranka=$page"
+    fi
+    curl -sS -L -A "$UA" --max-time 30 -o "$PAGE_TMP" "$PAGE_URL" 2>/dev/null || break
+    [ ! -s "$PAGE_TMP" ] && break
+    CARDS=$(grep -c 'class="event style-default' "$PAGE_TMP" || true)
+    [ "${CARDS:-0}" -eq 0 ] && break
+    cat "$PAGE_TMP" >> "$TMP"
+    page=$((page + 1))
+    sleep 1   # politeness — this is someone else's server
+done
+
 [ ! -s "$TMP" ] && { echo '[]'; exit 0; }
 
 HTML_PATH="$TMP" ENSEMBLE="$ENSEMBLE_NAME" python3 - <<'PY'

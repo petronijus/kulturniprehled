@@ -382,7 +382,12 @@ class SeasonPoolPutResult(BaseModel):
     created: int
     updated: int
     unchanged: int
+    # Items that reached the pool — the payload minus the vetoed ones.
     total: int
+    # Refused on arrival because their venue is vetoed.
+    vetoed: int = 0
+    # Already-stored candidates at a vetoed venue, soft-deleted by this run.
+    purged: int = 0
 
 
 class CandidateResponse(BaseModel):

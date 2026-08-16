@@ -1,4 +1,5 @@
 import type { Lane } from "../../api/types";
+import type { PoolFacets } from "../../domain/facets";
 import type { IsoMonth } from "../../domain/season";
 import { cs } from "../../i18n/cs";
 import styles from "./PoolFilters.module.css";
@@ -6,6 +7,8 @@ import styles from "./PoolFilters.module.css";
 export interface PoolFilterState {
   lane: Lane | null;
   month: IsoMonth | null;
+  /** Encoded `source:…` / `venue:…`, or null for every ensemble and venue. */
+  facet: string | null;
   undecidedOnly: boolean;
   newOnly: boolean;
   query: string;
@@ -14,6 +17,7 @@ export interface PoolFilterState {
 export const defaultFilters: PoolFilterState = {
   lane: null,
   month: null,
+  facet: null,
   undecidedOnly: false,
   newOnly: false,
   query: "",
@@ -24,10 +28,11 @@ const LANES: Lane[] = ["klasika", "elektronika", "divadlo", "film"];
 interface PoolFiltersProps {
   filters: PoolFilterState;
   months: IsoMonth[];
+  facets: PoolFacets;
   onChange: (filters: PoolFilterState) => void;
 }
 
-export function PoolFilters({ filters, months, onChange }: PoolFiltersProps) {
+export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersProps) {
   return (
     <div className={styles.bar}>
       <div className={styles.laneChips}>
@@ -67,6 +72,33 @@ export function PoolFilters({ filters, months, onChange }: PoolFiltersProps) {
               </option>
             );
           })}
+        </select>
+        <select
+          className={styles.select}
+          value={filters.facet ?? ""}
+          onChange={(event) =>
+            onChange({ ...filters, facet: event.target.value === "" ? null : event.target.value })
+          }
+        >
+          <option value="">{cs.filters.facet}</option>
+          {facets.sources.length > 0 && (
+            <optgroup label={cs.filters.facetSources}>
+              {facets.sources.map((name) => (
+                <option key={`source:${name}`} value={`source:${name}`}>
+                  {name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {facets.venues.length > 0 && (
+            <optgroup label={cs.filters.facetVenues}>
+              {facets.venues.map((name) => (
+                <option key={`venue:${name}`} value={`venue:${name}`}>
+                  {name}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
         <label className={styles.toggle}>
           <input

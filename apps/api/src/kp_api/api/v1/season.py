@@ -142,6 +142,41 @@ async def _get_active_season(
     return season
 
 
+def _matches_veto(venue: str | None, source_name: str | None, veto: tuple[str, ...]) -> bool:
+    haystack = f"{venue or ''} {source_name or ''}".casefold()
+    return any(term in haystack for term in veto)
+
+
+def _is_vetoed_venue(item: CandidateUpsert, veto: tuple[str, ...]) -> bool:
+    return bool(veto) and _matches_veto(item.venue, item.source_name, veto)
+
+
+async def _purge_vetoed(session: AsyncSession, season: SeasonPlan, veto: tuple[str, ...]) -> int:
+    """Soft-delete pool rows sitting at a vetoed venue. Returns the count.
+
+    Runs on every ingest so a newly added veto cleans up after itself. Only
+    the pool is touched — a candidate already promoted to a booked event
+    lives in `events` and is out of scope here.
+    """
+
+    if not veto:
+        return 0
+    rows = await session.scalars(
+        select(SeasonCandidate).where(
+            SeasonCandidate.season_id == season.id,
+            SeasonCandidate.deleted_at.is_(None),
+        )
+    )
+    now = _utcnow()
+    purged = 0
+    for row in rows.all():
+        if _matches_veto(row.venue, row.source_name, veto):
+            row.deleted_at = now
+            row.version += 1
+            purged += 1
+    return purged
+
+
 def _content_hash(item: CandidateUpsert) -> str:
     """Deterministic hash over the scraped fields.
 
@@ -264,14 +299,23 @@ async def put_pool(
     season_id: UUID,
     body: SeasonPoolPutRequest,
     session: SessionDep,
+    settings: SettingsDep,
     user: SeasonWriter,
 ) -> SeasonPoolPutResult:
     workspace = await _user_workspace(session, user)
     season = await _get_active_season(session, workspace, season_id)
 
+    veto = settings.season_venue_veto_terms
     # Last occurrence wins on duplicate keys within one payload — a scrape
     # merging several sources can legitimately see the same event twice.
-    by_key: dict[str, CandidateUpsert] = {item.dedup_key: item for item in body.items}
+    by_key: dict[str, CandidateUpsert] = {
+        item.dedup_key: item for item in body.items if not _is_vetoed_venue(item, veto)
+    }
+    vetoed = len(body.items) - len(by_key)
+    # The veto is retroactive: candidates ingested before a venue was vetoed
+    # (or before this backstop existed) disappear on the next scrape instead
+    # of lingering in the pool forever.
+    purged = await _purge_vetoed(session, season, veto)
 
     existing_rows = await session.scalars(
         select(SeasonCandidate).where(
@@ -314,7 +358,12 @@ async def put_pool(
 
     await session.commit()
     return SeasonPoolPutResult(
-        created=created, updated=updated, unchanged=unchanged, total=len(by_key)
+        created=created,
+        updated=updated,
+        unchanged=unchanged,
+        total=len(by_key),
+        vetoed=vetoed,
+        purged=purged,
     )
 
 

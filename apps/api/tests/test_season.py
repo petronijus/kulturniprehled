@@ -4,11 +4,16 @@ plan mutations and the novelty cursor."""
 from __future__ import annotations
 
 import hashlib
+import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
+from unittest.mock import patch
 
 from httpx import AsyncClient
 
+from kp_api.config import get_settings
 from tests.conftest import auth_header, login_as
 
 
@@ -113,7 +118,14 @@ async def test_pool_bulk_upsert_creates(client: AsyncClient) -> None:
         headers=headers,
     )
     assert response.status_code == 200, response.text
-    assert response.json() == {"created": 3, "updated": 0, "unchanged": 0, "total": 3}
+    assert response.json() == {
+        "created": 3,
+        "updated": 0,
+        "unchanged": 0,
+        "total": 3,
+        "vetoed": 0,
+        "purged": 0,
+    }
 
 
 async def test_pool_reput_is_idempotent(client: AsyncClient) -> None:
@@ -128,7 +140,14 @@ async def test_pool_reput_is_idempotent(client: AsyncClient) -> None:
     versions_before = {c["dedup_key"]: c["version"] for c in before.json()["items"]}
 
     second = await client.put(f"/v1/season/plans/{season_id}/pool", json=body, headers=headers)
-    assert second.json() == {"created": 0, "updated": 0, "unchanged": 2, "total": 2}
+    assert second.json() == {
+        "created": 0,
+        "updated": 0,
+        "unchanged": 2,
+        "total": 2,
+        "vetoed": 0,
+        "purged": 0,
+    }
 
     after = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
     for candidate in after.json()["items"]:
@@ -162,7 +181,14 @@ async def test_pool_update_refreshes_but_preserves_plan_fields(client: AsyncClie
         json={"items": [_candidate("a", price_czk="600-1800", tickets_available=False)]},
         headers=headers,
     )
-    assert refreshed.json() == {"created": 0, "updated": 1, "unchanged": 0, "total": 1}
+    assert refreshed.json() == {
+        "created": 0,
+        "updated": 1,
+        "unchanged": 0,
+        "total": 1,
+        "vetoed": 0,
+        "purged": 0,
+    }
 
     after = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
     row = after.json()["items"][0]
@@ -439,3 +465,117 @@ async def test_unknown_season_returns_404(client: AsyncClient) -> None:
         "/v1/season/plans/00000000-0000-0000-0000-000000000000/pool", headers=headers
     )
     assert response.status_code == 404
+
+
+@contextmanager
+def _veto(terms: str) -> Iterator[None]:
+    """Turn the venue veto on for the duration of a call.
+
+    Settings are read per request through `get_settings`, so patching the env
+    (and dropping the cache) switches the veto on mid-test — which is exactly
+    the real-world sequence: a pool ingested first, a veto added later.
+    """
+
+    with patch.dict(os.environ, {"SEASON_VENUE_VETO": terms}, clear=False):
+        get_settings.cache_clear()
+        try:
+            yield
+        finally:
+            get_settings.cache_clear()
+
+
+async def test_ingest_refuses_candidates_at_a_vetoed_venue(client: AsyncClient) -> None:
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+
+    with _veto("Cross Club,Ankali,Roxy"):
+        response = await client.put(
+            f"/v1/season/plans/{season_id}/pool",
+            json={
+                "items": [
+                    _candidate("keep", venue="Rudolfinum"),
+                    _candidate("club", lane="elektronika", venue="Cross Club"),
+                    # The veto matches the source name too — an aggregator can
+                    # carry the venue there instead.
+                    _candidate("agg", lane="elektronika", venue=None, source_name="Ankali"),
+                    # Case and surrounding text must not matter.
+                    _candidate("mixed", lane="elektronika", venue="ROXY Praha"),
+                ]
+            },
+            headers=headers,
+        )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["created"] == 1
+    assert body["vetoed"] == 3
+    assert body["total"] == 1
+
+    pool = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
+    assert [c["venue"] for c in pool.json()["items"]] == ["Rudolfinum"]
+
+
+async def test_ingest_purges_candidates_vetoed_after_they_were_stored(
+    client: AsyncClient,
+) -> None:
+    """The veto is retroactive — that is the whole point of the backstop."""
+
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+    seeded = await client.put(
+        f"/v1/season/plans/{season_id}/pool",
+        json={
+            "items": [
+                _candidate("keep", venue="Rudolfinum"),
+                _candidate("club", lane="elektronika", venue="Cross Club"),
+            ]
+        },
+        headers=headers,
+    )
+    assert seeded.json()["created"] == 2
+
+    with _veto("Cross Club"):
+        response = await client.put(
+            f"/v1/season/plans/{season_id}/pool",
+            json={"items": [_candidate("keep", venue="Rudolfinum")]},
+            headers=headers,
+        )
+        assert response.json()["purged"] == 1
+
+        pool = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
+        assert [c["venue"] for c in pool.json()["items"]] == ["Rudolfinum"]
+
+
+async def test_empty_ingest_purges_without_touching_anything_else(
+    client: AsyncClient,
+) -> None:
+    """`{"items": []}` is the cleanup call — no scrape needed to apply a veto."""
+
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+    await client.put(
+        f"/v1/season/plans/{season_id}/pool",
+        json={
+            "items": [
+                _candidate("keep", venue="Rudolfinum"),
+                _candidate("club", lane="elektronika", venue="Cross Club"),
+            ]
+        },
+        headers=headers,
+    )
+
+    with _veto("Cross Club"):
+        response = await client.put(
+            f"/v1/season/plans/{season_id}/pool", json={"items": []}, headers=headers
+        )
+
+        assert response.json() == {
+            "created": 0,
+            "updated": 0,
+            "unchanged": 0,
+            "total": 0,
+            "vetoed": 0,
+            "purged": 1,
+        }
+        pool = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
+        assert pool.json()["total"] == 1

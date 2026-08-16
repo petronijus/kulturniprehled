@@ -98,6 +98,8 @@ services:
       # Public-holiday feed; empty string disables the grid marks.
       HOLIDAYS_ICS_URL: ${HOLIDAYS_ICS_URL:-https://calendar.google.com/calendar/ical/cs.czech%23holiday%40group.v.calendar.google.com/public/basic.ics}
       ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
+      # Venues refused at pool ingest and purged on the next scrape.
+      SEASON_VENUE_VETO: ${SEASON_VENUE_VETO:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
       # Discogs taste map served via /v1/digest/context (empty → discogs: null).

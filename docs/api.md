@@ -38,6 +38,16 @@ or unreachable feed answers `200` with `available: false` (a stale cached
 feed is preferred over an empty one), so no consumer ever hard-fails on
 the calendar. The window is capped at 400 days.
 
+The pool ingest enforces a **venue veto** (`SEASON_VENUE_VETO`, comma
+separated): a candidate whose `venue` or `source_name` contains a vetoed term
+is refused on arrival (`vetoed` in the response), and pool rows already stored
+at such a venue are soft-deleted on every ingest (`purged`). The veto is
+therefore retroactive — adding a venue to it cleans the pool up on the next
+scrape, and `PUT …/pool` with `{"items": []}` applies it immediately without
+running one. The experts veto the same venues while scraping
+(`skills/*/preferences.md`); this is the backstop that holds regardless of
+which expert or run produced the candidate.
+
 `GET /v1/season/holidays?from=&to=` marks Czech public holidays in the
 planner grid, from the public feed in `HOLIDAYS_ICS_URL` (defaulted, not a
 secret, cached for a day). It reuses the same fetch/expand pipeline and

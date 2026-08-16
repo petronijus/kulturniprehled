@@ -54,7 +54,9 @@ Dedup against primary sources by dedup_key):
 - https://goout.net/cs/praha/koncerty/?tags=electronic — GoOut elektronika
 
 **Venue veto**: Cross Club, Ankali, Roxy (Petr tam nechodí — 2026-08-10).
-Kdyby tam ale hrál někdo z Favourite artists, smí projít — veto je na
-běžný program, ne na výjimečné koncerty.
+**Bez výjimek** (2026-08-16): veto je od té doby vynucené i backendem
+(`SEASON_VENUE_VETO`) — kandidáta z těchto míst pool odmítne bez ohledu na
+interpreta a existující řádky při dalším scrapu smaže. Dřívější výjimka pro
+Favourite artists tím padá; kdyby ji Petr chtěl zpátky, musí se změnit obojí.
 
 *(přidávej dle libosti: Lethargy, Sonic Visions, Fuchs2, …)*

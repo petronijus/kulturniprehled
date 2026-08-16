@@ -86,6 +86,13 @@ class Settings(BaseSettings):
 
     allowed_emails: str = ""
 
+    # Venues Petr does not go to. Comma-separated; a candidate whose venue or
+    # source name contains one of these (case-insensitive) is refused at
+    # ingest and purged from the pool on the next scrape — the experts also
+    # veto them, this is the backstop that makes "gone" mean gone regardless
+    # of which expert or run produced the candidate.
+    season_venue_veto: str = ""
+
     # Anthropic
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-6"
@@ -154,6 +161,10 @@ class Settings(BaseSettings):
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
         )
+
+    @property
+    def season_venue_veto_terms(self) -> tuple[str, ...]:
+        return tuple(t.strip().casefold() for t in self.season_venue_veto.split(",") if t.strip())
 
     @property
     def allowed_emails_set(self) -> frozenset[str]:

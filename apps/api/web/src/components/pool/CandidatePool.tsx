@@ -1,6 +1,7 @@
 import { useDroppable } from "@dnd-kit/core";
 import { useMemo, useState } from "react";
 import type { Candidate, PlanStatus } from "../../api/types";
+import { decodeFacet, matchesFacet, poolFacets } from "../../domain/facets";
 import { candidateDate } from "../../domain/planState";
 import type { IsoMonth } from "../../domain/season";
 import { monthOf } from "../../domain/season";
@@ -33,10 +34,12 @@ export function CandidatePool({
   actionsDisabled,
 }: CandidatePoolProps) {
   const [filters, setFilters] = useState<PoolFilterState>(defaultFilters);
+  const facets = useMemo(() => poolFacets(pool), [pool]);
   const { setNodeRef, isOver } = useDroppable({ id: "pool", data: { kind: "pool" } });
 
   const visible = useMemo(() => {
     const query = filters.query.trim().toLowerCase();
+    const facet = filters.facet === null ? null : decodeFacet(filters.facet);
     return pool
       .filter((candidate) => {
         if (filters.lane !== null && candidate.lane !== filters.lane) {
@@ -51,8 +54,15 @@ export function CandidatePool({
         if (filters.newOnly && !isNew(candidate.first_seen_at)) {
           return false;
         }
-        if (query !== "" && !candidate.title.toLowerCase().includes(query)) {
+        if (facet !== null && !matchesFacet(candidate, facet)) {
           return false;
+        }
+        if (query !== "") {
+          const haystack =
+            `${candidate.title} ${candidate.venue ?? ""} ${candidate.source_name ?? ""}`.toLowerCase();
+          if (!haystack.includes(query)) {
+            return false;
+          }
         }
         return true;
       })
@@ -82,7 +92,7 @@ export function CandidatePool({
 
   return (
     <div ref={setNodeRef} className={`${styles.pool} ${isOver ? styles.dropTarget : ""}`}>
-      <PoolFilters filters={filters} months={months} onChange={setFilters} />
+      <PoolFilters filters={filters} months={months} facets={facets} onChange={setFilters} />
       <div className={styles.cards}>
         {visible.length === 0 && <p className={styles.empty}>{cs.poolEmpty}</p>}
         {visible.map((candidate) => (

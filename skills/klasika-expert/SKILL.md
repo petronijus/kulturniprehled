@@ -168,6 +168,22 @@ Call `mcp__claude_ai_Spotify__search` with `language: "en"`:
 - `"every classical & contemporary album in my saved/liked library"` (the WHOLE library, not just recent saves)
 - `"classical, contemporary-classical and jazz-with-classical-crossover artists across my playlists"`
 
+**One question per call — never merge them to save a round-trip.** The
+connector answers a single intent; a combined prompt ("both all-time and the
+last 6 months") comes back as a generic Spotify-curated playlist with no
+personal data, which reads exactly like an unauthorized connector. The
+2026-08-16 season run logged `MISSING_SPOTIFY` and ranked on Discogs alone
+because of this; the same four prompts sent one at a time returned the real
+library. If a prompt still answers with a `creator: "Spotify"` playlist and no
+`library_status` fields, that one phrasing missed — rephrase it rather than
+concluding Spotify is unavailable.
+
+Discogs and Spotify point in different directions and both matter: Petr's
+vinyl is Czech romantic repertoire, his current listening is contemporary
+post-classical and experimental (Cage, Ligeti Quartet, Hildur Guðnadóttir,
+Sakamoto/alva noto). A candidate matching the Spotify side is a *fresh
+interest* signal — boost it, don't treat the collection as the only truth.
+
 Merge artist + album names into `$SPOTIFY_TASTE`, de-duplicated. Where
 the connector distinguishes horizon, tag each entry `long_term` vs
 `recent` so step 7 can treat a years-long favourite as a steady signal

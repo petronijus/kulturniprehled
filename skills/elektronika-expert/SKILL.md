@@ -81,6 +81,10 @@ Call `mcp__claude_ai_Spotify__search` with `language: "en"`:
 - `"my electronic / techno / ambient / IDM top artists last 12 months"`
 - `"my saved electronic albums recently"`
 
+**One question per call.** A merged prompt returns a Spotify-curated playlist
+instead of the user's own data — see klasika-expert SKILL.md 4a for the full
+note (it cost the 2026-08-16 season run its whole Spotify signal).
+
 Collect into `$SPOTIFY_TASTE`. On miss: `MISSING_SPOTIFY=1`.
 
 (No Discogs step — Petr's Discogs is biased toward classical/jazz,

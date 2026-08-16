@@ -76,6 +76,9 @@ export const cs = {
     unavailable: "Sdílený kalendář se nepodařilo načíst — kolize nejsou hlídané.",
     notConfigured: "Sdílený kalendář není propojený — kolize nejsou hlídané.",
     updated: (time: string) => `Kalendář aktualizován ${time}`,
+    layerLabel: "Kalendář",
+    hide: "Skrýt kalendář z mřížky (kolize se hlídají dál)",
+    show: "Zobrazit kalendář v mřížce",
   },
   poolEmpty: "Žádní kandidáti pro zvolené filtry.",
   counts: (selected: number, undecided: number) =>

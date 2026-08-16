@@ -27,7 +27,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from kp_api.adapters.calendar_ics import CalendarView, fetch_calendar_view
+from kp_api.adapters.calendar_ics import (
+    CalendarView,
+    HolidayView,
+    fetch_calendar_view,
+    fetch_holidays,
+)
 from kp_api.api.deps import SessionDep, SettingsDep, require_scope
 from kp_api.domain.enums import PlanStatus, SeasonLane, SeasonStatus
 from kp_api.domain.models import (
@@ -79,6 +84,31 @@ _CALENDAR_MAX_RANGE_DAYS = 400
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _calendar_window(range_start: date | None, range_end: date | None) -> tuple[date, date]:
+    """Validate and default the feed window shared by the calendar endpoints.
+
+    Defaults to the next 180 days — the digest horizon.
+    """
+
+    today = datetime.now(tz=_PRAGUE).date()
+    start = range_start or today
+    end = range_end or today + timedelta(days=180)
+    if end < start:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "invalid_range", "message": "`to` precedes `from`"},
+        )
+    if (end - start).days > _CALENDAR_MAX_RANGE_DAYS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "range_too_wide",
+                "message": f"window exceeds {_CALENDAR_MAX_RANGE_DAYS} days",
+            },
+        )
+    return start, end
 
 
 def _iso_week(moment: datetime) -> str:
@@ -538,28 +568,32 @@ async def shared_calendar(
     """
 
     _ = user
-    today = datetime.now(tz=_PRAGUE).date()
-    start = range_start or today
-    end = range_end or today + timedelta(days=180)
-    if end < start:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={"code": "invalid_range", "message": "`to` precedes `from`"},
-        )
-    if (end - start).days > _CALENDAR_MAX_RANGE_DAYS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail={
-                "code": "range_too_wide",
-                "message": f"window exceeds {_CALENDAR_MAX_RANGE_DAYS} days",
-            },
-        )
+    start, end = _calendar_window(range_start, range_end)
     return await fetch_calendar_view(
         settings.calendar_ics_url,
         start,
         end,
         ttl_seconds=settings.calendar_cache_ttl_seconds,
     )
+
+
+@router.get("/holidays", response_model=HolidayView)
+async def public_holidays(
+    settings: SettingsDep,
+    user: SeasonReader,
+    range_start: Annotated[date | None, Query(alias="from")] = None,
+    range_end: Annotated[date | None, Query(alias="to")] = None,
+) -> HolidayView:
+    """Czech public holidays over the window — a mark in the planner grid.
+
+    Separate from `/calendar` on purpose: the holiday feed is public and the
+    household feed is a secret, and one being unreachable must not blank the
+    other. Holidays never block a day.
+    """
+
+    _ = user
+    start, end = _calendar_window(range_start, range_end)
+    return await fetch_holidays(settings.holidays_ics_url, start, end)
 
 
 @router.patch("/candidates/{candidate_id}", response_model=CandidateResponse)

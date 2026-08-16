@@ -21,6 +21,8 @@ interface DayCellProps {
   booked: BookedEvent[];
   /** Shared household calendar (Kocourek&Prdelčička) on this day. */
   personal: CalendarEntry[];
+  /** Public-holiday name, or null on an ordinary day. */
+  holiday: string | null;
   diffOf: (candidateId: string) => "none" | "added" | "removed";
   violatedIds: ReadonlySet<string>;
   previewMode: boolean;
@@ -38,6 +40,7 @@ export function DayCell({
   planned,
   booked,
   personal,
+  holiday,
   diffOf,
   violatedIds,
   previewMode,
@@ -70,13 +73,23 @@ export function DayCell({
   if (highlighted) {
     classes.push(styles.highlighted);
   }
+  if (holiday !== null) {
+    classes.push(styles.holiday);
+  }
 
   const shownPersonal = personal.slice(0, MAX_PERSONAL_CHIPS);
   const hiddenPersonal = personal.slice(MAX_PERSONAL_CHIPS);
 
   return (
     <div ref={setNodeRef} className={classes.join(" ")} data-date={date}>
-      <span className={styles.dayNumber}>{Number(date.slice(8, 10))}</span>
+      <span className={styles.dayNumber} title={holiday ?? undefined}>
+        {Number(date.slice(8, 10))}
+      </span>
+      {holiday !== null && (
+        <span className={styles.holidayName} title={holiday}>
+          {holiday}
+        </span>
+      )}
       <div className={styles.chips}>
         {shownPersonal.map((entry) => (
           <PersonalChip key={`${entry.uid}-${entry.span_index}`} entry={entry} />

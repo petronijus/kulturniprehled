@@ -3,16 +3,19 @@ import { useApplyScenario, usePatchCandidate } from "../api/mutations";
 import {
   useBookedEvents,
   useCurrentSeason,
+  useHolidays,
   usePool,
   useScenarios,
   useSharedCalendar,
 } from "../api/queries";
-import type { Candidate, PlanStatus } from "../api/types";
-import { blockedDaysOf, entriesByDay } from "../domain/calendar";
+import type { CalendarEntry, Candidate, PlanStatus } from "../api/types";
+import { blockedDaysOf, entriesByDay, holidaysByDay } from "../domain/calendar";
 import { candidateDate, selectedIdsOf, toPlannedItems } from "../domain/planState";
+import type { IsoDate } from "../domain/season";
 import { monthsBetween } from "../domain/season";
 import { computeViolations } from "../domain/violations";
 import { cs } from "../i18n/cs";
+import { useCalendarVisible } from "../state/calendarLayer";
 import { SeasonCalendar } from "./calendar/SeasonCalendar";
 import { PlannerDnd } from "./dnd/PlannerDnd";
 import { HeaderBar } from "./layout/HeaderBar";
@@ -21,6 +24,11 @@ import styles from "./PlannerPage.module.css";
 import { CandidatePool } from "./pool/CandidatePool";
 import { Toast } from "./ui/Toast";
 
+// Hiding the calendar layer is presentational only — the rule engine keeps
+// its real blocked-day set, so violations survive the toggle.
+const NO_ENTRIES: ReadonlyMap<IsoDate, CalendarEntry[]> = new Map();
+const NO_DAYS: ReadonlySet<IsoDate> = new Set<IsoDate>();
+
 export function PlannerPage() {
   const seasonQuery = useCurrentSeason();
   const season = seasonQuery.data;
@@ -28,6 +36,8 @@ export function PlannerPage() {
   const scenariosQuery = useScenarios(season?.id);
   const bookedQuery = useBookedEvents(season);
   const calendarQuery = useSharedCalendar(season);
+  const holidaysQuery = useHolidays(season);
+  const [calendarVisible, toggleCalendar] = useCalendarVisible();
 
   const [previewScenarioId, setPreviewScenarioId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -39,6 +49,7 @@ export function PlannerPage() {
   const booked = useMemo(() => bookedQuery.data ?? [], [bookedQuery.data]);
   const blockedDays = useMemo(() => blockedDaysOf(calendarQuery.data), [calendarQuery.data]);
   const personalByDate = useMemo(() => entriesByDay(calendarQuery.data), [calendarQuery.data]);
+  const holidaysByDate = useMemo(() => holidaysByDay(holidaysQuery.data), [holidaysQuery.data]);
 
   const onConflict = useCallback(() => setToast(cs.conflictToast), []);
   const patchMutation = usePatchCandidate(season?.id ?? "none", onConflict);
@@ -147,6 +158,8 @@ export function PlannerPage() {
         pool={pool}
         violations={violations}
         calendar={calendarQuery.data}
+        calendarVisible={calendarVisible}
+        onToggleCalendar={toggleCalendar}
       />
       <ScenarioTabs
         scenarios={scenarios}
@@ -167,8 +180,9 @@ export function PlannerPage() {
               previewMode={previewMode}
               reservedSlots={previewScenario?.reserved_slots ?? []}
               violations={violations}
-              blockedDays={blockedDays}
-              personalByDate={personalByDate}
+              blockedDays={calendarVisible ? blockedDays : NO_DAYS}
+              personalByDate={calendarVisible ? personalByDate : NO_ENTRIES}
+              holidaysByDate={holidaysByDate}
               dragTargetDate={dragTargetDate}
               highlightIds={(() => {
                 const ids = new Set(pinnedCandidates.map((c) => c.id));

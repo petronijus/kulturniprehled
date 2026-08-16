@@ -91,4 +91,8 @@
   --personal-chip-bg: light-dark(#f0eef9, #232236);
   --personal-chip-border: light-dark(#cdc7e6, #43406b);
   --personal-chip-blocking: light-dark(#6b5bb5, #a094e6);
+
+  /* Public holidays — the Czech red, muted enough to sit under the plan. */
+  --holiday: light-dark(#b3282d, #ef8386);
+  --holiday-bg: light-dark(#fdf1f1, #2a1719);
 }

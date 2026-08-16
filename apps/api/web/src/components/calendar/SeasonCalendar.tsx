@@ -21,6 +21,8 @@ interface SeasonCalendarProps {
   blockedDays: ReadonlySet<IsoDate>;
   /** Shared household calendar, one bucket per day it occupies. */
   personalByDate: ReadonlyMap<IsoDate, CalendarEntry[]>;
+  /** Public holidays, keyed by day. Independent of the calendar layer. */
+  holidaysByDate: ReadonlyMap<IsoDate, string>;
   /** The dragged candidate's own date, or null when no drag is active. */
   dragTargetDate: IsoDate | null;
   /** Hovered + pinned pool cards — their date cells (and chips) light up. */
@@ -41,6 +43,7 @@ export function SeasonCalendar({
   violations,
   blockedDays,
   personalByDate,
+  holidaysByDate,
   dragTargetDate,
   highlightIds,
   highlightDates,
@@ -236,6 +239,7 @@ export function SeasonCalendar({
             plannedByDate={plannedByDate}
             bookedByDate={bookedByDate}
             personalByDate={personalByDate}
+            holidaysByDate={holidaysByDate}
             weekLoad={weekLoad}
             reservedSlots={reservedByMonth.get(month) ?? []}
             diffOf={diffOf}

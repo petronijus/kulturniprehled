@@ -15,6 +15,7 @@ interface WeekRowProps {
   plannedByDate: ReadonlyMap<IsoDate, Candidate[]>;
   bookedByDate: ReadonlyMap<IsoDate, BookedEvent[]>;
   personalByDate: ReadonlyMap<IsoDate, CalendarEntry[]>;
+  holidaysByDate: ReadonlyMap<IsoDate, string>;
   /** Plan-wide events per ISO week (selected + booked) for the budget dots. */
   weekLoad: ReadonlyMap<string, number>;
   diffOf: (candidateId: string) => "none" | "added" | "removed";
@@ -33,6 +34,7 @@ export function WeekRow({
   plannedByDate,
   bookedByDate,
   personalByDate,
+  holidaysByDate,
   weekLoad,
   diffOf,
   violatedIds,
@@ -70,6 +72,7 @@ export function WeekRow({
           planned={plannedByDate.get(date) ?? []}
           booked={bookedByDate.get(date) ?? []}
           personal={personalByDate.get(date) ?? []}
+          holiday={holidaysByDate.get(date) ?? null}
           diffOf={diffOf}
           violatedIds={violatedIds}
           previewMode={previewMode}

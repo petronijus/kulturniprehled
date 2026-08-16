@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CalendarEntry, CalendarView } from "../api/types";
-import { blockedDaysOf, dayTooltip, entriesByDay, entryLabel } from "./calendar";
+import { blockedDaysOf, dayTooltip, entriesByDay, entryLabel, holidaysByDay } from "./calendar";
 
 function entry(overrides: Partial<CalendarEntry> = {}): CalendarEntry {
   return {
@@ -55,6 +55,27 @@ describe("entriesByDay", () => {
     expect(byDay.get("2026-10-12")?.length).toBe(1);
     expect(byDay.get("2026-10-13")?.map((e) => e.uid)).toEqual(["trip@kp", "dinner@kp"]);
     expect(byDay.get("2026-10-14")).toBeUndefined();
+  });
+});
+
+describe("holidaysByDay", () => {
+  it("is empty when the holiday feed is unavailable", () => {
+    expect(holidaysByDay(undefined).size).toBe(0);
+  });
+
+  it("keys the titles by day", () => {
+    const map = holidaysByDay({
+      available: true,
+      unavailable_reason: null,
+      range_start: "2026-12-01",
+      range_end: "2026-12-31",
+      days: [
+        { day: "2026-12-24", title: "Štědrý den" },
+        { day: "2026-12-25", title: "1. svátek vánoční" },
+      ],
+    });
+    expect(map.get("2026-12-24")).toBe("Štědrý den");
+    expect(map.get("2026-12-26")).toBeUndefined();
   });
 });
 

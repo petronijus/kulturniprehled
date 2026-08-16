@@ -78,3 +78,27 @@
   padding-inline-start: var(--space-1);
   cursor: default;
 }
+
+/* Public holiday — a mark, not a rule: the day stays fully plannable. */
+.holiday .dayNumber {
+  color: var(--holiday);
+  font-weight: 700;
+}
+
+.holiday:not(.outside) {
+  background: var(--holiday-bg);
+}
+
+.holidayName {
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+  color: var(--holiday);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-inline-start: 2px;
+}
+
+.outside .holidayName {
+  opacity: 0.5;
+}

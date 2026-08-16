@@ -5,7 +5,7 @@
  * the blocked-day set the rule engine takes.
  */
 
-import type { CalendarEntry, CalendarView } from "../api/types";
+import type { CalendarEntry, CalendarView, HolidayView } from "../api/types";
 import { cs } from "../i18n/cs";
 import type { IsoDate } from "./season";
 import { isoToLocalTime } from "./season";
@@ -42,6 +42,11 @@ export function entryLabel(entry: CalendarEntry): string {
   return entry.starts_at === null
     ? entry.title
     : `${isoToLocalTime(entry.starts_at)} ${entry.title}`;
+}
+
+/** Holiday titles keyed by day, for the grid's holiday mark. */
+export function holidaysByDay(view: HolidayView | undefined): ReadonlyMap<IsoDate, string> {
+  return new Map((view?.days ?? []).map((holiday) => [holiday.day, holiday.title]));
 }
 
 /** Full-day tooltip: every entry of the day, one per line. */

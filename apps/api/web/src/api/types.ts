@@ -139,6 +139,22 @@ export interface CalendarConflict {
   title: string;
 }
 
+/** A public holiday — a mark in the grid, never a planning rule. */
+export interface Holiday {
+  day: string;
+  title: string;
+}
+
+/** GET /v1/season/holidays. Separate from the household calendar so one feed
+ * being down cannot blank the other. */
+export interface HolidayView {
+  available: boolean;
+  unavailable_reason: string | null;
+  range_start: string;
+  range_end: string;
+  days: Holiday[];
+}
+
 /** GET /v1/season/calendar. `available: false` (no feed configured, or the
  * feed is unreachable and nothing was cached) is a normal answer — the
  * planner renders without the calendar layer. */

@@ -40,3 +40,27 @@
   border-radius: var(--radius-sm);
   padding: 2px var(--space-2);
 }
+
+.calendarToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px var(--space-3);
+  white-space: nowrap;
+}
+
+.calendarToggle:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+/* Layer off reads as muted, not as an error — the rules still run. */
+.calendarOff {
+  color: var(--text-faint);
+  border-style: dashed;
+  text-decoration: line-through;
+}

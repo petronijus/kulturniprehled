@@ -9,6 +9,7 @@ import type {
   BookedEvent,
   CalendarView,
   Candidate,
+  HolidayView,
   PoolListResponse,
   Scenario,
   ScenarioListResponse,
@@ -22,6 +23,7 @@ export const queryKeys = {
   scenarios: (seasonId: string) => ["scenarios", seasonId] as const,
   booked: (seasonId: string) => ["booked", seasonId] as const,
   calendar: (from: string, to: string) => ["calendar", from, to] as const,
+  holidays: (from: string, to: string) => ["holidays", from, to] as const,
 };
 
 /** Get the active season, bootstrapping it when none exists.
@@ -149,5 +151,22 @@ export function useSharedCalendar(season: Season | undefined) {
     enabled: season !== undefined,
     staleTime: 5 * 60_000,
     refetchInterval: 15 * 60_000,
+  });
+}
+
+/** Czech public holidays over the season window — a mark in the grid. The
+ * feed is public and changes once a year, so this is cached hard and never
+ * refetched on an interval. */
+export function useHolidays(season: Season | undefined) {
+  const from = season?.starts_on ?? "";
+  const to = season?.ends_on ?? "";
+  return useQuery({
+    queryKey: queryKeys.holidays(from, to),
+    queryFn: () =>
+      api<HolidayView>(
+        `/v1/season/holidays?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      ),
+    enabled: season !== undefined,
+    staleTime: 24 * 60 * 60_000,
   });
 }

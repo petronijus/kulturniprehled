@@ -10,9 +10,18 @@ interface HeaderBarProps {
   pool: Candidate[];
   violations: Violation[];
   calendar: CalendarView | undefined;
+  calendarVisible: boolean;
+  onToggleCalendar: () => void;
 }
 
-export function HeaderBar({ season, pool, violations, calendar }: HeaderBarProps) {
+export function HeaderBar({
+  season,
+  pool,
+  violations,
+  calendar,
+  calendarVisible,
+  onToggleCalendar,
+}: HeaderBarProps) {
   const selected = pool.filter((candidate) => candidate.plan_status === "selected").length;
   const undecided = pool.filter((candidate) => candidate.plan_status === "undecided").length;
 
@@ -32,6 +41,15 @@ export function HeaderBar({ season, pool, violations, calendar }: HeaderBarProps
               : cs.calendar.unavailable}
           </span>
         )}
+        <button
+          type="button"
+          className={`${styles.calendarToggle} ${calendarVisible ? "" : styles.calendarOff}`}
+          onClick={onToggleCalendar}
+          aria-pressed={calendarVisible}
+          title={calendarVisible ? cs.calendar.hide : cs.calendar.show}
+        >
+          <span aria-hidden="true">🗓</span> {cs.calendar.layerLabel}
+        </button>
         <ViolationsSummary violations={violations} pool={pool} />
         <ThemeToggle />
       </div>

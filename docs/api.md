@@ -38,6 +38,14 @@ or unreachable feed answers `200` with `available: false` (a stale cached
 feed is preferred over an empty one), so no consumer ever hard-fails on
 the calendar. The window is capped at 400 days.
 
+`GET /v1/season/holidays?from=&to=` marks Czech public holidays in the
+planner grid, from the public feed in `HOLIDAYS_ICS_URL` (defaulted, not a
+secret, cached for a day). It reuses the same fetch/expand pipeline and
+reduces it to one titled day per date. Deliberately a separate endpoint
+from `/calendar`: the household feed is a secret and the holiday feed is
+not, and one being unreachable must not blank the other. Holidays are a
+visual mark only — they never block a day and never enter `conflicts`.
+
 Season endpoints are gated by the `season:read` / `season:write` PAT
 scopes (interactive JWTs and unscoped PATs pass everywhere). With
 `WEB_TRUSTED_LAN=true`, a request with no Authorization header that did

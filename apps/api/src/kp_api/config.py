@@ -75,6 +75,15 @@ class Settings(BaseSettings):
     calendar_ics_url: str = ""
     calendar_cache_ttl_seconds: int = 900
 
+    # Czech public holidays, marked in the planner grid. Google's public
+    # holiday feed needs no credentials — this URL is not a secret, and the
+    # default is the real one so a fresh deployment marks holidays without
+    # any configuration. Empty disables the marks.
+    holidays_ics_url: str = (
+        "https://calendar.google.com/calendar/ical/"
+        "cs.czech%23holiday%40group.v.calendar.google.com/public/basic.ics"
+    )
+
     allowed_emails: str = ""
 
     # Anthropic

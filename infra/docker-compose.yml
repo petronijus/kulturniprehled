@@ -95,6 +95,8 @@ services:
       # Shared household calendar (secret iCal address) → blocked days.
       CALENDAR_ICS_URL: ${CALENDAR_ICS_URL:-}
       CALENDAR_CACHE_TTL_SECONDS: ${CALENDAR_CACHE_TTL_SECONDS:-900}
+      # Public-holiday feed; empty string disables the grid marks.
+      HOLIDAYS_ICS_URL: ${HOLIDAYS_ICS_URL:-https://calendar.google.com/calendar/ical/cs.czech%23holiday%40group.v.calendar.google.com/public/basic.ics}
       ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}

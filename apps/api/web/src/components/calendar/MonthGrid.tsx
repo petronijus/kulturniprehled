@@ -14,6 +14,7 @@ interface MonthGridProps {
   plannedByDate: ReadonlyMap<IsoDate, Candidate[]>;
   bookedByDate: ReadonlyMap<IsoDate, BookedEvent[]>;
   personalByDate: ReadonlyMap<IsoDate, CalendarEntry[]>;
+  holidaysByDate: ReadonlyMap<IsoDate, string>;
   weekLoad: ReadonlyMap<string, number>;
   reservedSlots: ReservedSlot[];
   diffOf: (candidateId: string) => "none" | "added" | "removed";
@@ -31,6 +32,7 @@ export function MonthGrid({
   plannedByDate,
   bookedByDate,
   personalByDate,
+  holidaysByDate,
   weekLoad,
   reservedSlots,
   diffOf,
@@ -80,6 +82,7 @@ export function MonthGrid({
             plannedByDate={plannedByDate}
             bookedByDate={bookedByDate}
             personalByDate={personalByDate}
+            holidaysByDate={holidaysByDate}
             weekLoad={weekLoad}
             diffOf={diffOf}
             violatedIds={violatedIds}

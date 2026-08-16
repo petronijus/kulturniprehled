@@ -219,6 +219,52 @@ async def test_first_fetch_failure_degrades_to_unavailable() -> None:
     assert view.unavailable_reason == "fetch_failed"
 
 
+HOLIDAY_FEED = _ics(
+    _vevent("xmas-eve@h", "Štědrý den", ";VALUE=DATE:20261224", ";VALUE=DATE:20261225"),
+    _vevent("xmas-1@h", "1. svátek vánoční", ";VALUE=DATE:20261225", ";VALUE=DATE:20261226"),
+    # Two observances on one date must collapse into a single titled day.
+    _vevent("adam@h", "Adam a Eva", ";VALUE=DATE:20261224", ";VALUE=DATE:20261225"),
+)
+
+
+async def test_holidays_collapse_to_one_titled_day() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=HOLIDAY_FEED)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        view = await calendar_ics.fetch_holidays(
+            "https://example.test/holidays.ics", WINDOW_START, WINDOW_END, client=client
+        )
+
+    assert view.available is True
+    assert [(d.day, d.title) for d in view.days] == [
+        (date(2026, 12, 24), "Štědrý den · Adam a Eva"),
+        (date(2026, 12, 25), "1. svátek vánoční"),
+    ]
+
+
+async def test_holidays_without_a_feed_are_unavailable_not_an_error() -> None:
+    view = await calendar_ics.fetch_holidays("", WINDOW_START, WINDOW_END)
+
+    assert view.available is False
+    assert view.unavailable_reason == "not_configured"
+    assert view.days == []
+
+
+async def test_holiday_feed_failure_does_not_raise() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(502, text="bad gateway")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        view = await calendar_ics.fetch_holidays(
+            "https://example.test/holidays.ics", WINDOW_START, WINDOW_END, client=client
+        )
+
+    assert view.available is False
+    assert view.unavailable_reason == "fetch_failed"
+    assert view.days == []
+
+
 @pytest_asyncio.fixture
 async def calendar_client(settings: Settings, engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
     """An app instance configured with a (stubbed) calendar feed."""
@@ -306,3 +352,40 @@ async def test_calendar_endpoint_without_a_feed_still_answers(client: AsyncClien
     assert body["available"] is False
     assert body["unavailable_reason"] == "not_configured"
     assert body["blocked_days"] == []
+
+
+async def test_holidays_endpoint_marks_days(
+    calendar_client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_fetch(url: str, client: httpx.AsyncClient) -> str:
+        return HOLIDAY_FEED
+
+    monkeypatch.setattr(calendar_ics, "_fetch_ics", fake_fetch)
+    pair = await login_as(calendar_client, "petr@example.com")
+
+    response = await calendar_client.get(
+        "/v1/season/holidays",
+        params={"from": "2026-12-01", "to": "2026-12-31"},
+        headers=auth_header(pair["access_token"]),
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["available"] is True
+    assert [d["day"] for d in body["days"]] == ["2026-12-24", "2026-12-25"]
+
+
+async def test_holidays_endpoint_shares_the_window_validation(
+    calendar_client: AsyncClient,
+) -> None:
+    pair = await login_as(calendar_client, "petr@example.com")
+
+    response = await calendar_client.get(
+        "/v1/season/holidays",
+        params={"from": "2026-12-31", "to": "2026-12-01"},
+        headers=auth_header(pair["access_token"]),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "invalid_range"

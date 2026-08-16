@@ -44,6 +44,8 @@ _USER_AGENT = "kp-api/1.0 +https://kulturniprehled.example.com"
 # Google regenerates the feed lazily anyway; a quarter hour keeps the planner
 # fresh enough for "I just added a trip to the cottage" without hammering it.
 _CACHE_TTL_SECONDS = 900
+# Public holidays move once a year, if that — no reason to refetch hourly.
+_HOLIDAY_CACHE_TTL_SECONDS = 24 * 3600
 # A runaway guard on the feed size (a household calendar is tens of KB).
 _MAX_FEED_BYTES = 8 * 1024 * 1024
 
@@ -93,6 +95,21 @@ class CalendarView(BaseModel):
     blocked_days: list[date]
     conflicts: list[CalendarConflict]
     entries: list[CalendarEntry]
+
+
+class Holiday(BaseModel):
+    day: date
+    # Several observances can land on one date (Christmas Eve and a name day);
+    # they are joined so a cell shows one line.
+    title: str
+
+
+class HolidayView(BaseModel):
+    available: bool
+    unavailable_reason: str | None = None
+    range_start: date
+    range_end: date
+    days: list[Holiday]
 
 
 class _CachedFeed(BaseModel):
@@ -332,3 +349,54 @@ async def fetch_calendar_view(
     except Exception:
         logger.warning("Calendar feed parse failed", exc_info=True)
         return _empty(range_start, range_end, "fetch_failed")
+
+
+async def fetch_holidays(
+    url: str,
+    range_start: date,
+    range_end: date,
+    *,
+    client: httpx.AsyncClient | None = None,
+    ttl_seconds: float = _HOLIDAY_CACHE_TTL_SECONDS,
+) -> HolidayView:
+    """Public-holiday dates over the window, from a public iCal feed.
+
+    Reuses the household-calendar pipeline (fetch, cache, recurrence
+    expansion) — a holiday feed is just all-day events — and reduces it to
+    one titled entry per day. Holidays are a visual mark only: they never
+    block a day and never enter the conflict set.
+    """
+
+    if not url:
+        return HolidayView(
+            available=False,
+            unavailable_reason="not_configured",
+            range_start=range_start,
+            range_end=range_end,
+            days=[],
+        )
+
+    view = await fetch_calendar_view(
+        url, range_start, range_end, client=client, ttl_seconds=ttl_seconds
+    )
+    if not view.available:
+        return HolidayView(
+            available=False,
+            unavailable_reason=view.unavailable_reason,
+            range_start=range_start,
+            range_end=range_end,
+            days=[],
+        )
+
+    titles: dict[date, list[str]] = {}
+    for entry in view.entries:
+        titles.setdefault(entry.day, []).append(entry.title)
+
+    return HolidayView(
+        available=True,
+        range_start=range_start,
+        range_end=range_end,
+        days=[
+            Holiday(day=day, title=" · ".join(dict.fromkeys(titles[day]))) for day in sorted(titles)
+        ],
+    )

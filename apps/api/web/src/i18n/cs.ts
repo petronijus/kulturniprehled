@@ -69,6 +69,14 @@ export const cs = {
   weekdaysShort: ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"],
   reservedSlot: "Rezervované místo",
   bookedEvent: "Koupeno",
+  calendar: {
+    chipPrefix: "Kalendář",
+    until: "do",
+    more: (count: number) => `+${count} další`,
+    unavailable: "Sdílený kalendář se nepodařilo načíst — kolize nejsou hlídané.",
+    notConfigured: "Sdílený kalendář není propojený — kolize nejsou hlídané.",
+    updated: (time: string) => `Kalendář aktualizován ${time}`,
+  },
   poolEmpty: "Žádní kandidáti pro zvolené filtry.",
   counts: (selected: number, undecided: number) =>
     `${selected} v plánu · ${undecided} nerozhodnuto`,

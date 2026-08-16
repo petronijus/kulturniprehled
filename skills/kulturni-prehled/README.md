@@ -55,7 +55,7 @@ The SPA mirrors it client-side (`apps/api/web/src/domain/violations.ts`)
 | Same work, same calendar year (history) | hard veto | — |
 | Same work, last year | warn („jen pokud výjimečné") | — |
 | Price (VIP-clamped midpoint) | > 3000 Kč out, 2000–3000 warn | — |
-| Blocked days / timed conflicts | `[start−2h, end+1h]` | — |
+| Blocked days / timed conflicts (`GET /v1/season/calendar`) | `[start−2h, end+1h]` | — |
 
 Violations are hard gates for scenarios; in the SPA they are advisory
 (Petr overrules by design).

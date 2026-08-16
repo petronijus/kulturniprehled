@@ -112,13 +112,23 @@ validator:
     normalized `"composer|work"` strings. When a historical event has no
     program metadata, match on title fragments — better a fuzzy entry than
     a missed hard veto.
-- `blocked.json` ← the shared **Kocourek&Prdelčička** calendar over the
-  whole season window via the workspace MCP
-  (`mcp__google-workspace__get_events`, `user_google_email`
-  `petronijus@example.com`, calendar id in `kulturni-prehled/SKILL.md`
-  step 4b). Classify exactly as the aggregator's step 4b does: all-day
-  spans + vacation-regex titles → `blocked_days`; timed events →
-  `conflicts` `{start_iso, end_iso, title}`.
+- `blocked.json` ← `GET /v1/season/calendar?from=<season start>&to=<season end>`
+  — the API classifies the shared **Kocourek&Prdelčička** feed
+  (all-day spans + vacation-regex titles → `blocked_days`; other timed
+  events → `conflicts` `{start_iso, end_iso, title}`) and the response is
+  already in the shape `kp_validate.py` reads, so store it verbatim:
+
+  ```bash
+  curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
+    "$KP_API_BASE/v1/season/calendar?from=$SEASON_START&to=$SEASON_END" \
+    > "$SEASON_DIR/blocked.json"
+  ```
+
+  Do not read the calendar over an MCP connector and do not parse the
+  iCal feed here — one implementation, in the API, keeps the planner SPA
+  and the weekly watcher agreeing on which days are blocked.
+  `available: false` → plan without calendar checks and say so in the
+  final report.
 
 ### 2. Run experts in season mode
 

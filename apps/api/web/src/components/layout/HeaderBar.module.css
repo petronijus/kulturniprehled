@@ -32,3 +32,11 @@
   align-items: center;
   gap: var(--space-3);
 }
+
+.calendarWarning {
+  font-size: var(--text-sm);
+  color: var(--warn);
+  background: var(--warn-bg);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+}

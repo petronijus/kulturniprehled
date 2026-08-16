@@ -64,16 +64,26 @@ Into `$DIGEST_DIR`:
 - `context.json` ← `GET /v1/digest/context?horizon_days=180&lookback_days=180`
   (`booked`, `feedback.lane_sentiment`, `feedback.recent_downvoted_titles`,
   `balance.hint` for the email footer).
-- `blocked.json` ← the shared **Kocourek&Prdelčička** calendar
-  (`c_9a5bbccc4605dfbee65ff6ec08e3259596e8fc63bb131db50438b28e9cfece87@group.calendar.google.com`)
-  over the next 180 days via the workspace MCP
-  (`mcp__workspace-mcp__get_events`, `user_google_email`
-  `petronijus@example.com` — the work account cannot see this calendar).
-  Classify: all-day events → every covered date into `blocked_days`;
-  multi-day titles matching
-  `(dovolená|holiday|pryč|away|cottage|šumperák|chalupa)` (case-insensitive)
-  likewise; timed events → `conflicts` `{start_iso, end_iso, title}`.
-  Calendar unavailable → empty `blocked.json` + a footer note in the email.
+- `blocked.json` ← `GET /v1/season/calendar?from=<today>&to=<today+180d>`.
+  The API owns the shared **Kocourek&Prdelčička** feed (secret iCal
+  address in `CALENDAR_ICS_URL`) and returns the classification ready to
+  use — `blocked_days` + `conflicts` are exactly the keys
+  `kp_validate.py` reads, so save the response verbatim:
+
+  ```bash
+  TODAY=$(date +%F)
+  HORIZON=$(date -d "+180 days" +%F)
+  curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
+    "$KP_API_BASE/v1/season/calendar?from=$TODAY&to=$HORIZON" \
+    > "$DIGEST_DIR/blocked.json"
+  ```
+
+  Never parse the iCal feed yourself and never read the calendar over an
+  MCP connector — the endpoint is the single source of truth for all
+  consumers (this skill, `/kulturni-sezona`, the planner SPA).
+  `available: false` in the response (no feed configured, or unreachable)
+  → treat it as an empty blocked set and add the footer note that
+  calendar conflicts were not checked.
 
 ### 3. Run experts (weekly mode)
 

@@ -31,10 +31,11 @@ Two runs live here:
    #   ssh claudebox 'umask 077; mkdir -p ~/.config/kulturni-prehled; cat > ~/.config/kulturni-prehled/kp-token'
    ```
 
-4. Optional — blocked-day checks: put the shared calendar's **secret
-   iCal address** (Google Calendar → Settings → Kocourek&Prdelčička →
-   "Secret address in iCal format") into
-   `~/.config/kulturni-prehled/calendar-ics-url` (0600). Without it the
+4. Optional — blocked-day checks: nothing to do on this box. The shared
+   calendar's **secret iCal address** (Google Calendar → Settings →
+   Kocourek&Prdelčička → "Secret address in iCal format") belongs in the
+   API's `.env` as `CALENDAR_ICS_URL` on the app VM; the routine reads
+   the classification from `GET /v1/season/calendar`. Without it the
    weekly email just notes that calendar conflicts were not checked.
 5. Install units:
 

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -27,7 +27,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from kp_api.api.deps import SessionDep, require_scope
+from kp_api.adapters.calendar_ics import CalendarView, fetch_calendar_view
+from kp_api.api.deps import SessionDep, SettingsDep, require_scope
 from kp_api.domain.enums import PlanStatus, SeasonLane, SeasonStatus
 from kp_api.domain.models import (
     Event,
@@ -70,6 +71,10 @@ SeasonWriter = Annotated[User, Depends(require_scope(SCOPE_SEASON_WRITE))]
 # Events are Prague events; ISO-week bucketing must follow the local wall
 # calendar, not UTC (a 00:30 CEST concert belongs to its local date's week).
 _PRAGUE = ZoneInfo("Europe/Prague")
+
+# A season plus its shoulder months; wider windows are a caller bug, and each
+# one costs a full recurrence expansion.
+_CALENDAR_MAX_RANGE_DAYS = 400
 
 
 def _utcnow() -> datetime:
@@ -511,6 +516,50 @@ async def booked_events(
         .order_by(Event.starts_at.asc())
     )
     return SeasonBookedResponse(items=[SeasonBookedItem.model_validate(e) for e in rows.all()])
+
+
+@router.get("/calendar", response_model=CalendarView)
+async def shared_calendar(
+    settings: SettingsDep,
+    user: SeasonReader,
+    range_start: Annotated[date | None, Query(alias="from")] = None,
+    range_end: Annotated[date | None, Query(alias="to")] = None,
+) -> CalendarView:
+    """The shared household calendar, classified into blocked days + conflicts.
+
+    One canonical answer for three consumers: the planner SPA paints the days,
+    `/kulturni-prehled` and `/kulturni-sezona` save the response verbatim as
+    their `blocked.json` (`blocked_days` + `conflicts` are exactly the keys
+    `kp_validate.py` reads), and nobody re-implements the classification.
+
+    Defaults to the next 180 days — the digest horizon. Never 503s: an
+    unconfigured or unreachable feed answers `available: false` so a planner
+    without a calendar still renders.
+    """
+
+    _ = user
+    today = datetime.now(tz=_PRAGUE).date()
+    start = range_start or today
+    end = range_end or today + timedelta(days=180)
+    if end < start:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"code": "invalid_range", "message": "`to` precedes `from`"},
+        )
+    if (end - start).days > _CALENDAR_MAX_RANGE_DAYS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "range_too_wide",
+                "message": f"window exceeds {_CALENDAR_MAX_RANGE_DAYS} days",
+            },
+        )
+    return await fetch_calendar_view(
+        settings.calendar_ics_url,
+        start,
+        end,
+        ttl_seconds=settings.calendar_cache_ttl_seconds,
+    )
 
 
 @router.patch("/candidates/{candidate_id}", response_model=CandidateResponse)

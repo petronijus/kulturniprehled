@@ -1,5 +1,6 @@
 import { useDraggable } from "@dnd-kit/core";
-import type { Candidate } from "../../api/types";
+import type { CalendarEntry, Candidate } from "../../api/types";
+import { entryLabel } from "../../domain/calendar";
 import { isoToLocalTime } from "../../domain/season";
 import { cs } from "../../i18n/cs";
 import styles from "./EventChip.module.css";
@@ -65,6 +66,21 @@ export function BookedChip({ title }: { title: string }) {
   return (
     <div className={`${styles.chip} ${styles.booked}`} title={`${cs.bookedEvent}: ${title}`}>
       <span className={styles.title}>{title}</span>
+    </div>
+  );
+}
+
+/** An entry of the shared household calendar — context, never a plan item.
+ * A blocking one (all-day, or the household is away) reads stronger than a
+ * mere evening appointment. */
+export function PersonalChip({ entry }: { entry: CalendarEntry }) {
+  const classes = [styles.chip, styles.personal];
+  if (entry.blocking) {
+    classes.push(styles.personalBlocking);
+  }
+  return (
+    <div className={classes.join(" ")} title={`${cs.calendar.chipPrefix}: ${entryLabel(entry)}`}>
+      <span className={styles.title}>{entryLabel(entry)}</span>
     </div>
   );
 }

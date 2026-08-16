@@ -72,3 +72,18 @@
   border-color: var(--highlight-ring);
   box-shadow: 0 0 0 1px var(--highlight-ring);
 }
+
+/* Shared household calendar — context under the plan, not part of it. */
+.personal {
+  background: var(--personal-chip-bg);
+  border-color: var(--personal-chip-border);
+  border-inline-start-color: var(--personal-chip-border);
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.personalBlocking {
+  border-inline-start-color: var(--personal-chip-blocking);
+  color: var(--text);
+  font-weight: 600;
+}

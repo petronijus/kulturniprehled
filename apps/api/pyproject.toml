@@ -27,6 +27,12 @@ dependencies = [
   "google-auth>=2.36",
   "google-auth-oauthlib>=1.2",
   "minio>=7.2",
+  # Shared-calendar ingest. `icalendar` parses the feed (VTIMEZONE, folded
+  # lines, escaping); `recurring-ical-events` expands RRULE/EXDATE and
+  # RECURRENCE-ID overrides over a window — both are things a hand-rolled
+  # VEVENT scanner gets wrong quietly.
+  "icalendar>=6.1",
+  "recurring-ical-events>=3.5",
   "slowapi>=0.1.9",
   "structlog>=24.4",
   "uuid-utils>=0.10",
@@ -88,7 +94,7 @@ mypy_path = "src"
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["minio.*", "authlib.*"]
+module = ["minio.*", "authlib.*", "recurring_ical_events.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -1,4 +1,4 @@
-import type { BookedEvent, Candidate, ReservedSlot } from "../../api/types";
+import type { BookedEvent, CalendarEntry, Candidate, ReservedSlot } from "../../api/types";
 import type { IsoDate, IsoMonth } from "../../domain/season";
 import { monthGrid } from "../../domain/season";
 import { cs } from "../../i18n/cs";
@@ -13,6 +13,7 @@ interface MonthGridProps {
   dragTargetDate: IsoDate | null;
   plannedByDate: ReadonlyMap<IsoDate, Candidate[]>;
   bookedByDate: ReadonlyMap<IsoDate, BookedEvent[]>;
+  personalByDate: ReadonlyMap<IsoDate, CalendarEntry[]>;
   weekLoad: ReadonlyMap<string, number>;
   reservedSlots: ReservedSlot[];
   diffOf: (candidateId: string) => "none" | "added" | "removed";
@@ -29,6 +30,7 @@ export function MonthGrid({
   dragTargetDate,
   plannedByDate,
   bookedByDate,
+  personalByDate,
   weekLoad,
   reservedSlots,
   diffOf,
@@ -77,6 +79,7 @@ export function MonthGrid({
             dragTargetDate={dragTargetDate}
             plannedByDate={plannedByDate}
             bookedByDate={bookedByDate}
+            personalByDate={personalByDate}
             weekLoad={weekLoad}
             diffOf={diffOf}
             violatedIds={violatedIds}

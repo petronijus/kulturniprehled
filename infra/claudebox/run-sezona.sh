@@ -27,22 +27,15 @@ KP_TOKEN="$(op item get 'Kulturni Prehled API Token' --account my --fields label
 export KP_TOKEN
 export KP_API_BASE="${KP_API_BASE:-https://kulturniprehled.bastla.com}"
 
-ICS_FILE="$CFG_DIR/calendar-ics-url"
-if [ -r "$ICS_FILE" ]; then
-  KP_CALENDAR_ICS_URL="$(cat "$ICS_FILE")"
-  export KP_CALENDAR_ICS_URL
-fi
-
 ALLOWED="$(grep -vE '^\s*(#|$)' "$HERE/allowed-tools-weekly.txt" | paste -sd, -)"
 
 PROMPT="$(cat "$REPO/skills/kulturni-sezona/SKILL.md")
 
 Claudebox substitutions for this run: the KP token is already in
 \$KP_TOKEN (do not use op yourself, never print it). No Spotify and no
-google-workspace MCP here — skip Spotify (missing_sources) and build
-blocked.json from \$KP_CALENDAR_ICS_URL per
-skills/kulturni-prehled/claudebox-routine.md 'Calendar via ICS' (unset →
-empty blocked set, note it in the report). Experts run via the Skill
+google-workspace MCP here — skip Spotify (missing_sources); blocked.json
+comes from GET /v1/season/calendar exactly as SKILL.md step 1 says
+(available:false → empty blocked set, note it in the report). Experts run via the Skill
 tool in season mode; scrapers and kp_validate.py run natively from the
 checkout at $REPO. Today (UTC): $STAMP."
 

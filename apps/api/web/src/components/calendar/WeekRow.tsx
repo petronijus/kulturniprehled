@@ -1,4 +1,4 @@
-import type { BookedEvent, Candidate } from "../../api/types";
+import type { BookedEvent, CalendarEntry, Candidate } from "../../api/types";
 import type { IsoDate, MonthGridWeek } from "../../domain/season";
 import { isoWeek, monthOf } from "../../domain/season";
 import { DayCell } from "./DayCell";
@@ -14,6 +14,7 @@ interface WeekRowProps {
   dragTargetDate: IsoDate | null;
   plannedByDate: ReadonlyMap<IsoDate, Candidate[]>;
   bookedByDate: ReadonlyMap<IsoDate, BookedEvent[]>;
+  personalByDate: ReadonlyMap<IsoDate, CalendarEntry[]>;
   /** Plan-wide events per ISO week (selected + booked) for the budget dots. */
   weekLoad: ReadonlyMap<string, number>;
   diffOf: (candidateId: string) => "none" | "added" | "removed";
@@ -31,6 +32,7 @@ export function WeekRow({
   dragTargetDate,
   plannedByDate,
   bookedByDate,
+  personalByDate,
   weekLoad,
   diffOf,
   violatedIds,
@@ -67,6 +69,7 @@ export function WeekRow({
           dragTargetDate={dragTargetDate}
           planned={plannedByDate.get(date) ?? []}
           booked={bookedByDate.get(date) ?? []}
+          personal={personalByDate.get(date) ?? []}
           diffOf={diffOf}
           violatedIds={violatedIds}
           previewMode={previewMode}

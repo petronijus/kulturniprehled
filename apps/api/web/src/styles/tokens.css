@@ -84,4 +84,11 @@
     light-dark(rgb(0 0 0 / 0.045), rgb(255 255 255 / 0.05)) 6px 12px
   );
   --booked-chip: light-dark(#e7e5e0, #2e2e31);
+
+  /* Shared household calendar (Kocourek&Prdelcicka) — deliberately
+     off-palette from the lanes so private life never reads as a
+     cultural pick. */
+  --personal-chip-bg: light-dark(#f0eef9, #232236);
+  --personal-chip-border: light-dark(#cdc7e6, #43406b);
+  --personal-chip-blocking: light-dark(#6b5bb5, #a094e6);
 }

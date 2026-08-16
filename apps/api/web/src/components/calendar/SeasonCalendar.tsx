@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { BookedEvent, Candidate, ReservedSlot, Season } from "../../api/types";
+import type { BookedEvent, CalendarEntry, Candidate, ReservedSlot, Season } from "../../api/types";
 import { candidateDate } from "../../domain/planState";
 import type { IsoDate, IsoMonth } from "../../domain/season";
 import { isoToLocalDate, isoWeek, monthOf, monthsBetween } from "../../domain/season";
@@ -19,6 +19,8 @@ interface SeasonCalendarProps {
   reservedSlots: ReservedSlot[];
   violations: Violation[];
   blockedDays: ReadonlySet<IsoDate>;
+  /** Shared household calendar, one bucket per day it occupies. */
+  personalByDate: ReadonlyMap<IsoDate, CalendarEntry[]>;
   /** The dragged candidate's own date, or null when no drag is active. */
   dragTargetDate: IsoDate | null;
   /** Hovered + pinned pool cards — their date cells (and chips) light up. */
@@ -38,6 +40,7 @@ export function SeasonCalendar({
   reservedSlots,
   violations,
   blockedDays,
+  personalByDate,
   dragTargetDate,
   highlightIds,
   highlightDates,
@@ -232,6 +235,7 @@ export function SeasonCalendar({
             dragTargetDate={dragTargetDate}
             plannedByDate={plannedByDate}
             bookedByDate={bookedByDate}
+            personalByDate={personalByDate}
             weekLoad={weekLoad}
             reservedSlots={reservedByMonth.get(month) ?? []}
             diffOf={diffOf}

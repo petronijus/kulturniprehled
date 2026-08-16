@@ -20,8 +20,23 @@ the API.
 | `/v1/costs/*`        | Per-event cost rows                                    | `api/v1/costs.py` |
 | `/v1/stats/*`        | Year-in-review aggregates                              | `api/v1/stats.py` |
 | `/v1/sync/*`         | Change-log pull + outbox apply                         | `api/v1/sync.py` |
-| `/v1/season/*`       | Season planner: plans, candidate pool (bulk upsert + plan state), scenarios (upsert/apply), novelty cursor | `api/v1/season.py` |
+| `/v1/season/*`       | Season planner: plans, candidate pool (bulk upsert + plan state), scenarios (upsert/apply), novelty cursor, shared-calendar view | `api/v1/season.py` |
 | `/app`               | Season-planner SPA (static bundle, history-API fallback, relaxed CSP). **Home-only + login-less**: with `WEB_PUBLIC=false` (default) Cloudflare-proxied requests get 404 — reachable only via LAN / Tailscale | `web.py` + `web/dist` |
+
+`GET /v1/season/calendar?from=&to=` is the one place the shared household
+calendar (Kocourek&Prdelčička) is read and classified. The API fetches its
+secret iCal address (`CALENDAR_ICS_URL`, cached for
+`CALENDAR_CACHE_TTL_SECONDS`), expands recurrence over the window and
+answers with `blocked_days` + `conflicts` — the exact shape
+`skills/kulturni-sezona/bin/kp_validate.py` consumes as `blocked.json` —
+plus `entries`, one per day an event occupies, which the planner grid
+renders. Classification canon: all-day spans block every covered date
+(DTEND exclusive); a title matching
+`(dovolen|holiday|pryč|away|cottage|šumperák|chalup)` blocks every day it
+spans; every other timed event becomes a conflict window. An unconfigured
+or unreachable feed answers `200` with `available: false` (a stale cached
+feed is preferred over an empty one), so no consumer ever hard-fails on
+the calendar. The window is capped at 400 days.
 
 Season endpoints are gated by the `season:read` / `season:write` PAT
 scopes (interactive JWTs and unscoped PATs pass everywhere). With

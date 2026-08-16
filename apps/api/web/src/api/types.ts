@@ -116,3 +116,40 @@ export interface BookedEvent {
 export interface SeasonBookedResponse {
   items: BookedEvent[];
 }
+
+/** One local day occupied by one event of the shared household calendar
+ * (Kocourek&Prdelčička). A multi-day event yields one entry per day it
+ * covers — `span_index` / `span_days` say which. */
+export interface CalendarEntry {
+  uid: string;
+  title: string;
+  day: string;
+  all_day: boolean;
+  starts_at: string | null;
+  ends_at: string | null;
+  /** Counts into `blocked_days` — the planner must not book this day. */
+  blocking: boolean;
+  span_days: number;
+  span_index: number;
+}
+
+export interface CalendarConflict {
+  start_iso: string;
+  end_iso: string;
+  title: string;
+}
+
+/** GET /v1/season/calendar. `available: false` (no feed configured, or the
+ * feed is unreachable and nothing was cached) is a normal answer — the
+ * planner renders without the calendar layer. */
+export interface CalendarView {
+  available: boolean;
+  unavailable_reason: string | null;
+  calendar_name: string | null;
+  fetched_at: string | null;
+  range_start: string;
+  range_end: string;
+  blocked_days: string[];
+  conflicts: CalendarConflict[];
+  entries: CalendarEntry[];
+}

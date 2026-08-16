@@ -1,8 +1,14 @@
 import { useDroppable } from "@dnd-kit/core";
-import type { BookedEvent, Candidate } from "../../api/types";
+import type { BookedEvent, CalendarEntry, Candidate } from "../../api/types";
+import { dayTooltip } from "../../domain/calendar";
 import type { IsoDate } from "../../domain/season";
+import { cs } from "../../i18n/cs";
 import styles from "./DayCell.module.css";
-import { BookedChip, EventChip } from "./EventChip";
+import { BookedChip, EventChip, PersonalChip } from "./EventChip";
+
+/** Household entries shown in full; the rest collapse into a "+N" summary so
+ * a busy family day can never push the cultural plan out of its cell. */
+const MAX_PERSONAL_CHIPS = 2;
 
 interface DayCellProps {
   date: IsoDate;
@@ -13,6 +19,8 @@ interface DayCellProps {
   dragTargetDate: IsoDate | null;
   planned: Candidate[];
   booked: BookedEvent[];
+  /** Shared household calendar (Kocourek&Prdelčička) on this day. */
+  personal: CalendarEntry[];
   diffOf: (candidateId: string) => "none" | "added" | "removed";
   violatedIds: ReadonlySet<string>;
   previewMode: boolean;
@@ -29,6 +37,7 @@ export function DayCell({
   dragTargetDate,
   planned,
   booked,
+  personal,
   diffOf,
   violatedIds,
   previewMode,
@@ -62,10 +71,21 @@ export function DayCell({
     classes.push(styles.highlighted);
   }
 
+  const shownPersonal = personal.slice(0, MAX_PERSONAL_CHIPS);
+  const hiddenPersonal = personal.slice(MAX_PERSONAL_CHIPS);
+
   return (
     <div ref={setNodeRef} className={classes.join(" ")} data-date={date}>
       <span className={styles.dayNumber}>{Number(date.slice(8, 10))}</span>
       <div className={styles.chips}>
+        {shownPersonal.map((entry) => (
+          <PersonalChip key={`${entry.uid}-${entry.span_index}`} entry={entry} />
+        ))}
+        {hiddenPersonal.length > 0 && (
+          <span className={styles.personalMore} title={dayTooltip(hiddenPersonal)}>
+            {cs.calendar.more(hiddenPersonal.length)}
+          </span>
+        )}
         {booked.map((event) => (
           <BookedChip key={event.id} title={event.title} />
         ))}

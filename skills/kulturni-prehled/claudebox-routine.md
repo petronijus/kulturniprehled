@@ -16,7 +16,7 @@ only the interactive MCP connectors are missing.
 | --- | --- |
 | `op` token | `$KP_DIGEST_TOKEN` env (scoped PAT: `digest:read feedback:sign digest:send events:read season:read season:write`), injected by run-weekly.sh from a 0600 file — never print it |
 | `/v1/events` history queries (same-work hard veto) | work as-is — the PAT carries `events:read` (read-only; mutations stay unrestricted-only) |
-| local `google-workspace` MCP (calendar) | `$KP_CALENDAR_ICS_URL` env (secret iCal address of the Kocourek&Prdelčička calendar), when set — see below; unset → empty blocked set + a footer note in the email |
+| local `google-workspace` MCP (calendar) | nothing to substitute — the calendar now comes from `GET /v1/season/calendar` (SKILL.md step 2), same as on a workstation. `available: false` → empty blocked set + a footer note in the email |
 | Gmail send via workspace MCP | **`POST /v1/digest/send`** (SMTP relay; recipient is server-side). On 503/502: write the rendered HTML next to the run log and do NOT ack — there is no draft fallback here |
 | Spotify connector | skip; note in `missing_sources` |
 | `api.discogs.com` | `discogs` field of `GET /v1/digest/context` (never fetch Discogs directly) |
@@ -30,18 +30,6 @@ Unchanged from the local flow (unlike the old cloud routine):
   (stdlib-only) for the `fit` checks.
 - Pool-aware enrichment via the season API works — dedup keys per
   `skills/kulturni-sezona/SKILL.md`.
-
-## Calendar via ICS (blocked days)
-
-When `$KP_CALENDAR_ICS_URL` is set, fetch it with
-`curl -sS "$KP_CALENDAR_ICS_URL"` and parse VEVENTs over the next 180
-days (python3 stdlib is fine; unfold folded lines first). Classify per
-the canon: `DTSTART;VALUE=DATE` all-day spans → every covered date into
-`blocked_days` (DTEND date is exclusive); multi-day or all-day events
-whose SUMMARY matches `(dovolená|holiday|pryč|away|cottage|šumperák|chalupa)`
-(case-insensitive) likewise; timed events → `conflicts`
-`{start_iso, end_iso, title}`. The URL is a secret — never echo it or
-write it into a repo file.
 
 ## Run discipline
 

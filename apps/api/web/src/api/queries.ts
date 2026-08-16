@@ -7,6 +7,7 @@ import { isoToLocalDate, seasonWindowFor } from "../domain/season";
 import { ApiError, api } from "./client";
 import type {
   BookedEvent,
+  CalendarView,
   Candidate,
   PoolListResponse,
   Scenario,
@@ -20,6 +21,7 @@ export const queryKeys = {
   pool: (seasonId: string) => ["pool", seasonId] as const,
   scenarios: (seasonId: string) => ["scenarios", seasonId] as const,
   booked: (seasonId: string) => ["booked", seasonId] as const,
+  calendar: (from: string, to: string) => ["calendar", from, to] as const,
 };
 
 /** Get the active season, bootstrapping it when none exists.
@@ -128,5 +130,24 @@ export function useBookedEvents(season: Season | undefined) {
     },
     enabled: season !== undefined,
     staleTime: 5 * 60_000,
+  });
+}
+
+/** The shared household calendar over the season window — blocked days for
+ * the rule engine, entries for the grid. The backend already caches the
+ * feed, so a modest refetch keeps a freshly added trip visible without a
+ * page reload. */
+export function useSharedCalendar(season: Season | undefined) {
+  const from = season?.starts_on ?? "";
+  const to = season?.ends_on ?? "";
+  return useQuery({
+    queryKey: queryKeys.calendar(from, to),
+    queryFn: () =>
+      api<CalendarView>(
+        `/v1/season/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      ),
+    enabled: season !== undefined,
+    staleTime: 5 * 60_000,
+    refetchInterval: 15 * 60_000,
   });
 }

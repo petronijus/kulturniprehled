@@ -6,9 +6,9 @@
 #
 # Secrets: ~/.config/kulturni-prehled/kp-token (0600) holds the scoped PAT
 # (digest:read feedback:sign digest:send events:read season:read season:write) —
-# provisioned per infra/claudebox/README.md. Optional:
-# ~/.config/kulturni-prehled/calendar-ics-url with the shared calendar's
-# secret iCal address (blocked-day checks degrade gracefully without it).
+# provisioned per infra/claudebox/README.md. The shared calendar is NOT a
+# secret of this box any more: the API holds the iCal address
+# (CALENDAR_ICS_URL in its .env) and serves GET /v1/season/calendar.
 set -euo pipefail
 
 # Manual ssh runs come in with a bare non-login PATH — make claude et al.
@@ -30,12 +30,6 @@ TOKEN_FILE="$CFG_DIR/kp-token"
 KP_DIGEST_TOKEN="$(cat "$TOKEN_FILE")"
 export KP_DIGEST_TOKEN
 export KP_API_BASE="${KP_API_BASE:-https://kulturniprehled.bastla.com}"
-
-ICS_FILE="$CFG_DIR/calendar-ics-url"
-if [ -r "$ICS_FILE" ]; then
-  KP_CALENDAR_ICS_URL="$(cat "$ICS_FILE")"
-  export KP_CALENDAR_ICS_URL
-fi
 
 ALLOWED="$(grep -vE '^\s*(#|$)' "$HERE/allowed-tools-weekly.txt" | paste -sd, -)"
 

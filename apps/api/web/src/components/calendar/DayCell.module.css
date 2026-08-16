@@ -70,3 +70,11 @@
   outline-offset: -2px;
   background: var(--highlight-bg);
 }
+
+.personalMore {
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+  color: var(--text-faint);
+  padding-inline-start: var(--space-1);
+  cursor: default;
+}

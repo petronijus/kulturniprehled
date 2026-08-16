@@ -64,6 +64,17 @@ class Settings(BaseSettings):
     google_oauth_client_secret: str = ""
     google_calendar_id: str = ""
 
+    # Shared household calendar (Kocourek&Prdelčička) as its **secret iCal
+    # address** (Google Calendar → calendar settings → "Secret address in
+    # iCal format"). The API is the single place that reads it: the planner
+    # SPA renders the days, and the weekly/season skills fetch the same
+    # classification from GET /v1/season/calendar instead of parsing the
+    # feed themselves. Empty → the endpoint answers `available: false` and
+    # every consumer degrades to "conflicts not checked".
+    # Anyone holding this URL can read the calendar — treat it as a secret.
+    calendar_ics_url: str = ""
+    calendar_cache_ttl_seconds: int = 900
+
     allowed_emails: str = ""
 
     # Anthropic

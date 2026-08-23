@@ -131,6 +131,15 @@ class Report:
         self.warnings.append({"code": code, "detail": detail, **extra})
 
 
+def as_prague(moment_iso: str) -> datetime:
+    """Parse ISO 8601, treating tz-naive stamps as Europe/Prague wall time."""
+
+    moment = datetime.fromisoformat(moment_iso.replace("Z", "+00:00"))
+    if moment.tzinfo is None:
+        return moment.replace(tzinfo=PRAGUE)
+    return moment.astimezone(PRAGUE)
+
+
 def timed_conflict(date_iso: str, starts_at: str, blocked: dict[str, Any] | None) -> str | None:
     """Return the conflicting calendar title, if any."""
 
@@ -138,11 +147,11 @@ def timed_conflict(date_iso: str, starts_at: str, blocked: dict[str, Any] | None
         return None
     if date_iso in set(blocked.get("blocked_days", [])):
         return f"blokovaný den {date_iso}"
-    start = datetime.fromisoformat(starts_at.replace("Z", "+00:00"))
+    start = as_prague(starts_at)
     for conflict in blocked.get("conflicts", []):
         try:
-            c_start = datetime.fromisoformat(conflict["start_iso"])
-            c_end = datetime.fromisoformat(conflict["end_iso"])
+            c_start = as_prague(conflict["start_iso"])
+            c_end = as_prague(conflict["end_iso"])
         except (KeyError, TypeError, ValueError):
             continue
         if c_start - timedelta(hours=2) <= start <= c_end + timedelta(hours=1):

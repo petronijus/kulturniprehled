@@ -26,8 +26,6 @@ interface CandidatePoolProps {
   actionsDisabled: boolean;
 }
 
-const STATUS_ORDER: Record<PlanStatus, number> = { undecided: 0, selected: 1, rejected: 2 };
-
 export function CandidatePool({
   pool,
   groups,
@@ -84,9 +82,12 @@ export function CandidatePool({
         });
       })
       .sort((a, b) => {
-        const statusDelta = STATUS_ORDER[groupStatus(a)] - STATUS_ORDER[groupStatus(b)];
-        if (statusDelta !== 0) {
-          return statusDelta;
+        // Chronological and stable: selecting a date must not move the card.
+        // Only rejected productions (visible via the toggle) sink to the end.
+        const rejectedDelta =
+          Number(groupStatus(a) === "rejected") - Number(groupStatus(b) === "rejected");
+        if (rejectedDelta !== 0) {
+          return rejectedDelta;
         }
         const firstA = a.candidates[0]?.starts_at ?? "";
         const firstB = b.candidates[0]?.starts_at ?? "";

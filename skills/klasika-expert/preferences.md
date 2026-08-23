@@ -12,6 +12,15 @@ Edit freely — the skill rereads it on every run.
 - **Veto**: dechovky, lidovka, muzikály (s velmi vzácnou výjimkou —
   pokud je to klasika jako *West Side Story* s reálným orchestrem,
   budiž; ABBA tribute NE).
+- **Veto: dětské / rodinné / edukační řady** — do poolu nepatří vůbec
+  (2026-08-23, poté co „Hudba z večerníčků a pohádek" prošla do
+  plánovače). Poznávací znaky: názvy řad *Orchestr na dotek*, *Hudbou
+  k srdci*, *Kulišáci v orchestru*, *Koncerty pro děti*, ČF edu tituly
+  (*Vláčkem za Dvořá(č)kem*, *Císařův slavík*, *Basa tvrdí muziku*,
+  *Zkouška orchestru*, *Smyčcové mlsání*, …), slova
+  večerníček/pohádka/workshop/„aneb" + dětský námět, URL segment
+  `koncerty-pro-deti`, představení v 11:00/14:00 o víkendu s pohádkovým
+  názvem.
 - **Strong yes**: klasika (baroko → 20. století — Bach, Beethoven,
   Mahler, Šostakovič, Bartók, Ligeti), soudobá vážná, jazz s
   klasickým přesahem (Mehldau, Hamasyan), world music s reálným

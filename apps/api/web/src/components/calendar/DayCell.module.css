@@ -41,6 +41,19 @@
   background-image: var(--cell-blocked);
 }
 
+/* A day with a bought ticket — the strongest state a day can have, so it
+   reads instantly against household-calendar days and holidays. */
+.bookedDay:not(.outside) {
+  background: var(--booked-day-bg);
+  box-shadow: inset 0 0 0 2px var(--booked-day-ring);
+  border-radius: 2px;
+}
+
+.bookedDay .dayNumber {
+  color: var(--booked-day-ring);
+  font-weight: 700;
+}
+
 .target {
   outline: 2px dashed var(--focus-ring);
   outline-offset: -2px;

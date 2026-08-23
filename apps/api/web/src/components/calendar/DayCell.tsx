@@ -64,6 +64,9 @@ export function DayCell({
   if (blocked) {
     classes.push(styles.blocked);
   }
+  if (booked.length > 0) {
+    classes.push(styles.bookedDay);
+  }
   if (isTarget) {
     classes.push(styles.target);
   }

@@ -24,12 +24,22 @@ export const cs = {
     all: "Vše",
     undecidedOnly: "Jen nerozhodnuté",
     newOnly: "Nové",
+    showRejected: "I odmítnuté",
     month: "Měsíc",
     facet: "Těleso / místo",
     facetSources: "Tělesa a festivaly",
     facetVenues: "Místa",
     lane: "Oblast",
     search: "Hledat…",
+  },
+  production: {
+    dates: (count: number) =>
+      count === 1 ? "1 termín" : count <= 4 ? `${count} termíny` : `${count} termínů`,
+    pickHint: "Vyber termín:",
+    selectDate: "Vybrat tento termín do plánu",
+    deselectDate: "Vrátit termín mezi kandidáty",
+    dateRejected: "Termín odmítnut",
+    inPlan: "v plánu",
   },
   lanes: {
     klasika: "Vážná hudba",

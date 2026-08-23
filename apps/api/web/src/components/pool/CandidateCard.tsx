@@ -1,6 +1,8 @@
 import { useDraggable } from "@dnd-kit/core";
-import type { Candidate } from "../../api/types";
+import type { Candidate, PlanStatus } from "../../api/types";
 import { candidateDate } from "../../domain/planState";
+import type { ProductionGroup } from "../../domain/productions";
+import { groupStatus } from "../../domain/productions";
 import { isoToLocalTime, weekday } from "../../domain/season";
 import { cs } from "../../i18n/cs";
 import { isNew } from "../../state/newSince";
@@ -9,11 +11,9 @@ import { LaneBadge } from "./LaneBadge";
 import { SourceBadge } from "./SourceBadge";
 
 interface CandidateCardProps {
-  candidate: Candidate;
-  onSelect: () => void;
-  onReject: () => void;
-  onUndecide: () => void;
-  onHoverChange: (candidate: Candidate | null) => void;
+  group: ProductionGroup;
+  onSetStatus: (candidate: Candidate, status: PlanStatus) => void;
+  onHoverChange: (group: ProductionGroup | null) => void;
   pinned: boolean;
   onTogglePin: () => void;
   actionsDisabled: boolean;
@@ -26,28 +26,69 @@ function formatDate(candidate: Candidate): string {
   return `${dayName} ${Number(day)}. ${Number(month)}. · ${isoToLocalTime(candidate.starts_at)}`;
 }
 
-export function CandidateCard({
+/** One date of a multi-date production — click toggles it in/out of the plan. */
+function DateRow({
   candidate,
-  onSelect,
-  onReject,
-  onUndecide,
+  onSetStatus,
+  disabled,
+}: {
+  candidate: Candidate;
+  onSetStatus: (candidate: Candidate, status: PlanStatus) => void;
+  disabled: boolean;
+}) {
+  const selected = candidate.plan_status === "selected";
+  const rejected = candidate.plan_status === "rejected";
+  const classes = [styles.dateRow];
+  if (selected) {
+    classes.push(styles.dateSelected);
+  }
+  if (rejected) {
+    classes.push(styles.dateRejected);
+  }
+  const title = rejected
+    ? cs.production.dateRejected
+    : selected
+      ? cs.production.deselectDate
+      : cs.production.selectDate;
+  return (
+    <button
+      type="button"
+      className={classes.join(" ")}
+      title={title}
+      disabled={disabled}
+      onClick={() => onSetStatus(candidate, selected ? "undecided" : "selected")}
+    >
+      <span className={styles.dateLabel}>{formatDate(candidate)}</span>
+      {candidate.tickets_available === false && <span className={styles.dateSoldOut}>⚠</span>}
+      {selected && <span className={styles.dateMark}>✓ {cs.production.inPlan}</span>}
+    </button>
+  );
+}
+
+export function CandidateCard({
+  group,
+  onSetStatus,
   onHoverChange,
   pinned,
   onTogglePin,
   actionsDisabled,
 }: CandidateCardProps) {
-  const draggable = candidate.plan_status !== "selected" && !actionsDisabled;
+  const { primary, richest, candidates } = group;
+  const multiDate = candidates.length > 1;
+  const status = groupStatus(group);
+
+  const draggable = status !== "selected" && !actionsDisabled;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `card-${candidate.id}`,
-    data: { kind: "card", candidate },
+    id: `card-${primary.id}`,
+    data: { kind: "card", candidate: primary },
     disabled: !draggable,
   });
 
   const classes = [styles.card];
-  if (candidate.plan_status === "rejected") {
+  if (status === "rejected") {
     classes.push(styles.rejected);
   }
-  if (candidate.plan_status === "selected") {
+  if (status === "selected") {
     classes.push(styles.selected);
   }
   if (isDragging) {
@@ -57,7 +98,7 @@ export function CandidateCard({
     classes.push(styles.pinned);
   }
 
-  const program = (candidate.program ?? [])
+  const program = (richest.program ?? [])
     .map((entry) => {
       const author = entry.composer ?? entry.author ?? entry.director;
       const work = entry.work ?? entry.play ?? entry.film;
@@ -65,13 +106,30 @@ export function CandidateCard({
     })
     .filter((line): line is string => line !== null);
 
+  const anyNew = candidates.some((candidate) => isNew(candidate.first_seen_at));
+  const seasonEvent = candidates.some((candidate) => candidate.season_event);
+  const rejectAll = () => {
+    for (const candidate of candidates) {
+      if (candidate.plan_status !== "rejected") {
+        onSetStatus(candidate, "rejected");
+      }
+    }
+  };
+  const undecideAll = () => {
+    for (const candidate of candidates) {
+      if (candidate.plan_status !== "undecided") {
+        onSetStatus(candidate, "undecided");
+      }
+    }
+  };
+
   return (
     <article
       ref={setNodeRef}
       className={classes.join(" ")}
-      onMouseEnter={() => onHoverChange(candidate)}
+      onMouseEnter={() => onHoverChange(group)}
       onMouseLeave={() => onHoverChange(null)}
-      onFocus={() => onHoverChange(candidate)}
+      onFocus={() => onHoverChange(group)}
       onBlur={() => onHoverChange(null)}
       onClick={(event) => {
         // Buttons and links inside the card keep their own actions.
@@ -79,66 +137,83 @@ export function CandidateCard({
           onTogglePin();
         }
       }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && event.target === event.currentTarget) {
+          onTogglePin();
+        }
+      }}
       {...listeners}
       {...attributes}
     >
       <header className={styles.header}>
-        <LaneBadge lane={candidate.lane} />
-        <SourceBadge sourceType={candidate.source_type} sourceName={candidate.source_name} />
-        {candidate.season_event && (
-          <span className={styles.seasonBadge}>★ {cs.seasonEventBadge}</span>
-        )}
-        {isNew(candidate.first_seen_at) && <span className={styles.newBadge}>{cs.newBadge}</span>}
-        {candidate.score !== null && (
-          <span className={styles.score} title={candidate.why_cs ?? ""}>
-            {Math.round(candidate.score * 100)}
+        <LaneBadge lane={primary.lane} />
+        <SourceBadge sourceType={richest.source_type} sourceName={richest.source_name} />
+        {seasonEvent && <span className={styles.seasonBadge}>★ {cs.seasonEventBadge}</span>}
+        {anyNew && <span className={styles.newBadge}>{cs.newBadge}</span>}
+        {richest.score !== null && (
+          <span className={styles.score} title={richest.why_cs ?? ""}>
+            {Math.round(richest.score * 100)}
           </span>
         )}
       </header>
-      <h3 className={styles.title}>{candidate.title}</h3>
+      <h3 className={styles.title}>{richest.title}</h3>
       <p className={styles.meta}>
-        {formatDate(candidate)}
-        {candidate.venue !== null && ` · ${candidate.venue}`}
-        {candidate.price_czk !== null && ` · ${candidate.price_czk} Kč`}
+        {multiDate ? cs.production.dates(candidates.length) : formatDate(primary)}
+        {primary.venue !== null && ` · ${primary.venue}`}
+        {richest.price_czk !== null && ` · ${richest.price_czk} Kč`}
       </p>
+      {multiDate && (
+        <div className={styles.dates}>
+          {candidates.map((candidate) => (
+            <DateRow
+              key={candidate.id}
+              candidate={candidate}
+              onSetStatus={onSetStatus}
+              disabled={actionsDisabled}
+            />
+          ))}
+        </div>
+      )}
       {program.length > 0 && <p className={styles.program}>{program.join(" · ")}</p>}
-      {candidate.why_cs !== null && <p className={styles.why}>{candidate.why_cs}</p>}
-      {candidate.tickets_available === false && <p className={styles.soldOut}>⚠ {cs.soldOut}</p>}
+      {richest.why_cs !== null && <p className={styles.why}>{richest.why_cs}</p>}
+      {!multiDate && primary.tickets_available === false && (
+        <p className={styles.soldOut}>⚠ {cs.soldOut}</p>
+      )}
       <footer className={styles.actions}>
-        {candidate.plan_status !== "selected" && (
+        {!multiDate && status !== "selected" && (
           <button
             type="button"
             className={styles.selectButton}
-            onClick={onSelect}
+            onClick={() => onSetStatus(primary, "selected")}
             disabled={actionsDisabled}
           >
             ✓ {cs.select}
           </button>
         )}
-        {candidate.plan_status === "undecided" && (
+        {status === "undecided" && (
           <button
             type="button"
             className={styles.rejectButton}
-            onClick={onReject}
+            onClick={rejectAll}
             disabled={actionsDisabled}
           >
             ✕ {cs.reject}
           </button>
         )}
-        {candidate.plan_status !== "undecided" && (
+        {status !== "undecided" && (
           <button
             type="button"
             className={styles.undecideButton}
-            onClick={onUndecide}
+            onClick={undecideAll}
             disabled={actionsDisabled}
           >
             ↩ {cs.undecide}
           </button>
         )}
-        {candidate.url !== null && (
+        {richest.url !== null && (
           <a
             className={styles.link}
-            href={candidate.url}
+            href={richest.url}
             target="_blank"
             rel="noreferrer"
             onPointerDown={(event) => event.stopPropagation()}

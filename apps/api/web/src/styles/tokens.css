@@ -85,6 +85,10 @@
   );
   --booked-chip: light-dark(#e7e5e0, #2e2e31);
 
+  /* A day with a bought ticket — whole-cell emphasis, not just the chip. */
+  --booked-day-ring: var(--ok);
+  --booked-day-bg: light-dark(#e6f5ea, #14301d);
+
   /* Shared household calendar (Kocourek&Prdelcicka) — deliberately
      off-palette from the lanes so private life never reads as a
      cultural pick. */

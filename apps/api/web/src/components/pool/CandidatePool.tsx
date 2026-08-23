@@ -1,8 +1,10 @@
 import { useDroppable } from "@dnd-kit/core";
 import { useMemo, useState } from "react";
-import type { Candidate, PlanStatus } from "../../api/types";
+import type { BookedEvent, Candidate, PlanStatus } from "../../api/types";
 import { decodeFacet, matchesFacet, poolFacets } from "../../domain/facets";
 import { candidateDate } from "../../domain/planState";
+import type { ProductionGroup } from "../../domain/productions";
+import { groupStatus, isProductionBooked } from "../../domain/productions";
 import type { IsoMonth } from "../../domain/season";
 import { monthOf } from "../../domain/season";
 import { cs } from "../../i18n/cs";
@@ -14,11 +16,13 @@ import { defaultFilters, PoolFilters } from "./PoolFilters";
 
 interface CandidatePoolProps {
   pool: Candidate[];
+  groups: ProductionGroup[];
+  booked: BookedEvent[];
   months: IsoMonth[];
   onSetStatus: (candidate: Candidate, status: PlanStatus) => void;
-  onHoverChange: (candidate: Candidate | null) => void;
-  pinnedIds: ReadonlySet<string>;
-  onTogglePin: (candidate: Candidate) => void;
+  onHoverChange: (group: ProductionGroup | null) => void;
+  pinnedKeys: ReadonlySet<string>;
+  onTogglePin: (group: ProductionGroup) => void;
   actionsDisabled: boolean;
 }
 
@@ -26,10 +30,12 @@ const STATUS_ORDER: Record<PlanStatus, number> = { undecided: 0, selected: 1, re
 
 export function CandidatePool({
   pool,
+  groups,
+  booked,
   months,
   onSetStatus,
   onHoverChange,
-  pinnedIds,
+  pinnedKeys,
   onTogglePin,
   actionsDisabled,
 }: CandidatePoolProps) {
@@ -37,43 +43,56 @@ export function CandidatePool({
   const facets = useMemo(() => poolFacets(pool), [pool]);
   const { setNodeRef, isOver } = useDroppable({ id: "pool", data: { kind: "pool" } });
 
+  // Filters apply at production level: a group passes when ANY of its dates
+  // does, so a month filter shows every production reaching into that month.
   const visible = useMemo(() => {
     const query = filters.query.trim().toLowerCase();
     const facet = filters.facet === null ? null : decodeFacet(filters.facet);
-    return pool
-      .filter((candidate) => {
-        if (filters.lane !== null && candidate.lane !== filters.lane) {
+    return groups
+      .filter((group) => {
+        if (isProductionBooked(group, booked)) {
           return false;
         }
-        if (filters.month !== null && monthOf(candidateDate(candidate)) !== filters.month) {
+        const status = groupStatus(group);
+        if (!filters.showRejected && status === "rejected") {
           return false;
         }
-        if (filters.undecidedOnly && candidate.plan_status !== "undecided") {
+        if (filters.undecidedOnly && status !== "undecided") {
           return false;
         }
-        if (filters.newOnly && !isNew(candidate.first_seen_at)) {
-          return false;
-        }
-        if (facet !== null && !matchesFacet(candidate, facet)) {
-          return false;
-        }
-        if (query !== "") {
-          const haystack =
-            `${candidate.title} ${candidate.venue ?? ""} ${candidate.source_name ?? ""}`.toLowerCase();
-          if (!haystack.includes(query)) {
+        return group.candidates.some((candidate) => {
+          if (filters.lane !== null && candidate.lane !== filters.lane) {
             return false;
           }
-        }
-        return true;
+          if (filters.month !== null && monthOf(candidateDate(candidate)) !== filters.month) {
+            return false;
+          }
+          if (filters.newOnly && !isNew(candidate.first_seen_at)) {
+            return false;
+          }
+          if (facet !== null && !matchesFacet(candidate, facet)) {
+            return false;
+          }
+          if (query !== "") {
+            const haystack =
+              `${candidate.title} ${candidate.venue ?? ""} ${candidate.source_name ?? ""}`.toLowerCase();
+            if (!haystack.includes(query)) {
+              return false;
+            }
+          }
+          return true;
+        });
       })
       .sort((a, b) => {
-        const statusDelta = STATUS_ORDER[a.plan_status] - STATUS_ORDER[b.plan_status];
+        const statusDelta = STATUS_ORDER[groupStatus(a)] - STATUS_ORDER[groupStatus(b)];
         if (statusDelta !== 0) {
           return statusDelta;
         }
-        return a.starts_at.localeCompare(b.starts_at);
+        const firstA = a.candidates[0]?.starts_at ?? "";
+        const firstB = b.candidates[0]?.starts_at ?? "";
+        return firstA.localeCompare(firstB);
       });
-  }, [pool, filters]);
+  }, [groups, booked, filters]);
 
   if (pool.length === 0) {
     // The season exists but the scrape hasn't filled it yet — explain the
@@ -95,16 +114,14 @@ export function CandidatePool({
       <PoolFilters filters={filters} months={months} facets={facets} onChange={setFilters} />
       <div className={styles.cards}>
         {visible.length === 0 && <p className={styles.empty}>{cs.poolEmpty}</p>}
-        {visible.map((candidate) => (
+        {visible.map((group) => (
           <CandidateCard
-            key={candidate.id}
-            candidate={candidate}
-            onSelect={() => onSetStatus(candidate, "selected")}
-            onReject={() => onSetStatus(candidate, "rejected")}
-            onUndecide={() => onSetStatus(candidate, "undecided")}
+            key={group.key}
+            group={group}
+            onSetStatus={onSetStatus}
             onHoverChange={onHoverChange}
-            pinned={pinnedIds.has(candidate.id)}
-            onTogglePin={() => onTogglePin(candidate)}
+            pinned={pinnedKeys.has(group.key)}
+            onTogglePin={() => onTogglePin(group)}
             actionsDisabled={actionsDisabled}
           />
         ))}

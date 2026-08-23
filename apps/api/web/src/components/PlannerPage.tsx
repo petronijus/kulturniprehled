@@ -11,6 +11,8 @@ import {
 import type { CalendarEntry, Candidate, PlanStatus } from "../api/types";
 import { blockedDaysOf, entriesByDay, holidaysByDay } from "../domain/calendar";
 import { candidateDate, selectedIdsOf, toPlannedItems } from "../domain/planState";
+import type { ProductionGroup } from "../domain/productions";
+import { groupProductions } from "../domain/productions";
 import type { IsoDate } from "../domain/season";
 import { monthsBetween } from "../domain/season";
 import { computeViolations } from "../domain/violations";
@@ -41,10 +43,14 @@ export function PlannerPage() {
 
   const [previewScenarioId, setPreviewScenarioId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [hoveredCandidate, setHoveredCandidate] = useState<Candidate | null>(null);
-  const [pinnedCandidates, setPinnedCandidates] = useState<Candidate[]>([]);
+  // Hover/pin are tracked by production key so they survive pool refetches;
+  // the member candidates are re-derived from the current pool each render.
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [pinnedKeys, setPinnedKeys] = useState<string[]>([]);
 
   const pool = useMemo(() => poolQuery.data ?? [], [poolQuery.data]);
+  const groups = useMemo(() => groupProductions(pool), [pool]);
+  const groupsByKey = useMemo(() => new Map(groups.map((group) => [group.key, group])), [groups]);
   const scenarios = useMemo(() => scenariosQuery.data ?? [], [scenariosQuery.data]);
   const booked = useMemo(() => bookedQuery.data ?? [], [bookedQuery.data]);
   const blockedDays = useMemo(() => blockedDaysOf(calendarQuery.data), [calendarQuery.data]);
@@ -83,20 +89,44 @@ export function PlannerPage() {
       if (previewMode) {
         setPreviewScenarioId(null);
       } else {
-        setPinnedCandidates([]);
+        setPinnedKeys([]);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [previewMode]);
 
-  const togglePin = useCallback((candidate: Candidate) => {
-    setPinnedCandidates((current) =>
-      current.some((c) => c.id === candidate.id)
-        ? current.filter((c) => c.id !== candidate.id)
-        : [...current, candidate],
+  const togglePin = useCallback((group: ProductionGroup) => {
+    setPinnedKeys((current) =>
+      current.includes(group.key)
+        ? current.filter((key) => key !== group.key)
+        : [...current, group.key],
     );
   }, []);
+
+  const onHoverChange = useCallback((group: ProductionGroup | null) => {
+    setHoveredKey(group === null ? null : group.key);
+  }, []);
+
+  // A hovered or pinned card lights up every date of its production.
+  const { highlightIds, highlightDates, scrollTarget } = useMemo(() => {
+    const ids = new Set<string>();
+    const dates = new Set<IsoDate>();
+    const activeKeys = hoveredKey !== null ? [...pinnedKeys, hoveredKey] : pinnedKeys;
+    let target: IsoDate | null = null;
+    for (const key of activeKeys) {
+      const group = groupsByKey.get(key);
+      if (group === undefined) {
+        continue;
+      }
+      for (const candidate of group.candidates) {
+        ids.add(candidate.id);
+        dates.add(candidateDate(candidate));
+      }
+      target = candidateDate(group.primary);
+    }
+    return { highlightIds: ids, highlightDates: dates, scrollTarget: target };
+  }, [hoveredKey, pinnedKeys, groupsByKey]);
 
   const setStatus = useCallback(
     (candidate: Candidate, status: PlanStatus) => {
@@ -184,31 +214,18 @@ export function PlannerPage() {
               personalByDate={calendarVisible ? personalByDate : NO_ENTRIES}
               holidaysByDate={holidaysByDate}
               dragTargetDate={dragTargetDate}
-              highlightIds={(() => {
-                const ids = new Set(pinnedCandidates.map((c) => c.id));
-                if (hoveredCandidate !== null) {
-                  ids.add(hoveredCandidate.id);
-                }
-                return ids;
-              })()}
-              highlightDates={(() => {
-                const dates = new Set(pinnedCandidates.map(candidateDate));
-                if (hoveredCandidate !== null) {
-                  dates.add(candidateDate(hoveredCandidate));
-                }
-                return dates;
-              })()}
-              scrollTarget={(() => {
-                const last = hoveredCandidate ?? pinnedCandidates[pinnedCandidates.length - 1];
-                return last === undefined || last === null ? null : candidateDate(last);
-              })()}
+              highlightIds={highlightIds}
+              highlightDates={highlightDates}
+              scrollTarget={scrollTarget}
             />
             <CandidatePool
               pool={pool}
+              groups={groups}
+              booked={booked}
               months={months}
               onSetStatus={setStatus}
-              onHoverChange={setHoveredCandidate}
-              pinnedIds={new Set(pinnedCandidates.map((c) => c.id))}
+              onHoverChange={onHoverChange}
+              pinnedKeys={new Set(pinnedKeys)}
               onTogglePin={togglePin}
               actionsDisabled={previewMode}
             />

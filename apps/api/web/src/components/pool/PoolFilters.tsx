@@ -11,6 +11,8 @@ export interface PoolFilterState {
   facet: string | null;
   undecidedOnly: boolean;
   newOnly: boolean;
+  /** Fully rejected productions are hidden unless this is on. */
+  showRejected: boolean;
   query: string;
 }
 
@@ -20,6 +22,7 @@ export const defaultFilters: PoolFilterState = {
   facet: null,
   undecidedOnly: false,
   newOnly: false,
+  showRejected: false,
   query: "",
 };
 
@@ -115,6 +118,14 @@ export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersPr
             onChange={(event) => onChange({ ...filters, newOnly: event.target.checked })}
           />
           {cs.filters.newOnly}
+        </label>
+        <label className={styles.toggle}>
+          <input
+            type="checkbox"
+            checked={filters.showRejected}
+            onChange={(event) => onChange({ ...filters, showRejected: event.target.checked })}
+          />
+          {cs.filters.showRejected}
         </label>
       </div>
       <input

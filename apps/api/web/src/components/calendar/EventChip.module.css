@@ -56,9 +56,10 @@
 
 .booked {
   background: var(--booked-chip);
-  border-inline-start-color: var(--text-faint);
+  border-inline-start-color: var(--booked-day-ring);
   cursor: default;
-  color: var(--text-secondary);
+  color: var(--text);
+  font-weight: 600;
 }
 
 .reserved {

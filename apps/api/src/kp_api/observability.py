@@ -118,7 +118,9 @@ _SPOTIFY_API = "https://api.spotify.com"
 _SPOTIFY_HOSTS = "https://*.spotify.com https://*.scdn.co wss://*.spotify.com"
 _SPA_CSP = (
     "default-src 'self'; "
-    "img-src 'self' data:; "
+    # Album covers for whatever the player is playing come from Spotify's
+    # image CDN; nothing else third-party is rendered.
+    "img-src 'self' data: https://i.scdn.co; "
     "style-src 'self'; "
     "script-src 'self'; "
     "connect-src 'self'; "

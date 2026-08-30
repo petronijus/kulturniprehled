@@ -139,3 +139,69 @@
   font-size: var(--text-xs);
   color: var(--text-faint);
 }
+
+/* What the device is really playing: the recording, its cover and a
+   playhead — the panel above says which work, this says which take. */
+.nowPlaying {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.cover {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.recording {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.trackName {
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artists {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+  margin-block-start: var(--space-1);
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--ok);
+  transition: width 500ms linear;
+}
+
+.times {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    transition: none;
+  }
+}

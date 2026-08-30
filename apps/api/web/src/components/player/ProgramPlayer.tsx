@@ -19,6 +19,20 @@ interface ProgramPlayerProps {
   onClose: () => void;
 }
 
+interface TrackState {
+  name: string;
+  artists: string;
+  coverUrl: string | null;
+  position: number;
+  duration: number;
+  reportedAt: number;
+}
+
+function clock(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
 const FRAME_SRC = `${import.meta.env.BASE_URL}player.html`;
 
 export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
@@ -26,6 +40,10 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
   const [movement, setMovement] = useState(0);
   const [paused, setPaused] = useState(true);
   const [failure, setFailure] = useState<string | null>(null);
+  // What the device is actually playing, and since when — the SDK reports
+  // only on change, so the playhead is interpolated between reports.
+  const [track, setTrack] = useState<TrackState | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const frameRef = useRef<HTMLIFrameElement>(null);
   const readyRef = useRef(false);
 
@@ -88,6 +106,14 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
         return;
       }
       setPaused(message.isPaused);
+      setTrack({
+        name: message.trackName,
+        artists: message.artists,
+        coverUrl: message.coverUrl,
+        position: message.position,
+        duration: message.duration,
+        reportedAt: Date.now(),
+      });
       const at = positionOf.get(message.uri);
       if (at !== undefined) {
         setItemIndex(at.item);
@@ -97,6 +123,19 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [send, uris, positionOf]);
+
+  useEffect(() => {
+    if (paused || track === null) {
+      return;
+    }
+    const timer = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(timer);
+  }, [paused, track]);
+
+  const elapsed =
+    track === null
+      ? 0
+      : Math.min(track.position + (paused ? 0 : now - track.reportedAt), track.duration);
 
   const current = queue[itemIndex];
   if (current === undefined) {
@@ -123,6 +162,27 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
         {movements > 1 && ` · ${cs.player.movement(movement + 1, movements)}`}
         {current.kind === "album" && ` · ${cs.player.wholeAlbum}`}
       </p>
+
+      {track !== null && (
+        <div className={styles.nowPlaying}>
+          {track.coverUrl !== null && (
+            <img className={styles.cover} src={track.coverUrl} alt="" width={56} height={56} />
+          )}
+          <div className={styles.recording}>
+            <span className={styles.trackName}>{track.name}</span>
+            <span className={styles.artists}>{track.artists}</span>
+            <div className={styles.progress}>
+              <div
+                className={styles.progressFill}
+                style={{ width: `${track.duration > 0 ? (elapsed / track.duration) * 100 : 0}%` }}
+              />
+            </div>
+            <span className={styles.times}>
+              {clock(elapsed)} / {clock(track.duration)}
+            </span>
+          </div>
+        </div>
+      )}
 
       <iframe
         ref={frameRef}

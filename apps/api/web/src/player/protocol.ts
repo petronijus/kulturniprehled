@@ -25,7 +25,18 @@ export type PlayerEvent =
   | { kind: "ready" }
   /** No player: no token, no Premium, or the SDK refused to start. */
   | { kind: "failed"; reason: string }
-  | { kind: "state"; uri: string; position: number; duration: number; isPaused: boolean };
+  | {
+      kind: "state";
+      uri: string;
+      position: number;
+      duration: number;
+      isPaused: boolean;
+      /** The recording as Spotify names it — the planner knows the work, not
+       * which performance the resolver picked. */
+      trackName: string;
+      artists: string;
+      coverUrl: string | null;
+    };
 
 export function asPlayerEvent(data: unknown): PlayerEvent | null {
   if (typeof data !== "object" || data === null) {
@@ -42,7 +53,7 @@ export function asPlayerEvent(data: unknown): PlayerEvent | null {
   if (kind !== "state") {
     return null;
   }
-  const { uri, position, duration, isPaused } = record;
+  const { uri, position, duration, isPaused, trackName, artists, coverUrl } = record;
   if (
     typeof uri !== "string" ||
     typeof position !== "number" ||
@@ -51,7 +62,16 @@ export function asPlayerEvent(data: unknown): PlayerEvent | null {
   ) {
     return null;
   }
-  return { kind: "state", uri, position, duration, isPaused };
+  return {
+    kind: "state",
+    uri,
+    position,
+    duration,
+    isPaused,
+    trackName: typeof trackName === "string" ? trackName : "",
+    artists: typeof artists === "string" ? artists : "",
+    coverUrl: typeof coverUrl === "string" ? coverUrl : null,
+  };
 }
 
 export function asPlayerCommand(data: unknown): PlayerCommand | null {

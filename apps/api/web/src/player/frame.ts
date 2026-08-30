@@ -21,6 +21,9 @@ const TOKEN_URL = "/v1/season/spotify-token";
 interface WebPlaybackTrack {
   uri: string;
   duration_ms: number;
+  name: string;
+  artists: { name: string }[];
+  album: { images: { url: string; height: number | null }[] };
 }
 
 interface WebPlaybackState {
@@ -167,12 +170,20 @@ window.onSpotifyWebPlaybackSDKReady = () => {
     if (state === null) {
       return;
     }
+    const track = state.track_window.current_track;
+    // Smallest image that is still sharp in the panel's 56px slot.
+    const cover = [...(track?.album.images ?? [])]
+      .sort((a, b) => (a.height ?? 0) - (b.height ?? 0))
+      .find((image) => (image.height ?? 0) >= 64);
     post({
       kind: "state",
-      uri: state.track_window.current_track?.uri ?? "",
+      uri: track?.uri ?? "",
       position: state.position,
       duration: state.duration,
       isPaused: state.paused,
+      trackName: track?.name ?? "",
+      artists: (track?.artists ?? []).map((artist) => artist.name).join(", "),
+      coverUrl: cover?.url ?? track?.album.images[0]?.url ?? null,
     });
   });
 

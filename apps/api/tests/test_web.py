@@ -60,7 +60,9 @@ async def test_spa_gets_relaxed_csp_api_stays_locked(spa_client: AsyncClient) ->
     # the player frame, which is served from here.
     assert "script-src 'self';" in csp
     assert "frame-src 'self'" in csp
-    assert "spotify" not in csp
+    # The only third-party thing the planner itself loads is album art.
+    assert "img-src 'self' data: https://i.scdn.co" in csp
+    assert "sdk.scdn.co" not in csp
     assert "frame-ancestors 'none'" in csp
 
     api = await spa_client.get("/healthz")
@@ -132,7 +134,7 @@ async def test_no_dist_dir_means_no_mount(tmp_path: Path) -> None:
     assert response.status_code == 404
     assert (
         response.headers["content-security-policy"]
-        == "default-src 'self'; img-src 'self' data:; style-src 'self'; "
+        == "default-src 'self'; img-src 'self' data: https://i.scdn.co; style-src 'self'; "
         "script-src 'self'; connect-src 'self'; frame-src 'self'; "
         "frame-ancestors 'none'; base-uri 'none'"
     )

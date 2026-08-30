@@ -49,6 +49,8 @@ export const cs = {
   player: {
     title: "Přehrávání",
     close: "Zavřít přehrávač",
+    play: "Přehrát",
+    pause: "Pauza",
     previous: "Předchozí skladba",
     next: "Další",
     movement: (index: number, total: number) => `${index}. věta z ${total}`,

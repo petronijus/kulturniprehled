@@ -30,12 +30,18 @@ interface Position {
 
 export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
   const [position, setPosition] = useState<Position>({ item: 0, movement: 0 });
+  const [paused, setPaused] = useState(true);
   const [failed, setFailed] = useState(false);
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<SpotifyController | null>(null);
   // The URI the controller is currently on, so one `playback_update` per
   // track can trigger exactly one hand-over.
   const playingRef = useRef<string | null>(null);
+  // The embed loads paused, and `play()` right after `loadUri()` can land
+  // before the iframe is ready — so "start this one" is a standing wish,
+  // retried on `ready` and on the first paused-at-zero update, and dropped
+  // the moment playback actually starts (never fighting a manual pause).
+  const wantPlayRef = useRef(true);
   const advanceRef = useRef<() => void>(() => {});
 
   const current = queue[position.item];
@@ -82,11 +88,23 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
           }
           controllerRef.current = controller;
           playingRef.current = seed;
+          controller.addListener("ready", () => {
+            if (wantPlayRef.current) {
+              controller.play();
+            }
+          });
           controller.addListener("playback_update", ({ data }) => {
+            setPaused(data.isPaused);
+            if (!data.isPaused) {
+              wantPlayRef.current = false;
+            } else if (wantPlayRef.current && data.position === 0) {
+              controller.play();
+            }
             if (data.duration > 0 && data.position >= data.duration - END_SLACK_MS) {
               advanceRef.current();
             }
           });
+          controller.play();
         });
       })
       .catch(() => setFailed(true));
@@ -105,6 +123,7 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
       return;
     }
     playingRef.current = uri;
+    wantPlayRef.current = true;
     controller.loadUri(uri);
     controller.play();
   }, [uri]);
@@ -139,6 +158,25 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
       {failed && <p className={styles.failed}>{cs.player.failed}</p>}
 
       <div className={styles.controls}>
+        <button
+          type="button"
+          className={styles.control}
+          onClick={() => {
+            const controller = controllerRef.current;
+            if (controller === null) {
+              return;
+            }
+            wantPlayRef.current = false;
+            if (paused) {
+              controller.play();
+            } else {
+              controller.pause();
+            }
+          }}
+          title={paused ? cs.player.play : cs.player.pause}
+        >
+          {paused ? "▶" : "⏸"}
+        </button>
         <button
           type="button"
           className={styles.control}

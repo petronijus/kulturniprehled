@@ -2,7 +2,7 @@
  * the whole season once and filter client-side — filters are instant UI
  * state, not server round-trips. */
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isoToLocalDate, seasonWindowFor } from "../domain/season";
 import { ApiError, api } from "./client";
 import type {
@@ -135,6 +135,14 @@ export function useBookedEvents(season: Season | undefined) {
   });
 }
 
+function calendarPath(from: string, to: string, refresh = false): string {
+  const query = new URLSearchParams({ from, to });
+  if (refresh) {
+    query.set("refresh", "true");
+  }
+  return `/v1/season/calendar?${query.toString()}`;
+}
+
 /** The shared household calendar over the season window — blocked days for
  * the rule engine, entries for the grid. The backend already caches the
  * feed, so a modest refetch keeps a freshly added trip visible without a
@@ -144,13 +152,34 @@ export function useSharedCalendar(season: Season | undefined) {
   const to = season?.ends_on ?? "";
   return useQuery({
     queryKey: queryKeys.calendar(from, to),
-    queryFn: () =>
-      api<CalendarView>(
-        `/v1/season/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-      ),
+    queryFn: () => api<CalendarView>(calendarPath(from, to)),
     enabled: season !== undefined,
     staleTime: 5 * 60_000,
     refetchInterval: 15 * 60_000,
+  });
+}
+
+/** "I just added that trip" — pull the feed again right now.
+ *
+ * A plain refetch would be answered from the API's 15-minute feed cache, so
+ * this asks the server to skip it. Bought events ride along: a ticket
+ * ingested from the phone lands in the grid without a reload. */
+export function useRefreshCalendar(season: Season | undefined) {
+  const queryClient = useQueryClient();
+  const from = season?.starts_on ?? "";
+  const to = season?.ends_on ?? "";
+
+  return useMutation({
+    mutationFn: () => {
+      if (season === undefined) {
+        throw new Error("no season");
+      }
+      return api<CalendarView>(calendarPath(from, to, true));
+    },
+    onSuccess: (view) => {
+      queryClient.setQueryData(queryKeys.calendar(from, to), view);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.booked(season?.id ?? "none") });
+    },
   });
 }
 

@@ -64,3 +64,48 @@
   border-style: dashed;
   text-decoration: line-through;
 }
+
+/* Forces a fresh read of the household feed, past the API's own cache. */
+.calendarRefresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.calendarRefresh:hover:not(:disabled) {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.calendarRefresh:disabled {
+  cursor: progress;
+  color: var(--text-faint);
+}
+
+.refreshIcon {
+  display: block;
+  font-size: var(--text-md);
+  line-height: 1;
+}
+
+.spinning {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinning {
+    animation: none;
+    opacity: 0.5;
+  }
+}

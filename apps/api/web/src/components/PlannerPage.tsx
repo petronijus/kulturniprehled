@@ -5,6 +5,7 @@ import {
   useCurrentSeason,
   useHolidays,
   usePool,
+  useRefreshCalendar,
   useScenarios,
   useSharedCalendar,
 } from "../api/queries";
@@ -39,6 +40,7 @@ export function PlannerPage() {
   const bookedQuery = useBookedEvents(season);
   const calendarQuery = useSharedCalendar(season);
   const holidaysQuery = useHolidays(season);
+  const refreshCalendar = useRefreshCalendar(season);
   const [calendarVisible, toggleCalendar] = useCalendarVisible();
 
   const [previewScenarioId, setPreviewScenarioId] = useState<string | null>(null);
@@ -58,6 +60,11 @@ export function PlannerPage() {
   const holidaysByDate = useMemo(() => holidaysByDay(holidaysQuery.data), [holidaysQuery.data]);
 
   const onConflict = useCallback(() => setToast(cs.conflictToast), []);
+  const onRefreshCalendar = useCallback(() => {
+    refreshCalendar.mutate(undefined, {
+      onError: () => setToast(cs.calendar.refreshFailed),
+    });
+  }, [refreshCalendar]);
   const patchMutation = usePatchCandidate(season?.id ?? "none", onConflict);
   const applyMutation = useApplyScenario(season?.id ?? "none");
 
@@ -190,6 +197,8 @@ export function PlannerPage() {
         calendar={calendarQuery.data}
         calendarVisible={calendarVisible}
         onToggleCalendar={toggleCalendar}
+        onRefreshCalendar={onRefreshCalendar}
+        calendarRefreshing={refreshCalendar.isPending}
       />
       <ScenarioTabs
         scenarios={scenarios}

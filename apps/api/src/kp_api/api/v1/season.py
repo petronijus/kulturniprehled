@@ -603,6 +603,7 @@ async def shared_calendar(
     user: SeasonReader,
     range_start: Annotated[date | None, Query(alias="from")] = None,
     range_end: Annotated[date | None, Query(alias="to")] = None,
+    refresh: bool = False,
 ) -> CalendarView:
     """The shared household calendar, classified into blocked days + conflicts.
 
@@ -614,6 +615,10 @@ async def shared_calendar(
     Defaults to the next 180 days — the digest horizon. Never 503s: an
     unconfigured or unreachable feed answers `available: false` so a planner
     without a calendar still renders.
+
+    `refresh=true` skips the feed cache — the planner's manual refresh, for
+    "I just added the trip to the calendar" moments that would otherwise wait
+    out the TTL. A forced refetch that fails still serves the cached copy.
     """
 
     _ = user
@@ -622,7 +627,7 @@ async def shared_calendar(
         settings.calendar_ics_url,
         start,
         end,
-        ttl_seconds=settings.calendar_cache_ttl_seconds,
+        ttl_seconds=0 if refresh else settings.calendar_cache_ttl_seconds,
     )
 
 

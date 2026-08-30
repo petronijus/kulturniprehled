@@ -318,6 +318,36 @@ async def test_calendar_endpoint_serves_the_blocked_json_contract(
     assert ICS_URL not in response.text
 
 
+async def test_calendar_endpoint_refresh_bypasses_the_feed_cache(
+    calendar_client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A plain reload rides the cache; `refresh=1` re-reads the feed."""
+
+    calls = {"n": 0}
+
+    async def fake_fetch(url: str, client: httpx.AsyncClient) -> str:
+        calls["n"] += 1
+        return _ics(ALL_DAY_SPAN)
+
+    monkeypatch.setattr(calendar_ics, "_fetch_ics", fake_fetch)
+    pair = await login_as(calendar_client, "petr@example.com")
+    headers = auth_header(pair["access_token"])
+    window = {"from": "2026-10-01", "to": "2026-12-31"}
+
+    first = await calendar_client.get("/v1/season/calendar", params=window, headers=headers)
+    cached = await calendar_client.get("/v1/season/calendar", params=window, headers=headers)
+    assert calls["n"] == 1
+
+    forced = await calendar_client.get(
+        "/v1/season/calendar", params={**window, "refresh": "true"}, headers=headers
+    )
+
+    assert calls["n"] == 2
+    assert first.status_code == cached.status_code == forced.status_code == 200
+    assert forced.json()["blocked_days"] == first.json()["blocked_days"]
+
+
 async def test_calendar_endpoint_rejects_an_impossible_window(
     calendar_client: AsyncClient,
 ) -> None:

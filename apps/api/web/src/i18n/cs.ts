@@ -92,6 +92,9 @@ export const cs = {
     layerLabel: "Kalendář",
     hide: "Skrýt kalendář z mřížky (kolize se hlídají dál)",
     show: "Zobrazit kalendář v mřížce",
+    refresh: "Načíst kalendář znovu",
+    refreshing: "Načítám kalendář…",
+    refreshFailed: "Kalendář se nepodařilo obnovit.",
   },
   poolEmpty: "Žádní kandidáti pro zvolené filtry.",
   counts: (selected: number, undecided: number) =>

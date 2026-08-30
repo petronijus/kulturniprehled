@@ -170,6 +170,14 @@ then report it. After the LAST chunk of an **initial** season push, ack the
 novelty cursor: `POST …/novelties/ack {"through": "<now>"}` — otherwise
 Saturday's watcher emails the entire pool as "news".
 
+### 3.5. Resolve programme links
+
+Run `/program-links` once the pool push is in. It folds every candidate's
+programme into distinct pieces and resolves each one to a Spotify recording,
+so the planner's ▶ buttons play the work instead of opening a search. Cheap
+to re-run (already-linked pieces are skipped), non-fatal (an unresolved
+piece keeps the search fallback), and plan-neutral.
+
 ### 4. Generate scenarios (LLM step — you are the LLM)
 
 Read `archetypes.md`. For each archetype, select events from

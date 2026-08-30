@@ -162,6 +162,43 @@
   min-width: 0;
 }
 
+/* ▶ sits at the end of its line, faint until the card is hovered — the
+   programme is the content, playing it is the offer. */
+.playLinks {
+  display: inline-flex;
+  gap: var(--space-1);
+  margin-inline-start: var(--space-1);
+}
+
+.play {
+  font-size: var(--text-xs);
+  line-height: 1;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.card:hover .play,
+.play:focus-visible {
+  opacity: 1;
+}
+
+/* A resolved link is a real recording, not a search — always visible. */
+.playResolved {
+  color: var(--ok);
+  opacity: 1;
+}
+
+.play:hover {
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .play {
+    transition: none;
+  }
+}
+
 .why {
   font-size: var(--text-sm);
   font-style: italic;

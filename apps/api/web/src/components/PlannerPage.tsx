@@ -5,6 +5,7 @@ import {
   useCurrentSeason,
   useHolidays,
   usePool,
+  useProgramLinks,
   useRefreshCalendar,
   useScenarios,
   useSharedCalendar,
@@ -40,6 +41,7 @@ export function PlannerPage() {
   const bookedQuery = useBookedEvents(season);
   const calendarQuery = useSharedCalendar(season);
   const holidaysQuery = useHolidays(season);
+  const programLinksQuery = useProgramLinks();
   const refreshCalendar = useRefreshCalendar(season);
   const [calendarVisible, toggleCalendar] = useCalendarVisible();
 
@@ -58,6 +60,10 @@ export function PlannerPage() {
   const blockedDays = useMemo(() => blockedDaysOf(calendarQuery.data), [calendarQuery.data]);
   const personalByDate = useMemo(() => entriesByDay(calendarQuery.data), [calendarQuery.data]);
   const holidaysByDate = useMemo(() => holidaysByDay(holidaysQuery.data), [holidaysQuery.data]);
+  const programLinks = useMemo(
+    () => new Map((programLinksQuery.data ?? []).map((link) => [link.key, link])),
+    [programLinksQuery.data],
+  );
 
   const onConflict = useCallback(() => setToast(cs.conflictToast), []);
   const onRefreshCalendar = useCallback(() => {
@@ -232,6 +238,7 @@ export function PlannerPage() {
               groups={groups}
               booked={booked}
               months={months}
+              programLinks={programLinks}
               onSetStatus={setStatus}
               onHoverChange={onHoverChange}
               pinnedKeys={new Set(pinnedKeys)}

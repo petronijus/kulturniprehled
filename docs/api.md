@@ -20,7 +20,7 @@ the API.
 | `/v1/costs/*`        | Per-event cost rows                                    | `api/v1/costs.py` |
 | `/v1/stats/*`        | Year-in-review aggregates                              | `api/v1/stats.py` |
 | `/v1/sync/*`         | Change-log pull + outbox apply                         | `api/v1/sync.py` |
-| `/v1/season/*`       | Season planner: plans, candidate pool (bulk upsert + plan state), scenarios (upsert/apply), novelty cursor, shared-calendar view | `api/v1/season.py` |
+| `/v1/season/*`       | Season planner: plans, candidate pool (bulk upsert + plan state), scenarios (upsert/apply), novelty cursor, shared-calendar view, programme media links | `api/v1/season.py` |
 | `/app`               | Season-planner SPA (static bundle, history-API fallback, relaxed CSP). **Home-only + login-less**: with `WEB_PUBLIC=false` (default) Cloudflare-proxied requests get 404 — reachable only via LAN / Tailscale | `web.py` + `web/dist` |
 
 `GET /v1/season/calendar?from=&to=` is the one place the shared household
@@ -55,6 +55,23 @@ reduces it to one titled day per date. Deliberately a separate endpoint
 from `/calendar`: the household feed is a secret and the holiday feed is
 not, and one being unreachable must not blank the other. Holidays are a
 visual mark only — they never block a day and never enter `conflicts`.
+
+`GET|PUT /v1/season/program-links` is the piece→recording map behind the
+planner's ▶ buttons. A row is keyed by the **folded piece identity**
+(`author|work` lowercased, diacritics stripped, everything else collapsed
+to single spaces — `kp_api/domain/program_key.py`, mirrored in the SPA's
+`domain/programKey.ts`, both tested against the same fixtures). Keying by
+piece rather than by candidate is deliberate: a season's orchestras play
+the same works, so each is resolved once, and a pool upsert — which
+rewrites a candidate's `program` wholesale — cannot wipe the links.
+
+The upsert is additive per service: an item carrying only `spotify_url`
+leaves a stored `youtube_url` alone, so the resolver (`/program-links`
+skill, which searches Spotify with Petr's own refresh token — the API holds
+no Spotify credentials) can run in several passes. Items with no identity
+or no link are counted as `skipped` rather than failing the batch. A piece
+with no stored link is not broken in the planner: the ▶ falls back to a
+Spotify search for `author work`.
 
 Season endpoints are gated by the `season:read` / `season:write` PAT
 scopes (interactive JWTs and unscoped PATs pass everywhere). With

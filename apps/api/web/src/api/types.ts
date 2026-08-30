@@ -158,6 +158,25 @@ export interface HolidayView {
 /** GET /v1/season/calendar. `available: false` (no feed configured, or the
  * feed is unreachable and nothing was cached) is a normal answer — the
  * planner renders without the calendar layer. */
+/** Where to listen to one programme piece, keyed by the folded `author|work`
+ * identity (see `domain/programKey.ts`). Resolved by the link skill, shared
+ * by every candidate whose programme names that piece. */
+export interface ProgramMediaLink {
+  key: string;
+  author: string | null;
+  work: string | null;
+  spotify_url: string | null;
+  youtube_url: string | null;
+  /** What the resolver matched, e.g. "Karajan / BPO" — shown as the tooltip. */
+  match_label: string | null;
+  resolved_at: string;
+}
+
+export interface ProgramMediaLinkListResponse {
+  items: ProgramMediaLink[];
+  total: number;
+}
+
 export interface CalendarView {
   available: boolean;
   unavailable_reason: string | null;

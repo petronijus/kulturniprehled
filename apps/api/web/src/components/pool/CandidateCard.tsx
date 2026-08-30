@@ -1,9 +1,11 @@
 import { useDraggable } from "@dnd-kit/core";
-import type { Candidate, PlanStatus } from "../../api/types";
+import type { Candidate, PlanStatus, ProgramMediaLink } from "../../api/types";
 import { candidateDate } from "../../domain/planState";
 import type { ProductionGroup } from "../../domain/productions";
 import { groupStatus } from "../../domain/productions";
+import type { ProgramLine } from "../../domain/program";
 import { programLines } from "../../domain/program";
+import { programKey, programQuery } from "../../domain/programKey";
 import { isoToLocalTime, weekday } from "../../domain/season";
 import { cs } from "../../i18n/cs";
 import { isNew } from "../../state/newSince";
@@ -13,6 +15,8 @@ import { SourceBadge } from "./SourceBadge";
 
 interface CandidateCardProps {
   group: ProductionGroup;
+  /** Resolved media links by folded piece key; empty until the link skill runs. */
+  programLinks: ReadonlyMap<string, ProgramMediaLink>;
   onSetStatus: (candidate: Candidate, status: PlanStatus) => void;
   onHoverChange: (group: ProductionGroup | null) => void;
   pinned: boolean;
@@ -25,6 +29,56 @@ function formatDate(candidate: Candidate): string {
   const dayName = cs.weekdaysShort[weekday(date) - 1] ?? "";
   const [, month, day] = date.split("-");
   return `${dayName} ${Number(day)}. ${Number(month)}. · ${isoToLocalTime(candidate.starts_at)}`;
+}
+
+function spotifySearchUrl(query: string): string {
+  return `https://open.spotify.com/search/${encodeURIComponent(query)}`;
+}
+
+/** ▶ for one programme piece.
+ *
+ * A resolved link plays the recording the skill picked; everything else
+ * falls back to a Spotify search for the piece, so a programme is playable
+ * the moment it is scraped — the resolver only ever makes it more precise.
+ */
+function PlayLinks({ line, link }: { line: ProgramLine; link: ProgramMediaLink | undefined }) {
+  const query = programQuery(line.author, line.work);
+  const spotifyUrl = link?.spotify_url ?? spotifySearchUrl(query);
+  const resolved = link?.spotify_url !== undefined && link.spotify_url !== null;
+  const label = resolved ? cs.play.spotify : cs.play.spotifySearch;
+
+  return (
+    <span className={styles.playLinks}>
+      <a
+        className={`${styles.play} ${resolved ? styles.playResolved : ""}`}
+        href={spotifyUrl}
+        target="_blank"
+        rel="noreferrer"
+        title={
+          link?.match_label === undefined || link.match_label === null
+            ? label
+            : `${label} — ${link.match_label}`
+        }
+        aria-label={`${label}: ${query}`}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        ▶
+      </a>
+      {link?.youtube_url !== undefined && link.youtube_url !== null && (
+        <a
+          className={`${styles.play} ${styles.playResolved}`}
+          href={link.youtube_url}
+          target="_blank"
+          rel="noreferrer"
+          title={cs.play.youtube}
+          aria-label={`${cs.play.youtube}: ${query}`}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          ▶▶
+        </a>
+      )}
+    </span>
+  );
 }
 
 /** One date of a multi-date production — click toggles it in/out of the plan. */
@@ -68,6 +122,7 @@ function DateRow({
 
 export function CandidateCard({
   group,
+  programLinks,
   onSetStatus,
   onHoverChange,
   pinned,
@@ -100,6 +155,10 @@ export function CandidateCard({
   }
 
   const program = programLines(richest.program);
+  const linkFor = (line: ProgramLine): ProgramMediaLink | undefined => {
+    const key = programKey(line.author, line.work);
+    return key === null ? undefined : programLinks.get(key);
+  };
 
   const anyNew = candidates.some((candidate) => isNew(candidate.first_seen_at));
   const seasonEvent = candidates.some((candidate) => candidate.season_event);
@@ -181,6 +240,7 @@ export function CandidateCard({
                 </span>
               )}
               {line.work !== null && <span className={styles.programWork}>{line.work}</span>}
+              <PlayLinks line={line} link={linkFor(line)} />
             </li>
           ))}
         </ul>

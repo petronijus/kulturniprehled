@@ -428,6 +428,55 @@ class CandidatePoolListResponse(BaseModel):
     total: int
 
 
+class ProgramMediaLinkUpsert(BaseModel):
+    """One resolved piece, as the link-resolver skill found it.
+
+    At least one of `author` / `work` must carry text — the pair is the
+    piece's identity — and at least one link must be present, otherwise the
+    row would say nothing.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    author: str | None = Field(default=None, max_length=255)
+    work: str | None = Field(default=None, max_length=400)
+    spotify_url: str | None = Field(default=None, max_length=1024)
+    youtube_url: str | None = Field(default=None, max_length=1024)
+    match_label: str | None = Field(default=None, max_length=400)
+
+
+class ProgramMediaLinksPutRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[ProgramMediaLinkUpsert] = Field(max_length=500)
+
+
+class ProgramMediaLinksPutResult(BaseModel):
+    created: int
+    updated: int
+    unchanged: int
+    total: int
+    # Entries the server could not key or that carried no link at all.
+    skipped: int = 0
+
+
+class ProgramMediaLinkResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    key: str
+    author: str | None
+    work: str | None
+    spotify_url: str | None
+    youtube_url: str | None
+    match_label: str | None
+    resolved_at: datetime
+
+
+class ProgramMediaLinkListResponse(BaseModel):
+    items: list[ProgramMediaLinkResponse]
+    total: int
+
+
 class CandidatePatch(BaseModel):
     """Partial update of the user-owned plan fields on a candidate.
 

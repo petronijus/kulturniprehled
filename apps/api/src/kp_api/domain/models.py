@@ -682,6 +682,44 @@ class SeasonScenario(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class ProgramMediaLink(Base):
+    """Where to listen to one programme piece — resolved once, reused everywhere.
+
+    The same work sits in a dozen programmes across a season, so links hang
+    off the piece (`key` = folded `author|work`, see
+    `domain.program_key`), not off the candidate. That also keeps them clear
+    of the scrape: a pool upsert rewrites a candidate's `program` wholesale
+    and would drop anything stored inside it.
+
+    Rows are written by the link-resolver skill (which searches Spotify over
+    Petr's authorized connector) and read by the planner SPA, which folds
+    the line it is about to render into the same key.
+    """
+
+    __tablename__ = "program_media_links"
+    __table_args__ = (Index("uq_program_media_link_key", "workspace_id", "key", unique=True),)
+
+    id: Mapped[UUID] = _uuid_pk()
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    key: Mapped[str] = mapped_column(String(400), nullable=False)
+    # The spelling the resolver saw — for the skill's own reports, never for
+    # matching (matching is the folded key).
+    author: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    work: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    spotify_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    youtube_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    # What the resolver matched, so a wrong hit is recognizable without
+    # opening the link ("Karajan / BPO 1977").
+    match_label: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    resolved_at: Mapped[datetime] = _created_at()
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+
+
 class RecommendationFeedback(Base):
     """Per-event feedback from the weekly digest email (thumbs up/down).
 

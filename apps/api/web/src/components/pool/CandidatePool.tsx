@@ -1,6 +1,6 @@
 import { useDroppable } from "@dnd-kit/core";
 import { useMemo, useState } from "react";
-import type { BookedEvent, Candidate, PlanStatus } from "../../api/types";
+import type { BookedEvent, Candidate, PlanStatus, ProgramMediaLink } from "../../api/types";
 import { decodeFacet, matchesFacet, poolFacets } from "../../domain/facets";
 import { candidateDate } from "../../domain/planState";
 import type { ProductionGroup } from "../../domain/productions";
@@ -19,6 +19,7 @@ interface CandidatePoolProps {
   groups: ProductionGroup[];
   booked: BookedEvent[];
   months: IsoMonth[];
+  programLinks: ReadonlyMap<string, ProgramMediaLink>;
   onSetStatus: (candidate: Candidate, status: PlanStatus) => void;
   onHoverChange: (group: ProductionGroup | null) => void;
   pinnedKeys: ReadonlySet<string>;
@@ -31,6 +32,7 @@ export function CandidatePool({
   groups,
   booked,
   months,
+  programLinks,
   onSetStatus,
   onHoverChange,
   pinnedKeys,
@@ -119,6 +121,7 @@ export function CandidatePool({
           <CandidateCard
             key={group.key}
             group={group}
+            programLinks={programLinks}
             onSetStatus={onSetStatus}
             onHoverChange={onHoverChange}
             pinned={pinnedKeys.has(group.key)}

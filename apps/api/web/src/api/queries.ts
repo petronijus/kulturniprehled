@@ -11,6 +11,8 @@ import type {
   Candidate,
   HolidayView,
   PoolListResponse,
+  ProgramMediaLink,
+  ProgramMediaLinkListResponse,
   Scenario,
   ScenarioListResponse,
   Season,
@@ -22,6 +24,7 @@ export const queryKeys = {
   pool: (seasonId: string) => ["pool", seasonId] as const,
   scenarios: (seasonId: string) => ["scenarios", seasonId] as const,
   booked: (seasonId: string) => ["booked", seasonId] as const,
+  programLinks: ["program-links"] as const,
   calendar: (from: string, to: string) => ["calendar", from, to] as const,
   holidays: (from: string, to: string) => ["holidays", from, to] as const,
 };
@@ -132,6 +135,20 @@ export function useBookedEvents(season: Season | undefined) {
     },
     enabled: season !== undefined,
     staleTime: 5 * 60_000,
+  });
+}
+
+/** Media links for programme pieces, whole map in one go — a season's worth
+ * is hundreds of rows and every card needs a lookup. Only the link skill
+ * writes them, so this can sit stale for a long while. */
+export function useProgramLinks() {
+  return useQuery({
+    queryKey: queryKeys.programLinks,
+    queryFn: () =>
+      api<ProgramMediaLinkListResponse>("/v1/season/program-links").then(
+        (r): ProgramMediaLink[] => r.items,
+      ),
+    staleTime: 10 * 60_000,
   });
 }
 

@@ -37,6 +37,7 @@ from kp_api.api.deps import SessionDep, SettingsDep, require_scope
 from kp_api.domain.enums import PlanStatus, SeasonLane, SeasonStatus
 from kp_api.domain.models import (
     Event,
+    ProgramMediaLink,
     SeasonCandidate,
     SeasonPlan,
     SeasonScenario,
@@ -44,6 +45,7 @@ from kp_api.domain.models import (
     Workspace,
     WorkspaceMember,
 )
+from kp_api.domain.program_key import program_key
 from kp_api.domain.schemas import (
     CandidatePatch,
     CandidatePoolListResponse,
@@ -54,6 +56,11 @@ from kp_api.domain.schemas import (
     PlanCounts,
     PlanSummaryResponse,
     PlanWeek,
+    ProgramMediaLinkListResponse,
+    ProgramMediaLinkResponse,
+    ProgramMediaLinksPutRequest,
+    ProgramMediaLinksPutResult,
+    ProgramMediaLinkUpsert,
     ScenarioApplyRequest,
     ScenarioListResponse,
     ScenarioResponse,
@@ -648,6 +655,110 @@ async def public_holidays(
     _ = user
     start, end = _calendar_window(range_start, range_end)
     return await fetch_holidays(settings.holidays_ics_url, start, end)
+
+
+@router.get("/program-links", response_model=ProgramMediaLinkListResponse)
+async def list_program_links(
+    session: SessionDep,
+    user: SeasonReader,
+) -> ProgramMediaLinkListResponse:
+    """Where to listen to each resolved programme piece.
+
+    One row per piece rather than per candidate: a season's programmes
+    repeat the same works across orchestras, and the planner looks a line up
+    by folding it into the same `author|work` key the resolver used. Small
+    by construction (hundreds of rows), so it is served whole.
+    """
+
+    workspace = await _user_workspace(session, user)
+    rows = await session.scalars(
+        select(ProgramMediaLink)
+        .where(ProgramMediaLink.workspace_id == workspace.id)
+        .order_by(ProgramMediaLink.key.asc())
+    )
+    items = [ProgramMediaLinkResponse.model_validate(row) for row in rows.all()]
+    return ProgramMediaLinkListResponse(items=items, total=len(items))
+
+
+@router.put("/program-links", response_model=ProgramMediaLinksPutResult)
+async def put_program_links(
+    body: ProgramMediaLinksPutRequest,
+    session: SessionDep,
+    user: SeasonWriter,
+) -> ProgramMediaLinksPutResult:
+    """Upsert resolved links, keyed by the folded piece identity.
+
+    Additive by design: an entry that carries only a Spotify link leaves an
+    already-stored YouTube link alone, so the resolver can run per service
+    and in several passes. Entries with no usable identity or no link at all
+    are counted as `skipped` instead of failing the batch — a resolver run
+    over a few hundred pieces must not be lost to one malformed row.
+    """
+
+    workspace = await _user_workspace(session, user)
+
+    keyed: dict[str, ProgramMediaLinkUpsert] = {}
+    skipped = 0
+    for item in body.items:
+        if item.spotify_url is None and item.youtube_url is None:
+            skipped += 1
+            continue
+        try:
+            key = program_key(item.author, item.work)
+        except ValueError:
+            skipped += 1
+            continue
+        keyed[key] = item
+
+    existing_rows = await session.scalars(
+        select(ProgramMediaLink).where(
+            ProgramMediaLink.workspace_id == workspace.id,
+            ProgramMediaLink.key.in_(keyed.keys()),
+        )
+    )
+    existing = {row.key: row for row in existing_rows.all()}
+
+    now = _utcnow()
+    created = updated = unchanged = 0
+    for key, item in keyed.items():
+        row = existing.get(key)
+        if row is None:
+            session.add(
+                ProgramMediaLink(
+                    workspace_id=workspace.id,
+                    key=key,
+                    author=item.author,
+                    work=item.work,
+                    spotify_url=item.spotify_url,
+                    youtube_url=item.youtube_url,
+                    match_label=item.match_label,
+                    resolved_at=now,
+                )
+            )
+            created += 1
+            continue
+        changed = False
+        for field in ("spotify_url", "youtube_url", "match_label"):
+            value = getattr(item, field)
+            if value is not None and value != getattr(row, field):
+                setattr(row, field, value)
+                changed = True
+        if changed:
+            row.author = item.author or row.author
+            row.work = item.work or row.work
+            row.resolved_at = now
+            updated += 1
+        else:
+            unchanged += 1
+
+    await session.commit()
+    return ProgramMediaLinksPutResult(
+        created=created,
+        updated=updated,
+        unchanged=unchanged,
+        total=len(keyed),
+        skipped=skipped,
+    )
 
 
 @router.patch("/candidates/{candidate_id}", response_model=CandidateResponse)

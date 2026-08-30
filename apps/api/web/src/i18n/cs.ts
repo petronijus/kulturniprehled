@@ -41,6 +41,11 @@ export const cs = {
     dateRejected: "Termín odmítnut",
     inPlan: "v plánu",
   },
+  play: {
+    spotify: "Přehrát na Spotify",
+    spotifySearch: "Najít na Spotify",
+    youtube: "Přehrát na YouTube",
+  },
   lanes: {
     klasika: "Vážná hudba",
     elektronika: "Elektronika",

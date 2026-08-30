@@ -11,6 +11,10 @@
 
 services:
   caddy:
+    # Prebuilt locally and pushed to GHCR, like the API image — the VM only
+    # pulls (see ai-config docs/DEPLOY-STANDARD.md). `build:` stays as the
+    # provenance of that image: `docker build -t <image> infra/caddy`.
+    image: ghcr.io/petronijus/kulturniprehled-caddy:2
     build: ./caddy
     restart: always
     ports:

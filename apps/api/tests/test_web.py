@@ -106,8 +106,9 @@ async def test_player_frame_gets_the_only_eval_relaxation(spa_client: AsyncClien
     csp = player.headers["content-security-policy"]
 
     assert "'unsafe-eval'" in csp
-    assert "https://open.spotify.com" in csp
-    assert "https://embed-cdn.spotifycdn.com" in csp
+    assert "https://sdk.scdn.co" in csp
+    assert "https://api.spotify.com" in csp
+    assert "media-src blob:" in csp
     # It is framed by the planner, so it must not be DENY-framed.
     assert "frame-ancestors 'self'" in csp
     assert player.headers["x-frame-options"] == "SAMEORIGIN"

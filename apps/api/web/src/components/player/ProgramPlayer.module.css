@@ -47,12 +47,15 @@
   color: var(--text-faint);
 }
 
-/* Our own player frame; Spotify's embed lives inside it. */
+/* The SDK device lives here and renders nothing — the panel above is the
+   whole interface. Kept in the layout (not display:none) so the browser
+   treats it as a live frame. */
 .embed {
-  width: 100%;
-  height: 160px;
+  width: 1px;
+  height: 1px;
   border: 0;
-  color-scheme: normal;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .failed {

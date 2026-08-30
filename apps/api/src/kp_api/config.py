@@ -59,6 +59,15 @@ class Settings(BaseSettings):
     # reuse is assumed hostile and burns the family.
     api_refresh_reuse_grace_seconds: int = 60
 
+    # Spotify — only for the planner's in-page player. The refresh token is
+    # Petr's own (minted by hand with the `streaming` scope); the server
+    # exchanges it for short-lived access tokens and never lets the browser
+    # near the refresh token. Empty → the planner falls back to opening
+    # tracks on Spotify instead of playing them itself.
+    spotify_client_id: str = ""
+    spotify_client_secret: str = ""
+    spotify_refresh_token: str = ""
+
     # Google OAuth
     google_oauth_client_id: str = ""
     google_oauth_client_secret: str = ""

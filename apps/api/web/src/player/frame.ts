@@ -1,40 +1,57 @@
-/** The player frame: Spotify's embed API, and nothing else.
+/** The player frame: a Spotify device of our own, and nothing else.
  *
- * Runs in `/app/player.html`, whose CSP allows `'unsafe-eval'` (the embed
- * API needs it) and Spotify's script/frame origins. It accepts load/play/
- * pause over postMessage from the planner — same origin only — and reports
- * playback back, which is how the programme hands over between movements.
+ * Runs in `/app/player.html`. The embed player this replaced handed
+ * playback to Spotify Connect, which routed it to whatever device happened
+ * to be "active" — often a stale web-player registration that plays into
+ * the void: the progress bar moved and no sound ever came out. A Web
+ * Playback SDK device is unambiguous: we create it, we transfer playback to
+ * it, and the audio is produced right here.
+ *
+ * The running order goes to Spotify as a list of track URIs, so movements
+ * and pieces follow each other without the planner timing anything.
  */
 
 import type { PlayerCommand, PlayerEvent } from "./protocol";
 import { asPlayerCommand } from "./protocol";
 
-const SCRIPT_SRC = "https://open.spotify.com/embed/iframe-api/v1";
+const SDK_SRC = "https://sdk.scdn.co/spotify-player.js";
+const DEVICE_NAME = "Kulturní Přehled";
+const TOKEN_URL = "/v1/season/spotify-token";
 
-interface PlaybackData {
+interface WebPlaybackTrack {
+  uri: string;
+  duration_ms: number;
+}
+
+interface WebPlaybackState {
+  paused: boolean;
   position: number;
   duration: number;
-  isPaused: boolean;
+  track_window: { current_track: WebPlaybackTrack | null };
 }
 
-interface SpotifyController {
-  loadUri: (uri: string) => void;
-  play: () => void;
-  pause: () => void;
-  addListener: (event: string, callback: (payload: { data: PlaybackData }) => void) => void;
+interface SpotifyPlayer {
+  connect: () => Promise<boolean>;
+  addListener: (event: string, callback: (payload: never) => void) => void;
+  togglePlay: () => Promise<void>;
+  resume: () => Promise<void>;
+  pause: () => Promise<void>;
+  nextTrack: () => Promise<void>;
+  previousTrack: () => Promise<void>;
 }
 
-interface SpotifyIframeApi {
-  createController: (
-    element: HTMLElement,
-    options: { uri: string; width: string | number; height: string | number },
-    callback: (controller: SpotifyController) => void,
-  ) => void;
+interface SpotifyNamespace {
+  Player: new (options: {
+    name: string;
+    getOAuthToken: (callback: (token: string) => void) => void;
+    volume?: number;
+  }) => SpotifyPlayer;
 }
 
 declare global {
   interface Window {
-    onSpotifyIframeApiReady?: (api: SpotifyIframeApi) => void;
+    onSpotifyWebPlaybackSDKReady?: () => void;
+    Spotify?: SpotifyNamespace;
   }
 }
 
@@ -42,50 +59,67 @@ function post(event: PlayerEvent): void {
   window.parent.postMessage(event, window.location.origin);
 }
 
-const host = document.getElementById("embed");
-let controller: SpotifyController | null = null;
-let api: SpotifyIframeApi | null = null;
-/** Commands that arrived before the controller existed. */
+let deviceId: string | null = null;
+let player: SpotifyPlayer | null = null;
+/** Commands that arrived before the device existed. */
 let pending: PlayerCommand[] = [];
 
-function createWith(uri: string): void {
-  if (api === null || host === null) {
+async function token(): Promise<string> {
+  const response = await fetch(TOKEN_URL);
+  if (!response.ok) {
+    throw new Error(`token ${response.status}`);
+  }
+  const body = (await response.json()) as { access_token: string };
+  return body.access_token;
+}
+
+/** Spotify's own queue: hand it the whole running order at once. */
+async function playUris(uris: string[], offset: number): Promise<void> {
+  if (deviceId === null) {
     return;
   }
-  api.createController(host, { uri, width: "100%", height: 152 }, (created) => {
-    controller = created;
-    created.addListener("playback_update", ({ data }) => {
-      post({
-        kind: "update",
-        position: data.position,
-        duration: data.duration,
-        isPaused: data.isPaused,
-      });
-    });
-    created.addListener("ready", () => created.play());
-    created.play();
-    post({ kind: "ready" });
+  const access = await token();
+  await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${access}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ uris, offset: { position: offset } }),
+  });
+}
+
+/** Make this device the one that actually sounds. */
+async function takeOver(): Promise<void> {
+  if (deviceId === null) {
+    return;
+  }
+  const access = await token();
+  await fetch("https://api.spotify.com/v1/me/player", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${access}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ device_ids: [deviceId], play: false }),
   });
 }
 
 function apply(command: PlayerCommand): void {
-  if (controller === null) {
-    // The first load is what the controller gets built with; anything else
-    // waits for it.
-    if (command.kind === "load" && command.uri !== undefined && api !== null) {
-      createWith(command.uri);
-      return;
-    }
+  if (player === null || deviceId === null) {
     pending.push(command);
     return;
   }
-  if (command.kind === "load" && command.uri !== undefined) {
-    controller.loadUri(command.uri);
-    controller.play();
-  } else if (command.kind === "play") {
-    controller.play();
-  } else if (command.kind === "pause") {
-    controller.pause();
+  switch (command.kind) {
+    case "load":
+      void playUris(command.uris ?? [], command.offset ?? 0);
+      break;
+    case "play":
+      void player.resume();
+      break;
+    case "pause":
+      void player.pause();
+      break;
+    case "next":
+      void player.nextTrack();
+      break;
+    case "previous":
+      void player.previousTrack();
+      break;
   }
 }
 
@@ -99,22 +133,66 @@ window.addEventListener("message", (event: MessageEvent) => {
   }
 });
 
-window.onSpotifyIframeApiReady = (ready) => {
-  api = ready;
-  const queued = pending;
-  pending = [];
-  for (const command of queued) {
-    apply(command);
+window.onSpotifyWebPlaybackSDKReady = () => {
+  const namespace = window.Spotify;
+  if (namespace === undefined) {
+    post({ kind: "failed", reason: "sdk" });
+    return;
   }
+  const created = new namespace.Player({
+    name: DEVICE_NAME,
+    volume: 1,
+    getOAuthToken: (callback) => {
+      token()
+        .then(callback)
+        .catch(() => post({ kind: "failed", reason: "token" }));
+    },
+  });
+
+  created.addListener("ready", (payload: never) => {
+    deviceId = (payload as { device_id: string }).device_id;
+    player = created;
+    void takeOver().then(() => {
+      post({ kind: "ready" });
+      const queued = pending;
+      pending = [];
+      for (const command of queued) {
+        apply(command);
+      }
+    });
+  });
+
+  created.addListener("player_state_changed", (payload: never) => {
+    const state = payload as WebPlaybackState | null;
+    if (state === null) {
+      return;
+    }
+    post({
+      kind: "state",
+      uri: state.track_window.current_track?.uri ?? "",
+      position: state.position,
+      duration: state.duration,
+      isPaused: state.paused,
+    });
+  });
+
+  for (const failure of ["initialization_error", "authentication_error", "account_error"]) {
+    created.addListener(failure, (payload: never) => {
+      const message = (payload as { message?: string }).message ?? failure;
+      post({ kind: "failed", reason: `${failure}: ${message}` });
+    });
+  }
+
+  void created.connect();
 };
 
-// Announce the listener before fetching Spotify's script: the planner may
-// already be holding a URI, and a command sent into a frame that is not
+// Announce the listener before fetching the SDK: the planner may already be
+// holding a running order, and a command sent into a frame that is not
 // listening yet is simply lost.
 post({ kind: "hello" });
 
 const script = document.createElement("script");
-script.src = SCRIPT_SRC;
+script.src = SDK_SRC;
 script.async = true;
-script.onerror = () => post({ kind: "failed" });
+script.onerror = () => post({ kind: "failed", reason: "sdk-script" });
 document.head.appendChild(script);

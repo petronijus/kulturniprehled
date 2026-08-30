@@ -428,6 +428,13 @@ class CandidatePoolListResponse(BaseModel):
     total: int
 
 
+class SpotifyTokenResponse(BaseModel):
+    """Short-lived Spotify access token for the planner's own player."""
+
+    access_token: str
+    expires_in: int
+
+
 class ProgramMediaLinkUpsert(BaseModel):
     """One resolved piece, as the link-resolver skill found it.
 

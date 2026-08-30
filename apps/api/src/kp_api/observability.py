@@ -107,13 +107,15 @@ def configure_limiter(settings: Settings) -> None:
 # The planner itself stays pure same-origin: its only foreign content is the
 # player frame below, which is served from here, so `frame-src 'self'`.
 #
-# That frame (`/app/player.html`) is the one place Spotify's embed API runs.
-# The API evaluates code at runtime, so its document needs `'unsafe-eval'`
-# plus Spotify's script origins — a relaxation kept off the planner by
-# giving the embed a page of its own that holds no application data and
-# renders nothing but the player.
-_SPOTIFY_EMBED = "https://open.spotify.com"
-_SPOTIFY_EMBED_CDN = "https://embed-cdn.spotifycdn.com"
+# That frame (`/app/player.html`) is the one place Spotify's Web Playback
+# SDK runs. It evaluates code at runtime, streams encrypted audio and talks
+# to Spotify's API and websockets, so its document needs `'unsafe-eval'`
+# plus Spotify's hosts — a relaxation kept off the planner by giving the
+# player a page of its own that holds no application data and renders
+# nothing at all.
+_SPOTIFY_SDK = "https://sdk.scdn.co"
+_SPOTIFY_API = "https://api.spotify.com"
+_SPOTIFY_HOSTS = "https://*.spotify.com https://*.scdn.co wss://*.spotify.com"
 _SPA_CSP = (
     "default-src 'self'; "
     "img-src 'self' data:; "
@@ -126,11 +128,12 @@ _SPA_CSP = (
 )
 _PLAYER_CSP = (
     "default-src 'self'; "
-    "img-src 'self' data:; "
+    "img-src 'self' data: https://*.scdn.co; "
     "style-src 'self' 'unsafe-inline'; "
-    f"script-src 'self' 'unsafe-eval' {_SPOTIFY_EMBED} {_SPOTIFY_EMBED_CDN}; "
-    "connect-src 'self'; "
-    f"frame-src {_SPOTIFY_EMBED}; "
+    f"script-src 'self' 'unsafe-eval' {_SPOTIFY_SDK}; "
+    f"connect-src 'self' {_SPOTIFY_API} {_SPOTIFY_HOSTS}; "
+    f"media-src blob: {_SPOTIFY_HOSTS}; "
+    "worker-src 'self' blob:; "
     "frame-ancestors 'self'; "
     "base-uri 'none'"
 )

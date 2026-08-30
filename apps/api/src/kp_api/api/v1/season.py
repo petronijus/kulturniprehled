@@ -24,7 +24,7 @@ from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +34,7 @@ from kp_api.adapters.calendar_ics import (
     fetch_calendar_view,
     fetch_holidays,
 )
+from kp_api.adapters.spotify import SpotifyUnavailable, access_token
 from kp_api.api.deps import SessionDep, SettingsDep, require_scope
 from kp_api.domain.enums import PlanStatus, SeasonLane, SeasonStatus
 from kp_api.domain.models import (
@@ -73,6 +74,7 @@ from kp_api.domain.schemas import (
     SeasonPoolPutRequest,
     SeasonPoolPutResult,
     SeasonResponse,
+    SpotifyTokenResponse,
 )
 from kp_api.domain.scopes import SCOPE_SEASON_READ, SCOPE_SEASON_WRITE
 
@@ -668,6 +670,38 @@ def _clean_track_uris(uris: list[str] | None) -> list[str] | None:
         return None
     kept = [uri for uri in uris if _TRACK_URI.match(uri)]
     return kept or None
+
+
+@router.get("/spotify-token", response_model=SpotifyTokenResponse)
+async def spotify_token(
+    request: Request,
+    settings: SettingsDep,
+    user: SeasonReader,
+) -> SpotifyTokenResponse:
+    """A short-lived Spotify token so the planner can play a programme itself.
+
+    **Home network only.** Season reads are otherwise available to any
+    `season:read` credential, but this hands out real Spotify API access on
+    Petr's account, so it is refused for anything that arrived through the
+    Cloudflare tunnel — the same boundary that hides `/app`. The refresh
+    token never leaves the server.
+
+    Answers 503 when Spotify is unconfigured or refuses the grant; the
+    planner then degrades to opening tracks on Spotify.
+    """
+
+    _ = user
+    if "cf-connecting-ip" in request.headers:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not found")
+    try:
+        token = await access_token(
+            settings.spotify_client_id,
+            settings.spotify_client_secret,
+            settings.spotify_refresh_token,
+        )
+    except SpotifyUnavailable as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+    return SpotifyTokenResponse(access_token=token.access_token, expires_in=token.expires_in)
 
 
 @router.get("/program-links", response_model=ProgramMediaLinkListResponse)

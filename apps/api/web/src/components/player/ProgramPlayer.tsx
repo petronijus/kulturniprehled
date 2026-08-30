@@ -129,7 +129,7 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
         className={styles.embed}
         src={FRAME_SRC}
         title={cs.player.title}
-        allow="autoplay 'src' https://open.spotify.com; encrypted-media 'src' https://open.spotify.com"
+        allow="autoplay 'src' https://sdk.scdn.co; encrypted-media 'src' https://sdk.scdn.co"
       />
       {failure !== null && (
         <p className={styles.failed} title={failure}>

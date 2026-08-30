@@ -134,11 +134,19 @@ _PLAYER_CSP = (
     f"connect-src 'self' {_SPOTIFY_API} {_SPOTIFY_HOSTS}; "
     f"media-src blob: {_SPOTIFY_HOSTS}; "
     "worker-src 'self' blob:; "
+    f"frame-src {_SPOTIFY_SDK}; "
     "frame-ancestors 'self'; "
     "base-uri 'none'"
 )
 
 _API_CSP = "default-src 'none'; frame-ancestors 'none'"
+
+# The SDK plays inside its own frame on sdk.scdn.co, so DRM and autoplay have
+# to reach that origin. A bare `allow="encrypted-media"` on an iframe means
+# `'src'` — the frame's own origin — and a document may only delegate what it
+# is itself allowed to use, which by default is `self`. Without this header
+# the player runs its progress and produces no sound.
+_PERMISSIONS_POLICY = f'encrypted-media=(self "{_SPOTIFY_SDK}"), autoplay=(self "{_SPOTIFY_SDK}")'
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -179,6 +187,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         else:
             policy = _API_CSP
         response.headers.setdefault("Content-Security-Policy", policy)
+        if is_spa:
+            response.headers.setdefault("Permissions-Policy", _PERMISSIONS_POLICY)
         # The planner frames the player; X-Frame-Options: DENY would win over
         # the CSP's `frame-ancestors 'self'` in browsers that honour both.
         if is_player:

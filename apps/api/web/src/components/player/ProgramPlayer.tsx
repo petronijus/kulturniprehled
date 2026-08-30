@@ -44,6 +44,9 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
   // only on change, so the playhead is interpolated between reports.
   const [track, setTrack] = useState<TrackState | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // While the slider is being dragged it shows the user's intent, not the
+  // device's position; control returns when the device reports the seek.
+  const [scrub, setScrub] = useState<number | null>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const readyRef = useRef(false);
 
@@ -106,6 +109,7 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
         return;
       }
       setPaused(message.isPaused);
+      setScrub(null);
       setTrack({
         name: message.trackName,
         artists: message.artists,
@@ -132,10 +136,17 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
     return () => window.clearInterval(timer);
   }, [paused, track]);
 
-  const elapsed =
+  const played =
     track === null
       ? 0
       : Math.min(track.position + (paused ? 0 : now - track.reportedAt), track.duration);
+  const elapsed = scrub ?? played;
+
+  const commitScrub = () => {
+    if (scrub !== null) {
+      send({ kind: "seek", position: Math.round(scrub) });
+    }
+  };
 
   const current = queue[itemIndex];
   if (current === undefined) {
@@ -171,12 +182,20 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
           <div className={styles.recording}>
             <span className={styles.trackName}>{track.name}</span>
             <span className={styles.artists}>{track.artists}</span>
-            <div className={styles.progress}>
-              <div
-                className={styles.progressFill}
-                style={{ width: `${track.duration > 0 ? (elapsed / track.duration) * 100 : 0}%` }}
-              />
-            </div>
+            <input
+              type="range"
+              className={styles.seek}
+              min={0}
+              max={Math.max(track.duration, 1)}
+              step={1000}
+              value={elapsed}
+              aria-label={cs.player.seek}
+              aria-valuetext={`${clock(elapsed)} / ${clock(track.duration)}`}
+              onChange={(event) => setScrub(Number(event.target.value))}
+              onPointerUp={commitScrub}
+              onKeyUp={commitScrub}
+              onBlur={commitScrub}
+            />
             <span className={styles.times}>
               {clock(elapsed)} / {clock(track.duration)}
             </span>

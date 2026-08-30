@@ -41,6 +41,7 @@ interface SpotifyPlayer {
   pause: () => Promise<void>;
   nextTrack: () => Promise<void>;
   previousTrack: () => Promise<void>;
+  seek: (positionMs: number) => Promise<void>;
 }
 
 interface SpotifyNamespace {
@@ -122,6 +123,9 @@ function apply(command: PlayerCommand): void {
       break;
     case "previous":
       void player.previousTrack();
+      break;
+    case "seek":
+      void player.seek(command.position ?? 0);
       break;
   }
 }

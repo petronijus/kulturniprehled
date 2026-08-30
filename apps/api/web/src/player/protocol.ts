@@ -10,11 +10,13 @@
  */
 
 export interface PlayerCommand {
-  kind: "load" | "play" | "pause" | "next" | "previous";
+  kind: "load" | "play" | "pause" | "next" | "previous" | "seek";
   /** For `load`: the whole running order, in playing order. */
   uris?: string[];
   /** For `load`: where in that list to start. */
   offset?: number;
+  /** For `seek`: milliseconds into the current track. */
+  position?: number;
 }
 
 export type PlayerEvent =
@@ -80,17 +82,15 @@ export function asPlayerCommand(data: unknown): PlayerCommand | null {
   }
   const record = data as Record<string, unknown>;
   const kind = record.kind;
-  if (
-    kind !== "load" &&
-    kind !== "play" &&
-    kind !== "pause" &&
-    kind !== "next" &&
-    kind !== "previous"
-  ) {
-    return null;
+  if (kind === "play" || kind === "pause" || kind === "next" || kind === "previous") {
+    return { kind };
+  }
+  if (kind === "seek") {
+    const { position } = record;
+    return typeof position === "number" && position >= 0 ? { kind, position } : null;
   }
   if (kind !== "load") {
-    return { kind };
+    return null;
   }
   const { uris, offset } = record;
   if (!Array.isArray(uris) || !uris.every((uri): uri is string => typeof uri === "string")) {

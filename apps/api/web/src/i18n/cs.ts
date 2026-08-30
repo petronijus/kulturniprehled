@@ -50,6 +50,7 @@ export const cs = {
     title: "Přehrávání",
     close: "Zavřít přehrávač",
     play: "Přehrát",
+    seek: "Posunout ve stopě",
     pause: "Pauza",
     previous: "Předchozí skladba",
     next: "Další",

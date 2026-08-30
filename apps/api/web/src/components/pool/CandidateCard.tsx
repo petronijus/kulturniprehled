@@ -3,6 +3,7 @@ import type { Candidate, PlanStatus } from "../../api/types";
 import { candidateDate } from "../../domain/planState";
 import type { ProductionGroup } from "../../domain/productions";
 import { groupStatus } from "../../domain/productions";
+import { programLines } from "../../domain/program";
 import { isoToLocalTime, weekday } from "../../domain/season";
 import { cs } from "../../i18n/cs";
 import { isNew } from "../../state/newSince";
@@ -98,13 +99,7 @@ export function CandidateCard({
     classes.push(styles.pinned);
   }
 
-  const program = (richest.program ?? [])
-    .map((entry) => {
-      const author = entry.composer ?? entry.author ?? entry.director;
-      const work = entry.work ?? entry.play ?? entry.film;
-      return typeof author === "string" && typeof work === "string" ? `${author}: ${work}` : null;
-    })
-    .filter((line): line is string => line !== null);
+  const program = programLines(richest.program);
 
   const anyNew = candidates.some((candidate) => isNew(candidate.first_seen_at));
   const seasonEvent = candidates.some((candidate) => candidate.season_event);
@@ -174,7 +169,22 @@ export function CandidateCard({
           ))}
         </div>
       )}
-      {program.length > 0 && <p className={styles.program}>{program.join(" · ")}</p>}
+      {program.length > 0 && (
+        <ul className={styles.program}>
+          {program.map((line, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: a programme is an ordered list, position is its identity
+            <li key={index} className={styles.programLine}>
+              {line.author !== null && <span className={styles.programAuthor}>{line.author}</span>}
+              {line.author !== null && line.work !== null && (
+                <span className={styles.programSeparator} aria-hidden="true">
+                  ·
+                </span>
+              )}
+              {line.work !== null && <span className={styles.programWork}>{line.work}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
       {richest.why_cs !== null && <p className={styles.why}>{richest.why_cs}</p>}
       {!multiDate && primary.tickets_available === false && (
         <p className={styles.soldOut}>⚠ {cs.soldOut}</p>

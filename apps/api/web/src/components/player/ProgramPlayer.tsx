@@ -2,17 +2,21 @@
  *
  * A concert's programme is a running order, so this is a queue, not a link:
  * one movement follows the next, one work follows the previous, and the
- * panel stays put while Petr keeps planning. Advancing is driven by
- * Spotify's `playback_update` (the embed has no "ended" event): a track
- * that has reached its duration hands over to the next URI.
+ * panel stays put while Petr keeps planning.
+ *
+ * Playback itself lives in `/app/player.html` (see `player/protocol.ts`):
+ * Spotify's embed API needs `'unsafe-eval'`, and that stays confined to a
+ * frame holding nothing but the embed. This component talks to it over
+ * postMessage. Advancing is driven by playback updates, because the embed
+ * has no "ended" event: a track that has reached its duration hands over.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { QueueItem } from "../../domain/playQueue";
 import { cs } from "../../i18n/cs";
+import type { PlayerCommand } from "../../player/protocol";
+import { asPlayerEvent } from "../../player/protocol";
 import styles from "./ProgramPlayer.module.css";
-import type { SpotifyController } from "./spotifyIframeApi";
-import { loadSpotifyIframeApi } from "./spotifyIframeApi";
 
 interface ProgramPlayerProps {
   queue: QueueItem[];
@@ -23,6 +27,8 @@ interface ProgramPlayerProps {
  * lands exactly on the duration. */
 const END_SLACK_MS = 900;
 
+const FRAME_SRC = `${import.meta.env.BASE_URL}player.html`;
+
 interface Position {
   item: number;
   movement: number;
@@ -32,23 +38,19 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
   const [position, setPosition] = useState<Position>({ item: 0, movement: 0 });
   const [paused, setPaused] = useState(true);
   const [failed, setFailed] = useState(false);
-  const hostRef = useRef<HTMLDivElement>(null);
-  const controllerRef = useRef<SpotifyController | null>(null);
-  // The URI the controller is currently on, so one `playback_update` per
-  // track can trigger exactly one hand-over.
-  const playingRef = useRef<string | null>(null);
-  // The embed loads paused, and `play()` right after `loadUri()` can land
-  // before the iframe is ready — so "start this one" is a standing wish,
-  // retried on `ready` and on the first paused-at-zero update, and dropped
-  // the moment playback actually starts (never fighting a manual pause).
-  const wantPlayRef = useRef(true);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  // The frame answers `ready` once its controller exists; until then a load
+  // would be shouted into the void, so the wanted URI waits here.
+  const readyRef = useRef(false);
+  const wantedUriRef = useRef<string | null>(null);
   const advanceRef = useRef<() => void>(() => {});
 
   const current = queue[position.item];
   const uri = current?.uris[position.movement] ?? null;
-  // The URI the controller is created with. A ref, because the controller is
-  // built once and every later URI arrives through loadUri.
-  const seedUriRef = useRef(uri);
+
+  const send = useCallback((command: PlayerCommand) => {
+    frameRef.current?.contentWindow?.postMessage(command, window.location.origin);
+  }, []);
 
   const advance = useCallback(() => {
     setPosition((at) => {
@@ -67,66 +69,55 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
     advanceRef.current = advance;
   }, [advance]);
 
-  // One controller for the panel's lifetime; the queue is driven by
-  // loadUri, never by re-creating the iframe.
   useEffect(() => {
-    const host = hostRef.current;
-    const seed = seedUriRef.current;
-    if (host === null || seed === null) {
-      return;
-    }
-    let disposed = false;
-    loadSpotifyIframeApi()
-      .then((api) => {
-        if (disposed) {
-          return;
+    const onMessage = (event: MessageEvent) => {
+      if (
+        event.origin !== window.location.origin ||
+        event.source !== frameRef.current?.contentWindow
+      ) {
+        return;
+      }
+      const message = asPlayerEvent(event.data);
+      if (message === null) {
+        return;
+      }
+      if (message.kind === "failed") {
+        setFailed(true);
+        return;
+      }
+      if (message.kind === "hello") {
+        readyRef.current = true;
+        // Whatever the queue is on now was set before the frame could hear
+        // us; replay it.
+        const uriNow = wantedUriRef.current;
+        if (uriNow !== null) {
+          send({ kind: "load", uri: uriNow });
         }
-        api.createController(host, { uri: seed, width: "100%", height: 152 }, (controller) => {
-          if (disposed) {
-            controller.destroy();
-            return;
-          }
-          controllerRef.current = controller;
-          playingRef.current = seed;
-          controller.addListener("ready", () => {
-            if (wantPlayRef.current) {
-              controller.play();
-            }
-          });
-          controller.addListener("playback_update", ({ data }) => {
-            setPaused(data.isPaused);
-            if (!data.isPaused) {
-              wantPlayRef.current = false;
-            } else if (wantPlayRef.current && data.position === 0) {
-              controller.play();
-            }
-            if (data.duration > 0 && data.position >= data.duration - END_SLACK_MS) {
-              advanceRef.current();
-            }
-          });
-          controller.play();
-        });
-      })
-      .catch(() => setFailed(true));
-    return () => {
-      disposed = true;
-      controllerRef.current?.destroy();
-      controllerRef.current = null;
-      playingRef.current = null;
+        return;
+      }
+      if (message.kind === "ready") {
+        return;
+      }
+      setPaused(message.isPaused);
+      if (message.duration > 0 && message.position >= message.duration - END_SLACK_MS) {
+        advanceRef.current();
+      }
     };
-  }, []);
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [send]);
 
-  // Push the current URI into the existing controller and start it.
+  // Every URI change is a load; the frame builds its controller from the
+  // first one it receives, so this also starts playback.
   useEffect(() => {
-    const controller = controllerRef.current;
-    if (controller === null || uri === null || playingRef.current === uri) {
+    if (uri === null || wantedUriRef.current === uri) {
       return;
     }
-    playingRef.current = uri;
-    wantPlayRef.current = true;
-    controller.loadUri(uri);
-    controller.play();
-  }, [uri]);
+    wantedUriRef.current = uri;
+    if (readyRef.current) {
+      send({ kind: "load", uri });
+    }
+  }, [uri, send]);
 
   if (current === undefined) {
     return null;
@@ -154,25 +145,20 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
         {current.kind === "album" && ` · ${cs.player.wholeAlbum}`}
       </p>
 
-      <div ref={hostRef} className={styles.embed} />
+      <iframe
+        ref={frameRef}
+        className={styles.embed}
+        src={FRAME_SRC}
+        title={cs.player.title}
+        allow="autoplay; encrypted-media; clipboard-write"
+      />
       {failed && <p className={styles.failed}>{cs.player.failed}</p>}
 
       <div className={styles.controls}>
         <button
           type="button"
           className={styles.control}
-          onClick={() => {
-            const controller = controllerRef.current;
-            if (controller === null) {
-              return;
-            }
-            wantPlayRef.current = false;
-            if (paused) {
-              controller.play();
-            } else {
-              controller.pause();
-            }
-          }}
+          onClick={() => send({ kind: paused ? "play" : "pause" })}
           title={paused ? cs.player.play : cs.player.pause}
         >
           {paused ? "▶" : "⏸"}

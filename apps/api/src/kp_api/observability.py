@@ -102,21 +102,36 @@ def configure_limiter(settings: Settings) -> None:
     limiter.enabled = settings.rate_limit_enabled
 
 
-# The SPA's own bundle is same-origin (Vite production builds emit no
-# inline scripts). The single exception is Spotify's embed player: the
-# planner plays a concert's programme in place instead of throwing the user
-# out to open.spotify.com, which needs Spotify's iframe-API script and the
-# iframe it creates. Nothing else third-party is allowed, and the JSON
-# surface below keeps the deny-everything policy.
+# Three policies, keyed by path.
+#
+# The planner itself stays pure same-origin: its only foreign content is the
+# player frame below, which is served from here, so `frame-src 'self'`.
+#
+# That frame (`/app/player.html`) is the one place Spotify's embed API runs.
+# The API evaluates code at runtime, so its document needs `'unsafe-eval'`
+# plus Spotify's script origins — a relaxation kept off the planner by
+# giving the embed a page of its own that holds no application data and
+# renders nothing but the player.
 _SPOTIFY_EMBED = "https://open.spotify.com"
+_SPOTIFY_EMBED_CDN = "https://embed-cdn.spotifycdn.com"
 _SPA_CSP = (
     "default-src 'self'; "
     "img-src 'self' data:; "
     "style-src 'self'; "
-    f"script-src 'self' {_SPOTIFY_EMBED}; "
+    "script-src 'self'; "
+    "connect-src 'self'; "
+    "frame-src 'self'; "
+    "frame-ancestors 'none'; "
+    "base-uri 'none'"
+)
+_PLAYER_CSP = (
+    "default-src 'self'; "
+    "img-src 'self' data:; "
+    "style-src 'self' 'unsafe-inline'; "
+    f"script-src 'self' 'unsafe-eval' {_SPOTIFY_EMBED} {_SPOTIFY_EMBED_CDN}; "
     "connect-src 'self'; "
     f"frame-src {_SPOTIFY_EMBED}; "
-    "frame-ancestors 'none'; "
+    "frame-ancestors 'self'; "
     "base-uri 'none'"
 )
 
@@ -130,9 +145,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     or an attacker-driven embed can hit the API too — the headers are
     cheap and the floor is "no worse than no header".
 
-    Path-aware CSP: the SPA mount at `/app` gets a policy that lets its
-    own bundle and Google sign-in run; the JSON surface keeps the strict
-    deny-everything policy.
+    Path-aware CSP: the SPA mount at `/app` gets a same-origin policy, its
+    player frame (`/app/player.html`) the one relaxed policy Spotify's embed
+    API needs, and the JSON surface keeps the deny-everything policy.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -153,10 +168,18 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("Referrer-Policy", "no-referrer")
         path = request.url.path
         is_spa = path == "/app" or path.startswith("/app/")
-        response.headers.setdefault(
-            "Content-Security-Policy",
-            _SPA_CSP if is_spa else _API_CSP,
-        )
+        is_player = path == "/app/player.html"
+        if is_player:
+            policy = _PLAYER_CSP
+        elif is_spa:
+            policy = _SPA_CSP
+        else:
+            policy = _API_CSP
+        response.headers.setdefault("Content-Security-Policy", policy)
+        # The planner frames the player; X-Frame-Options: DENY would win over
+        # the CSP's `frame-ancestors 'self'` in browsers that honour both.
+        if is_player:
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
         return response
 
 

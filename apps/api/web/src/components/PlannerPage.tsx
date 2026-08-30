@@ -29,7 +29,6 @@ import { HeaderBar } from "./layout/HeaderBar";
 import { ScenarioTabs } from "./layout/ScenarioTabs";
 import styles from "./PlannerPage.module.css";
 import { ProgramPlayer } from "./player/ProgramPlayer";
-import { loadSpotifyIframeApi } from "./player/spotifyIframeApi";
 import { CandidatePool } from "./pool/CandidatePool";
 import { Toast } from "./ui/Toast";
 
@@ -101,13 +100,6 @@ export function PlannerPage() {
     () => (season !== undefined ? monthsBetween(season.starts_on, season.ends_on) : []),
     [season],
   );
-
-  // Spotify's embed script is fetched up front: loading it only on the
-  // first ▶ pushed playback outside the click's activation window, and the
-  // browser then refused to start.
-  useEffect(() => {
-    void loadSpotifyIframeApi().catch(() => undefined);
-  }, []);
 
   // Esc exits scenario preview, else clears the pinned card.
   useEffect(() => {

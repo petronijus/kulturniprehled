@@ -7,6 +7,16 @@ import { defineConfig } from "vite";
 export default defineConfig({
   base: "/app/",
   plugins: [react()],
+  build: {
+    // Two documents: the planner, and the sandboxed Spotify player frame it
+    // embeds (see src/player/protocol.ts for why the player is its own page).
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        player: "player.html",
+      },
+    },
+  },
   server: {
     proxy: {
       "/v1": {

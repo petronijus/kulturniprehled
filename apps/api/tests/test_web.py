@@ -56,9 +56,11 @@ async def test_spa_gets_relaxed_csp_api_stays_locked(spa_client: AsyncClient) ->
     assert "default-src 'self'" in csp
     assert "script-src 'self'" in csp
     assert "accounts.google.com" not in csp
-    # The inline programme player embeds Spotify — and nothing else.
-    assert "frame-src https://open.spotify.com" in csp
-    assert "script-src 'self' https://open.spotify.com" in csp
+    # The planner itself runs nothing foreign: Spotify's embed API lives in
+    # the player frame, which is served from here.
+    assert "script-src 'self';" in csp
+    assert "frame-src 'self'" in csp
+    assert "spotify" not in csp
     assert "frame-ancestors 'none'" in csp
 
     api = await spa_client.get("/healthz")
@@ -97,6 +99,24 @@ async def test_web_public_flag_opens_cloudflare_path(tmp_path: Path) -> None:
     assert "KP Planner" in response.text
 
 
+async def test_player_frame_gets_the_only_eval_relaxation(spa_client: AsyncClient) -> None:
+    """Spotify's embed API needs `eval` — that stays inside the player page."""
+
+    player = await spa_client.get("/app/player.html")
+    csp = player.headers["content-security-policy"]
+
+    assert "'unsafe-eval'" in csp
+    assert "https://open.spotify.com" in csp
+    assert "https://embed-cdn.spotifycdn.com" in csp
+    # It is framed by the planner, so it must not be DENY-framed.
+    assert "frame-ancestors 'self'" in csp
+    assert player.headers["x-frame-options"] == "SAMEORIGIN"
+
+    # …and the planner document itself gets none of that.
+    index = await spa_client.get("/app/")
+    assert "'unsafe-eval'" not in index.headers["content-security-policy"]
+
+
 async def test_no_dist_dir_means_no_mount(tmp_path: Path) -> None:
     # An app built while the bundle directory is missing must not mount
     # /app at all — the path 404s with the (path-keyed) SPA CSP.
@@ -112,6 +132,6 @@ async def test_no_dist_dir_means_no_mount(tmp_path: Path) -> None:
     assert (
         response.headers["content-security-policy"]
         == "default-src 'self'; img-src 'self' data:; style-src 'self'; "
-        "script-src 'self' https://open.spotify.com; connect-src 'self'; "
-        "frame-src https://open.spotify.com; frame-ancestors 'none'; base-uri 'none'"
+        "script-src 'self'; connect-src 'self'; frame-src 'self'; "
+        "frame-ancestors 'none'; base-uri 'none'"
     )

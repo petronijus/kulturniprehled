@@ -1,0 +1,100 @@
+.root {
+  position: relative;
+  display: inline-block;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  max-width: 16rem;
+}
+
+.trigger:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* A picked value is a live filter — it reads like the active lane chip. */
+.triggerActive {
+  color: var(--text);
+  font-weight: 600;
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  margin-inline-start: auto;
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+
+.list {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  max-width: 22rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-drag);
+}
+
+/* Not enough room below the trigger — hang the list above it instead. */
+.listUp {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.option {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.option:hover {
+  background: var(--surface-sunken);
+}
+
+/* The caret row: roving focus, so no separate "active" class is needed. */
+.option:focus {
+  outline: none;
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 2px var(--focus-ring);
+}
+
+.selected {
+  font-weight: 650;
+}
+
+.groupHeading {
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}

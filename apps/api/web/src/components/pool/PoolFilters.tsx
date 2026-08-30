@@ -1,7 +1,10 @@
+import { useMemo } from "react";
 import type { Lane } from "../../api/types";
 import type { PoolFacets } from "../../domain/facets";
 import type { IsoMonth } from "../../domain/season";
 import { cs } from "../../i18n/cs";
+import type { SelectOption } from "../ui/Select";
+import { Select } from "../ui/Select";
 import styles from "./PoolFilters.module.css";
 
 export interface PoolFilterState {
@@ -36,6 +39,31 @@ interface PoolFiltersProps {
 }
 
 export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersProps) {
+  const monthOptions = useMemo<SelectOption[]>(
+    () =>
+      months.map((month) => ({
+        value: month,
+        label: `${cs.months[Number(month.slice(5)) - 1] ?? month} ${month.slice(0, 4)}`,
+      })),
+    [months],
+  );
+  // Ensembles and venues share one control, each half under its own heading.
+  const facetOptions = useMemo<SelectOption[]>(
+    () => [
+      ...facets.sources.map((name) => ({
+        value: `source:${name}`,
+        label: name,
+        group: cs.filters.facetSources,
+      })),
+      ...facets.venues.map((name) => ({
+        value: `venue:${name}`,
+        label: name,
+        group: cs.filters.facetVenues,
+      })),
+    ],
+    [facets],
+  );
+
   return (
     <div className={styles.bar}>
       <div className={styles.laneChips}>
@@ -59,50 +87,18 @@ export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersPr
         ))}
       </div>
       <div className={styles.row}>
-        <select
-          className={styles.select}
+        <Select
           value={filters.month ?? ""}
-          onChange={(event) =>
-            onChange({ ...filters, month: event.target.value === "" ? null : event.target.value })
-          }
-        >
-          <option value="">{cs.filters.month}</option>
-          {months.map((month) => {
-            const index = Number(month.slice(5)) - 1;
-            return (
-              <option key={month} value={month}>
-                {cs.months[index]} {month.slice(0, 4)}
-              </option>
-            );
-          })}
-        </select>
-        <select
-          className={styles.select}
+          options={monthOptions}
+          placeholder={cs.filters.month}
+          onChange={(value) => onChange({ ...filters, month: value === "" ? null : value })}
+        />
+        <Select
           value={filters.facet ?? ""}
-          onChange={(event) =>
-            onChange({ ...filters, facet: event.target.value === "" ? null : event.target.value })
-          }
-        >
-          <option value="">{cs.filters.facet}</option>
-          {facets.sources.length > 0 && (
-            <optgroup label={cs.filters.facetSources}>
-              {facets.sources.map((name) => (
-                <option key={`source:${name}`} value={`source:${name}`}>
-                  {name}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {facets.venues.length > 0 && (
-            <optgroup label={cs.filters.facetVenues}>
-              {facets.venues.map((name) => (
-                <option key={`venue:${name}`} value={`venue:${name}`}>
-                  {name}
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </select>
+          options={facetOptions}
+          placeholder={cs.filters.facet}
+          onChange={(value) => onChange({ ...filters, facet: value === "" ? null : value })}
+        />
         <label className={styles.toggle}>
           <input
             type="checkbox"

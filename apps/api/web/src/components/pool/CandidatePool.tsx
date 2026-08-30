@@ -5,6 +5,7 @@ import { decodeFacet, matchesFacet, poolFacets } from "../../domain/facets";
 import { candidateDate } from "../../domain/planState";
 import type { ProductionGroup } from "../../domain/productions";
 import { groupStatus, isProductionBooked } from "../../domain/productions";
+import type { ProgramLine } from "../../domain/program";
 import type { IsoMonth } from "../../domain/season";
 import { monthOf } from "../../domain/season";
 import { cs } from "../../i18n/cs";
@@ -20,6 +21,7 @@ interface CandidatePoolProps {
   booked: BookedEvent[];
   months: IsoMonth[];
   programLinks: ReadonlyMap<string, ProgramMediaLink>;
+  onPlayProgram: (title: string, lines: ProgramLine[], startIndex: number) => void;
   onSetStatus: (candidate: Candidate, status: PlanStatus) => void;
   onHoverChange: (group: ProductionGroup | null) => void;
   pinnedKeys: ReadonlySet<string>;
@@ -33,6 +35,7 @@ export function CandidatePool({
   booked,
   months,
   programLinks,
+  onPlayProgram,
   onSetStatus,
   onHoverChange,
   pinnedKeys,
@@ -122,6 +125,7 @@ export function CandidatePool({
             key={group.key}
             group={group}
             programLinks={programLinks}
+            onPlayProgram={onPlayProgram}
             onSetStatus={onSetStatus}
             onHoverChange={onHoverChange}
             pinned={pinnedKeys.has(group.key)}

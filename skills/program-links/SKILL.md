@@ -75,7 +75,10 @@ for candidate in pool:
         author = entry.get("composer") or entry.get("author") or entry.get("director")
         work = entry.get("work") or entry.get("play") or entry.get("film")
         k = key(author, work)
-        if k is None or (k in have and have[k].get("spotify_url")):
+        # Fully resolved = the movements are known. A row with only an album
+        # is worth one more try (a second pass often finds the track list),
+        # so it stays in the work list.
+        if k is None or (k in have and have[k].get("spotify_track_uris")):
             continue
         # Keep the richest spelling seen and the lane, which decides where
         # to look: klasika/elektronika → Spotify, divadlo/film → YouTube.
@@ -131,6 +134,29 @@ Take the album URL from `external_urls.spotify` in the response (never
 build it by hand) and set `match_label` to `"<artist> — <album>"` so a
 wrong pick is visible in the planner tooltip without opening it.
 
+**A work is its movements.** The planner plays the programme in place, one
+piece after another, so a symphony must arrive as the track list of that
+symphony — not as "the album", which would run on into whatever else the
+record holds. After picking the album, list its tracks and keep the ones
+belonging to the work, in order:
+
+```bash
+curl -sS -H "Authorization: Bearer $SP_TOKEN" \
+  "https://api.spotify.com/v1/albums/$ALBUM_ID/tracks?limit=50" \
+  | jq -r '.items[] | "\(.track_number)\t\(.uri)\t\(.name)"'
+```
+
+Movement titles name the work ("Symphony No. 5 in C-sharp Minor: I.
+Trauermarsch") or are bare tempo markings under a disc that holds one work
+only. Keep the contiguous run that belongs to the piece and push it as
+`spotify_track_uris` in playing order. Two rules that save re-runs:
+
+- a single-movement piece is a one-element list, not a missing one;
+- when you cannot tell which tracks belong to the work (a compilation, an
+  opera in 40 tracks with no work prefix), push `spotify_url` **without**
+  `spotify_track_uris`. The planner then plays the album and says so —
+  honest, and re-resolvable later.
+
 For divadlo / film pieces Spotify is the wrong catalogue: skip it and, if
 you can find one cheaply, use WebSearch for a YouTube trailer or a
 production video, taking the URL from the result. Never guess a video id.
@@ -138,7 +164,8 @@ production video, taking the URL from the result. Never guess a video id.
 ### 5. Push
 
 ```bash
-# items: [{author, work, spotify_url?, youtube_url?, match_label?}], ≤500 per call
+# items: [{author, work, spotify_url?, spotify_track_uris?, youtube_url?, match_label?}]
+# ≤500 per call; malformed track URIs are dropped, the rest of the item stands
 curl -sS -A "$UA" -X PUT -H "$AUTH" -H 'Content-Type: application/json' \
   -d "{\"items\": $CHUNK}" "$KP_API_BASE/v1/season/program-links"
 ```
@@ -151,7 +178,8 @@ those are bugs in step 2/4, worth naming in the report.
 
 - how many pieces were resolved this run, how many the season now covers;
 - the pieces you deliberately left unresolved and why (no catalogue entry,
-  only dubious compilations);
+  only dubious compilations), and the ones that got an album but no
+  movement list — those are the ones worth a second pass;
 - anything that looked like a scrape problem — a "programme" that is really
   a marketing sentence tends to surface here first.
 

@@ -42,9 +42,19 @@ export const cs = {
     inPlan: "v plánu",
   },
   play: {
-    spotify: "Přehrát na Spotify",
+    spotify: "Přehrát tady — a dál podle programu",
     spotifySearch: "Najít na Spotify",
     youtube: "Přehrát na YouTube",
+  },
+  player: {
+    title: "Přehrávání",
+    close: "Zavřít přehrávač",
+    previous: "Předchozí skladba",
+    next: "Další",
+    movement: (index: number, total: number) => `${index}. věta z ${total}`,
+    wholeAlbum: "celé album (věty se nepodařilo rozlišit)",
+    openInSpotify: "Otevřít ve Spotify",
+    failed: "Přehrávač Spotify se nepodařilo načíst.",
   },
   lanes: {
     klasika: "Vážná hudba",

@@ -86,6 +86,38 @@ async def test_links_upsert_is_additive_per_service(client: AsyncClient) -> None
     assert item["match_label"] == "Karajan / BPO"
 
 
+async def test_track_uris_carry_the_movements_and_drop_junk(client: AsyncClient) -> None:
+    """A work is its movements — order is kept, malformed URIs are dropped."""
+
+    headers = await _auth(client)
+    response = await client.put(
+        "/v1/season/program-links",
+        json={
+            "items": [
+                {
+                    "author": "Gustav Mahler",
+                    "work": "Symfonie č. 5",
+                    "spotify_url": "https://open.spotify.com/album/mahler5",
+                    "spotify_track_uris": [
+                        "spotify:track:0000000000000000000001",
+                        "https://open.spotify.com/track/nope",
+                        "spotify:track:0000000000000000000002",
+                    ],
+                }
+            ]
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+
+    listing = await client.get("/v1/season/program-links", headers=headers)
+    item = listing.json()["items"][0]
+    assert item["spotify_track_uris"] == [
+        "spotify:track:0000000000000000000001",
+        "spotify:track:0000000000000000000002",
+    ]
+
+
 async def test_repeated_identical_push_is_unchanged(client: AsyncClient) -> None:
     headers = await _auth(client)
     payload = {

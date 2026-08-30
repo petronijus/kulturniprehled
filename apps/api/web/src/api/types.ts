@@ -166,6 +166,9 @@ export interface ProgramMediaLink {
   author: string | null;
   work: string | null;
   spotify_url: string | null;
+  /** The movements of the work, in playing order — what the inline player
+   * queues. Null when only the record was resolved. */
+  spotify_track_uris: string[] | null;
   youtube_url: string | null;
   /** What the resolver matched, e.g. "Karajan / BPO" — shown as the tooltip. */
   match_label: string | null;

@@ -65,10 +65,18 @@ piece rather than by candidate is deliberate: a season's orchestras play
 the same works, so each is resolved once, and a pool upsert — which
 rewrites a candidate's `program` wholesale — cannot wipe the links.
 
+A row carries `spotify_track_uris` — the work's movements in playing order
+— because the planner plays a programme in place (Spotify's embed player,
+the only third-party origin in the SPA's CSP) and a symphony is several
+tracks; `spotify_url` remains the human link to the record it came from. A
+piece resolved to a record but not to its tracks still plays: the panel
+loads the album and labels it as such.
+
 The upsert is additive per service: an item carrying only `spotify_url`
 leaves a stored `youtube_url` alone, so the resolver (`/program-links`
 skill, which searches Spotify with Petr's own refresh token — the API holds
-no Spotify credentials) can run in several passes. Items with no identity
+no Spotify credentials) can run in several passes. Malformed track URIs are
+dropped from an item rather than failing it. Items with no identity
 or no link are counted as `skipped` rather than failing the batch. A piece
 with no stored link is not broken in the planner: the ▶ falls back to a
 Spotify search for `author work`.

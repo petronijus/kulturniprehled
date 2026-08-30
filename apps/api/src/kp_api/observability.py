@@ -102,15 +102,20 @@ def configure_limiter(settings: Settings) -> None:
     limiter.enabled = settings.rate_limit_enabled
 
 
-# The SPA is fully self-contained (login-less, no third-party scripts;
-# Vite production builds emit no inline scripts), so its CSP is pure
-# same-origin. Every other path keeps the API lockdown CSP below.
+# The SPA's own bundle is same-origin (Vite production builds emit no
+# inline scripts). The single exception is Spotify's embed player: the
+# planner plays a concert's programme in place instead of throwing the user
+# out to open.spotify.com, which needs Spotify's iframe-API script and the
+# iframe it creates. Nothing else third-party is allowed, and the JSON
+# surface below keeps the deny-everything policy.
+_SPOTIFY_EMBED = "https://open.spotify.com"
 _SPA_CSP = (
     "default-src 'self'; "
     "img-src 'self' data:; "
     "style-src 'self'; "
-    "script-src 'self'; "
+    f"script-src 'self' {_SPOTIFY_EMBED}; "
     "connect-src 'self'; "
+    f"frame-src {_SPOTIFY_EMBED}; "
     "frame-ancestors 'none'; "
     "base-uri 'none'"
 )

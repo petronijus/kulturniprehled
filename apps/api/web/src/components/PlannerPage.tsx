@@ -13,8 +13,11 @@ import {
 import type { CalendarEntry, Candidate, PlanStatus } from "../api/types";
 import { blockedDaysOf, entriesByDay, holidaysByDay } from "../domain/calendar";
 import { candidateDate, selectedIdsOf, toPlannedItems } from "../domain/planState";
+import type { QueueItem } from "../domain/playQueue";
+import { buildQueue } from "../domain/playQueue";
 import type { ProductionGroup } from "../domain/productions";
 import { groupProductions } from "../domain/productions";
+import type { ProgramLine } from "../domain/program";
 import type { IsoDate } from "../domain/season";
 import { monthsBetween } from "../domain/season";
 import { computeViolations } from "../domain/violations";
@@ -25,6 +28,7 @@ import { PlannerDnd } from "./dnd/PlannerDnd";
 import { HeaderBar } from "./layout/HeaderBar";
 import { ScenarioTabs } from "./layout/ScenarioTabs";
 import styles from "./PlannerPage.module.css";
+import { ProgramPlayer } from "./player/ProgramPlayer";
 import { CandidatePool } from "./pool/CandidatePool";
 import { Toast } from "./ui/Toast";
 
@@ -50,6 +54,10 @@ export function PlannerPage() {
   // Hover/pin are tracked by production key so they survive pool refetches;
   // the member candidates are re-derived from the current pool each render.
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  // The programme currently queued for playback; the panel is open exactly
+  // while this holds something. `generation` remounts the player so a new
+  // ▶ starts at the top of its own queue.
+  const [play, setPlay] = useState<{ queue: QueueItem[]; generation: number } | null>(null);
   const [pinnedKeys, setPinnedKeys] = useState<string[]>([]);
 
   const pool = useMemo(() => poolQuery.data ?? [], [poolQuery.data]);
@@ -101,13 +109,15 @@ export function PlannerPage() {
       }
       if (previewMode) {
         setPreviewScenarioId(null);
+      } else if (play !== null) {
+        setPlay(null);
       } else {
         setPinnedKeys([]);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [previewMode]);
+  }, [previewMode, play]);
 
   const togglePin = useCallback((group: ProductionGroup) => {
     setPinnedKeys((current) =>
@@ -116,6 +126,16 @@ export function PlannerPage() {
         : [...current, group.key],
     );
   }, []);
+
+  const onPlayProgram = useCallback(
+    (title: string, lines: ProgramLine[], startIndex: number) => {
+      const queue = buildQueue(title, lines, programLinks, startIndex);
+      if (queue.length > 0) {
+        setPlay((current) => ({ queue, generation: (current?.generation ?? 0) + 1 }));
+      }
+    },
+    [programLinks],
+  );
 
   const onHoverChange = useCallback((group: ProductionGroup | null) => {
     setHoveredKey(group === null ? null : group.key);
@@ -215,7 +235,7 @@ export function PlannerPage() {
       />
       <PlannerDnd onSetStatus={setStatus}>
         {(dragTargetDate) => (
-          <div className={styles.panes}>
+          <div className={`${styles.panes} ${play === null ? "" : styles.withPlayer}`}>
             <SeasonCalendar
               season={season}
               pool={pool}
@@ -239,12 +259,20 @@ export function PlannerPage() {
               booked={booked}
               months={months}
               programLinks={programLinks}
+              onPlayProgram={onPlayProgram}
               onSetStatus={setStatus}
               onHoverChange={onHoverChange}
               pinnedKeys={new Set(pinnedKeys)}
               onTogglePin={togglePin}
               actionsDisabled={previewMode}
             />
+            {play !== null && (
+              <ProgramPlayer
+                key={play.generation}
+                queue={play.queue}
+                onClose={() => setPlay(null)}
+              />
+            )}
           </div>
         )}
       </PlannerDnd>

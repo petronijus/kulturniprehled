@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Annotated
 from uuid import UUID
@@ -657,6 +658,18 @@ async def public_holidays(
     return await fetch_holidays(settings.holidays_ics_url, start, end)
 
 
+_TRACK_URI = re.compile(r"^spotify:track:[A-Za-z0-9]{10,40}$")
+
+
+def _clean_track_uris(uris: list[str] | None) -> list[str] | None:
+    """Keep the well-formed track URIs, in order; `None` when none survive."""
+
+    if uris is None:
+        return None
+    kept = [uri for uri in uris if _TRACK_URI.match(uri)]
+    return kept or None
+
+
 @router.get("/program-links", response_model=ProgramMediaLinkListResponse)
 async def list_program_links(
     session: SessionDep,
@@ -700,6 +713,9 @@ async def put_program_links(
     keyed: dict[str, ProgramMediaLinkUpsert] = {}
     skipped = 0
     for item in body.items:
+        # A resolver typo in one URI must not cost the whole batch, so bad
+        # ones are dropped here instead of failing schema validation.
+        item.spotify_track_uris = _clean_track_uris(item.spotify_track_uris)
         if item.spotify_url is None and item.youtube_url is None:
             skipped += 1
             continue
@@ -730,6 +746,7 @@ async def put_program_links(
                     author=item.author,
                     work=item.work,
                     spotify_url=item.spotify_url,
+                    spotify_track_uris=item.spotify_track_uris,
                     youtube_url=item.youtube_url,
                     match_label=item.match_label,
                     resolved_at=now,
@@ -738,7 +755,7 @@ async def put_program_links(
             created += 1
             continue
         changed = False
-        for field in ("spotify_url", "youtube_url", "match_label"):
+        for field in ("spotify_url", "spotify_track_uris", "youtube_url", "match_label"):
             value = getattr(item, field)
             if value is not None and value != getattr(row, field):
                 setattr(row, field, value)

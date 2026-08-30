@@ -16,8 +16,15 @@
   gap: var(--space-4);
 }
 
+/* The player takes its own column rather than overlaying the plan — the
+   point is to keep planning while the programme runs. */
+.withPlayer {
+  grid-template-columns: minmax(0, 46fr) minmax(0, 34fr) minmax(18rem, 20fr);
+}
+
 @media (max-width: 900px) {
-  .panes {
+  .panes,
+  .withPlayer {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
   }

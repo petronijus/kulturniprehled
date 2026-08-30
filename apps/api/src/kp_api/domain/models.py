@@ -711,6 +711,9 @@ class ProgramMediaLink(Base):
     author: Mapped[str | None] = mapped_column(String(255), nullable=True)
     work: Mapped[str | None] = mapped_column(String(400), nullable=True)
     spotify_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    # A work is its movements: the tracks that make up this piece, in playing
+    # order. `spotify_url` stays the human link (the album it came from).
+    spotify_track_uris: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     youtube_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     # What the resolver matched, so a wrong hit is recognizable without
     # opening the link ("Karajan / BPO 1977").

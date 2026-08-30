@@ -1,11 +1,12 @@
 import { useDraggable } from "@dnd-kit/core";
 import type { Candidate, PlanStatus, ProgramMediaLink } from "../../api/types";
 import { candidateDate } from "../../domain/planState";
+import { isPlayable, linkFor } from "../../domain/playQueue";
 import type { ProductionGroup } from "../../domain/productions";
 import { groupStatus } from "../../domain/productions";
 import type { ProgramLine } from "../../domain/program";
 import { programLines } from "../../domain/program";
-import { programKey, programQuery } from "../../domain/programKey";
+import { programQuery } from "../../domain/programKey";
 import { isoToLocalTime, weekday } from "../../domain/season";
 import { cs } from "../../i18n/cs";
 import { isNew } from "../../state/newSince";
@@ -17,6 +18,8 @@ interface CandidateCardProps {
   group: ProductionGroup;
   /** Resolved media links by folded piece key; empty until the link skill runs. */
   programLinks: ReadonlyMap<string, ProgramMediaLink>;
+  /** Start the panel player at this piece and play the programme on from it. */
+  onPlayProgram: (title: string, lines: ProgramLine[], startIndex: number) => void;
   onSetStatus: (candidate: Candidate, status: PlanStatus) => void;
   onHoverChange: (group: ProductionGroup | null) => void;
   pinned: boolean;
@@ -37,33 +40,55 @@ function spotifySearchUrl(query: string): string {
 
 /** ▶ for one programme piece.
  *
- * A resolved link plays the recording the skill picked; everything else
- * falls back to a Spotify search for the piece, so a programme is playable
- * the moment it is scraped — the resolver only ever makes it more precise.
+ * A resolved piece plays in the panel beside the planner and carries on
+ * through the rest of the programme; an unresolved one still opens a
+ * Spotify search in a tab, so a freshly scraped programme is never a dead
+ * end.
  */
-function PlayLinks({ line, link }: { line: ProgramLine; link: ProgramMediaLink | undefined }) {
+function PlayLinks({
+  line,
+  link,
+  playable,
+  onPlay,
+}: {
+  line: ProgramLine;
+  link: ProgramMediaLink | undefined;
+  playable: boolean;
+  onPlay: () => void;
+}) {
   const query = programQuery(line.author, line.work);
-  const spotifyUrl = link?.spotify_url ?? spotifySearchUrl(query);
-  const resolved = link?.spotify_url !== undefined && link.spotify_url !== null;
-  const label = resolved ? cs.play.spotify : cs.play.spotifySearch;
+  const label = playable ? cs.play.spotify : cs.play.spotifySearch;
+  const title =
+    link?.match_label === undefined || link.match_label === null
+      ? label
+      : `${label} — ${link.match_label}`;
 
   return (
     <span className={styles.playLinks}>
-      <a
-        className={`${styles.play} ${resolved ? styles.playResolved : ""}`}
-        href={spotifyUrl}
-        target="_blank"
-        rel="noreferrer"
-        title={
-          link?.match_label === undefined || link.match_label === null
-            ? label
-            : `${label} — ${link.match_label}`
-        }
-        aria-label={`${label}: ${query}`}
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        ▶
-      </a>
+      {playable ? (
+        <button
+          type="button"
+          className={`${styles.play} ${styles.playResolved}`}
+          title={title}
+          aria-label={`${label}: ${query}`}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={onPlay}
+        >
+          ▶
+        </button>
+      ) : (
+        <a
+          className={styles.play}
+          href={spotifySearchUrl(query)}
+          target="_blank"
+          rel="noreferrer"
+          title={title}
+          aria-label={`${label}: ${query}`}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          ▶
+        </a>
+      )}
       {link?.youtube_url !== undefined && link.youtube_url !== null && (
         <a
           className={`${styles.play} ${styles.playResolved}`}
@@ -123,6 +148,7 @@ function DateRow({
 export function CandidateCard({
   group,
   programLinks,
+  onPlayProgram,
   onSetStatus,
   onHoverChange,
   pinned,
@@ -155,10 +181,6 @@ export function CandidateCard({
   }
 
   const program = programLines(richest.program);
-  const linkFor = (line: ProgramLine): ProgramMediaLink | undefined => {
-    const key = programKey(line.author, line.work);
-    return key === null ? undefined : programLinks.get(key);
-  };
 
   const anyNew = candidates.some((candidate) => isNew(candidate.first_seen_at));
   const seasonEvent = candidates.some((candidate) => candidate.season_event);
@@ -240,7 +262,12 @@ export function CandidateCard({
                 </span>
               )}
               {line.work !== null && <span className={styles.programWork}>{line.work}</span>}
-              <PlayLinks line={line} link={linkFor(line)} />
+              <PlayLinks
+                line={line}
+                link={linkFor(line, programLinks)}
+                playable={isPlayable(line, programLinks)}
+                onPlay={() => onPlayProgram(richest.title, program, index)}
+              />
             </li>
           ))}
         </ul>

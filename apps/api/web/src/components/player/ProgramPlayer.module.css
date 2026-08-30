@@ -1,0 +1,135 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-3);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.heading {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.close {
+  font-size: var(--text-sm);
+  color: var(--text-faint);
+}
+
+.close:hover {
+  color: var(--text);
+}
+
+.now {
+  font-size: var(--text-md);
+  line-height: var(--leading-tight);
+}
+
+.author {
+  font-weight: 650;
+}
+
+.context {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+
+/* Spotify replaces this host node with its iframe. */
+.embed {
+  min-height: 152px;
+}
+
+.failed {
+  font-size: var(--text-sm);
+  color: var(--warn);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.control {
+  font-size: var(--text-md);
+  line-height: 1;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px var(--space-2);
+}
+
+.control:hover:not(:disabled) {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.control:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.openLink {
+  margin-inline-start: auto;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+/* The running order — the point of the panel: what plays after this. */
+.queue {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.queueItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  text-align: start;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.queueItem:hover {
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+
+.queueCurrent {
+  background: var(--surface-raised);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--ok);
+}
+
+.queueWork {
+  line-height: var(--leading-tight);
+}
+
+.queueAuthor {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}

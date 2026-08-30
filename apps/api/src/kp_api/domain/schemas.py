@@ -441,6 +441,9 @@ class ProgramMediaLinkUpsert(BaseModel):
     author: str | None = Field(default=None, max_length=255)
     work: str | None = Field(default=None, max_length=400)
     spotify_url: str | None = Field(default=None, max_length=1024)
+    # The movements of this work, in playing order. Malformed entries are
+    # dropped by the router rather than failing the batch.
+    spotify_track_uris: list[str] | None = Field(default=None, max_length=120)
     youtube_url: str | None = Field(default=None, max_length=1024)
     match_label: str | None = Field(default=None, max_length=400)
 
@@ -467,6 +470,7 @@ class ProgramMediaLinkResponse(BaseModel):
     author: str | None
     work: str | None
     spotify_url: str | None
+    spotify_track_uris: list[str] | None
     youtube_url: str | None
     match_label: str | None
     resolved_at: datetime

@@ -68,6 +68,43 @@ The script:
 Postgres and MinIO are **not** restarted by the script — bump them
 manually after reviewing release notes for each service.
 
+## HTTPS front for the planner (deployed 2026-08-30)
+
+The planner is reachable at **<https://kulturniprehled-plan.bastla.com/app/>**
+from the home network. It is not a nicety: Spotify's embed player only
+plays full tracks in a **secure context** — over plain `http://<LAN IP>` the
+browser exposes no EME, so every piece stopped after a 30-second preview.
+
+How it is wired:
+
+- `infra/compose.internal-web.yml` runs Caddy (image built locally and
+  pushed to GHCR, like the API) publishing `:443` on the VM and proxying to
+  `api:8000`. Requests through it carry no `CF-Connecting-IP`, so the
+  login-less trusted-LAN path and `/app` work exactly as on the LAN port,
+  while the Cloudflare-tunnel path keeps 404ing `/app`.
+- The certificate is a real Let's Encrypt one, obtained by **DNS-01**
+  through the Cloudflare API (`CLOUDFLARE_DNS_API_TOKEN` in `/opt/kp/.env`,
+  needs Zone:DNS:Edit). The name therefore never needs to resolve publicly.
+- The name resolves **only at home**: an OPNsense Unbound host override
+  points it at the VM's LAN IP. Away from home there is no record, so the
+  planner is simply not there (the mobile app talks to the public API and
+  is unaffected).
+
+Bring it up (or back up) with:
+
+```bash
+cd /opt/kp/infra
+docker compose --env-file /opt/kp/.env -p kulturniprehled-dev \
+    -f docker-compose.yml -f compose.internal-web.yml up -d caddy
+```
+
+🚨 **`KP_API_TAG` must be set in `/opt/kp/.env`** (it is). Any ad-hoc
+`docker compose up` re-creates `api` from `${KP_API_TAG:-latest}`, and the
+VM's local `latest` tag is whatever was pulled last — running an image
+older than the database's Alembic head crash-loops the API on
+`Can't locate revision identified by '00XX'`. Recovery is to re-run with
+the right tag; keeping the tag pinned in `.env` prevents it.
+
 ## Disaster recovery
 
 See `infra/backup/restore-test.sh` for the drill. The recipe:

@@ -100,6 +100,12 @@ services:
       ALLOWED_EMAILS: ${ALLOWED_EMAILS:-}
       # Venues refused at pool ingest and purged on the next scrape.
       SEASON_VENUE_VETO: ${SEASON_VENUE_VETO:-}
+      # Spotify — only for the planner's in-page player (Web Playback SDK).
+      # The refresh token never leaves the server; the SPA gets one-hour
+      # access tokens from GET /v1/season/spotify-token.
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+      SPOTIFY_REFRESH_TOKEN: ${SPOTIFY_REFRESH_TOKEN:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
       # Discogs taste map served via /v1/digest/context (empty → discogs: null).

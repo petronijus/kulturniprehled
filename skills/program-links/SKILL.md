@@ -115,10 +115,40 @@ curl -sS -H "Authorization: Bearer $SP_TOKEN" -G 'https://api.spotify.com/v1/sea
   --data-urlencode 'type=album' --data-urlencode 'limit=5'
 ```
 
-Czech titles are the scrape's language, Spotify's catalogue mostly is not:
-search the **international** form of the work when the Czech one misses
-("Symfonie č. 9 → Symphony No. 9", "Prodaná nevěsta → The Bartered
-Bride"). One retry with the translated query is worth it; a third is not.
+Czech titles are the scrape's language, Spotify's catalogue mostly is not.
+A run over the 2026/27 pool (546 pieces) showed exactly where the misses
+come from — search these forms, in this order, and stop at the first query
+whose hits actually score:
+
+1. **`author work` verbatim** — enough for anything already catalogued in
+   Czech (Janáček, Smetana operas, Rybova Česká mše vánoční).
+2. **the international title** — "Symfonie č. 9 → Symphony No. 9",
+   "Prodaná nevěsta → The Bartered Bride", "Faunovo odpoledne → Prélude à
+   l'après-midi d'un faune", "Vůl na střeše → Le bœuf sur le toit".
+3. **the title without its catalogue number or key** — the programme writes
+   "Kouzelná flétna, KV 620", the catalogue writes "Die Zauberflöte, K.
+   620"; searching for "KV 620" finds nothing, so drop it from the query
+   and keep it for scoring.
+
+**Transliterate the composer too.** This one cost a whole pass: Spotify has
+never heard of "Dmitrij Šostakovič", so his Tenth came back empty while the
+recording sat there under Shostakovich. Same for Čajkovskij → Tchaikovsky,
+Musorgskij → Mussorgsky, Prokofjev → Prokofiev, Rachmaninov →
+Rachmaninoff, Kramář → Krommer.
+
+Three things to strip before searching, all of which the fold-to-ASCII step
+turns into ordinary words (the punctuation is gone by then, so match them
+as words, not as "everything after the dash"):
+
+- excerpt markers — "Rusalka — výběr" is a recording of Rusalka;
+- instrumentation — "Fratres pro housle a klavír" is catalogued as
+  "Fratres";
+- staging notes — "(scénická verze Matěje Formana)", "(komorní provedení)".
+
+A programme line naming several works ("Adiós Nonino / Fuga y misterio /
+Tres minutos") is **several pieces**: resolve each on its own and
+concatenate their tracks in programme order. Link it only when most parts
+resolved — a ▶ that plays one third of the line is worse than none.
 
 Pick with the same priority the ingest skill uses for playlists:
 
@@ -129,6 +159,17 @@ Pick with the same priority the ingest skill uses for playlists:
 3. else the top hit — but only if it plausibly *is* the work. A compilation
    called "Classical Relaxation" containing one movement is a miss, not a
    third-best answer: leave the piece unresolved instead.
+
+Two gates that caught real mistakes in the 2026/27 run, worth applying by
+hand as well:
+
+- **the album has to be about this work or this composer.** "West Side
+  Story" on *100 Best Film Classics* and "Prodaná nevěsta" on *Famous
+  Opera Choruses* are single movements lifted out of context.
+- **a number in the title must survive.** If the piece says "č. 9" or
+  "op. 93", those digits appear in the recording's title or it is a
+  different piece. Arrangements announce themselves too ("Don Giovanni
+  (Arranged for Wind Ensemble)") — not the work.
 
 Take the album URL from `external_urls.spotify` in the response (never
 build it by hand) and set `match_label` to `"<artist> — <album>"` so a
@@ -187,6 +228,12 @@ those are bugs in step 2/4, worth naming in the report.
 
 - **Re-runnable anytime.** Identical pushes report `unchanged`; new pieces
   appear as the weekly `/kulturni-prehled` watcher tops the pool up.
+- **Expect roughly half.** The 2026/27 pool resolved 286 of 553 pieces
+  (73 % of concerts got at least one playable piece) across three passes.
+  What stays unresolved is mostly honest: world premieres and contemporary
+  Czech works that are not recorded, "program bude upřesněn" placeholders,
+  and staged versions. Chasing the rest means translating title by title —
+  worth doing for a concert actually in the plan, not for the whole pool.
 - **Non-fatal per piece.** A search that fails or returns nothing leaves
   that piece without a link; the planner still offers a Spotify search. One
   bad piece never aborts the run.

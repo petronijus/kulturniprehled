@@ -162,3 +162,33 @@ async def test_unusable_entries_are_skipped_not_fatal(client: AsyncClient) -> No
     assert response.status_code == 200, response.text
     body = response.json()
     assert body == {"created": 1, "updated": 0, "unchanged": 0, "total": 1, "skipped": 2}
+
+
+async def test_a_wrong_link_can_be_taken_back(client: AsyncClient) -> None:
+    """The resolver guesses; there has to be an undo."""
+
+    headers = await _auth(client)
+    await client.put(
+        "/v1/season/program-links",
+        json={
+            "items": [
+                {
+                    "author": "Bedřich Smetana",
+                    "work": "písně",
+                    "spotify_url": "https://open.spotify.com/album/wrong",
+                }
+            ]
+        },
+        headers=headers,
+    )
+
+    key = "bedrich smetana|pisne"
+    deleted = await client.delete(f"/v1/season/program-links/{key}", headers=headers)
+    assert deleted.status_code == 204
+
+    listing = await client.get("/v1/season/program-links", headers=headers)
+    assert listing.json()["total"] == 0
+
+    # Deleting it twice is an error, not a silent success.
+    again = await client.delete(f"/v1/season/program-links/{key}", headers=headers)
+    assert again.status_code == 404

@@ -672,6 +672,34 @@ def _clean_track_uris(uris: list[str] | None) -> list[str] | None:
     return kept or None
 
 
+@router.delete("/program-links/{key:path}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_program_link(
+    key: str,
+    session: SessionDep,
+    user: SeasonWriter,
+) -> Response:
+    """Drop one resolved piece.
+
+    The resolver is a heuristic over a catalogue full of near-misses — it
+    will occasionally link a pop single called "Old Songs" to Smetana's
+    songs. Without this there is no way to take a wrong ▶ back, and the
+    upsert cannot do it: it is additive by design.
+    """
+
+    workspace = await _user_workspace(session, user)
+    row = await session.scalar(
+        select(ProgramMediaLink).where(
+            ProgramMediaLink.workspace_id == workspace.id,
+            ProgramMediaLink.key == key,
+        )
+    )
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such programme link")
+    await session.delete(row)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/spotify-token", response_model=SpotifyTokenResponse)
 async def spotify_token(
     request: Request,

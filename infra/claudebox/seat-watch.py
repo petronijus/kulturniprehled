@@ -21,6 +21,7 @@ the link and the twenty-minute hold is Petr's to start.
 from __future__ import annotations
 
 import argparse
+import http.cookiejar
 import json
 import os
 import re
@@ -67,22 +68,32 @@ def kp(method: str, path: str, body: dict[str, Any] | None = None) -> Any:
     return json.loads(raw) if raw else None
 
 
-def _get(url: str, jar: dict[str, str], referer: str | None = None) -> tuple[str, str]:
-    """GET with a hand-rolled cookie jar; returns (body, final url)."""
+def _opener() -> urllib.request.OpenerDirector:
+    """One opener per hall read, with a cookie jar that survives redirects.
+
+    The waiting room hands out its session on a 302, and reading `Set-Cookie`
+    off the final response alone loses it — the next request then arrives
+    unauthenticated and the hall page comes back without its config, which
+    reads as `no_hall_on_page` and looks like a markup change rather than a
+    dropped cookie.
+    """
+
+    return urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar())
+    )
+
+
+def _get(
+    opener: urllib.request.OpenerDirector, url: str, referer: str | None = None
+) -> tuple[str, str]:
+    """GET through the session's opener; returns (body, final url)."""
 
     headers = {"User-Agent": UA}
-    if jar:
-        headers["Cookie"] = "; ".join(f"{k}={v}" for k, v in jar.items())
     if referer:
         headers["Referer"] = referer
         headers["X-Requested-With"] = "XMLHttpRequest"
     try:
-        with urllib.request.urlopen(
-            urllib.request.Request(url, headers=headers), timeout=45
-        ) as response:
-            for raw in response.headers.get_all("Set-Cookie") or []:
-                name, _, rest = raw.partition("=")
-                jar[name.strip()] = rest.split(";")[0]
+        with opener.open(urllib.request.Request(url, headers=headers), timeout=45) as response:
             return response.read().decode("utf-8", "replace"), response.geturl()
     except urllib.error.HTTPError as error:
         raise HallUnavailable(f"http_{error.code}") from error
@@ -98,19 +109,19 @@ def read_hall(hall_url: str) -> list[dict[str, Any]]:
     seats.
     """
 
-    jar: dict[str, str] = {}
-    page, final = _get(hall_url, jar)
+    opener = _opener()
+    page, final = _get(opener, hall_url)
     if "ContentExpired" in final or "ContentExpired" in page:
         raise HallUnavailable("content_expired")
 
     origin = "{0.scheme}://{0.netloc}".format(urllib.parse.urlsplit(final))
     prepare = re.search(r'id="ajaxPathToPrepareData"[^>]*value="([^"]+)"', page)
     if prepare is not None:
-        target, _ = _get(origin + prepare.group(1), jar, referer=final)
+        target, _ = _get(opener, origin + prepare.group(1), referer=final)
         target = target.strip().strip('"')
         if not target.startswith("/"):
             raise HallUnavailable(f"prepare_said: {target[:60]}")
-        page, final = _get(origin + target, jar)
+        page, final = _get(opener, origin + target)
 
     event = re.search(r'id="HallEventId"[^>]*value="(\d+)"', page)
     seats_path = re.search(r'id="hallAjaxSeatsPath"[^>]*value="([^"]+)"', page)
@@ -130,7 +141,7 @@ def read_hall(hall_url: str) -> list[dict[str, Any]]:
             "ignoreMe": int(time.time() * 1000),
         }
     )
-    payload, _ = _get(f"{origin}{seats_path.group(1)}?{query}", jar, referer=final)
+    payload, _ = _get(opener, f"{origin}{seats_path.group(1)}?{query}", referer=final)
 
     seats: list[dict[str, Any]] = []
     for match in re.finditer(

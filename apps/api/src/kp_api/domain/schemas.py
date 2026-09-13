@@ -394,6 +394,11 @@ class SeasonPoolPutResult(BaseModel):
     # Rows folded into another row of the same event and retired — the pool's
     # own leftovers from a slug rewrite that already forked them.
     merged: int = 0
+    # Items of the payload that were the same candidate twice and collapsed
+    # into one before anything was written. A steady non-zero here is worth
+    # a look: `dedup_key` holds the date but not the hour, so two shows of
+    # one production on one day arrive as a single candidate.
+    collapsed: int = 0
 
 
 class CandidateResponse(BaseModel):

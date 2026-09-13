@@ -379,15 +379,20 @@ async def put_pool(
     season = await _get_active_season(session, workspace, season_id)
 
     veto = settings.season_venue_veto_terms
+    allowed = [item for item in body.items if not _is_vetoed_venue(item, veto)]
+    vetoed = len(body.items) - len(allowed)
     # Last occurrence wins on duplicate keys within one payload — a scrape
     # merging several sources can legitimately see the same event twice.
-    by_key: dict[str, CandidateUpsert] = {
-        item.dedup_key: item for item in body.items if not _is_vetoed_venue(item, veto)
-    }
-    vetoed = len(body.items) - len(by_key)
+    # Counted separately: folding this into `vetoed` reported 42 klasika
+    # concerts as refused for being in a techno club, which sent a reader
+    # looking in entirely the wrong place.
+    by_key: dict[str, CandidateUpsert] = {item.dedup_key: item for item in allowed}
+    collapsed = len(allowed) - len(by_key)
     # …and the same twice under two spellings of one URL, which `by_key`
     # cannot see because the spelling is what the key hashes.
+    before_identity = len(by_key)
     by_key = _collapse_by_identity(by_key)
+    collapsed += before_identity - len(by_key)
 
     pool = list(
         (
@@ -489,6 +494,7 @@ async def put_pool(
         purged=purged,
         rekeyed=rekeyed,
         merged=merged,
+        collapsed=collapsed,
     )
 
 

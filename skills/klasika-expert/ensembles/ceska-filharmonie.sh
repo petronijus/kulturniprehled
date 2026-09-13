@@ -65,9 +65,6 @@ for c in cards[1:]:
     # The href carries entities too ("…/38700-&#x10D;esk&#xE1;-filharmonie/"),
     # and an unescaped one becomes both a dead link and an unstable dedup key.
     href, raw_title = html.unescape(h_m.group(1)), h_m.group(2)
-    if href in seen:
-        continue
-    seen.add(href)
 
     title = html.unescape(re.sub(r'<[^>]+>', '', raw_title))
     title = re.sub(r'\s+', ' ', title).strip()
@@ -76,6 +73,14 @@ for c in cards[1:]:
     dt = stamp(t_m.group(1))
     if dt is None:
         continue
+
+    # ČF renders ONE CARD PER EVENING, every night of a run pointing at the
+    # same event URL. Deduplicating on the URL alone therefore kept the first
+    # night and silently dropped the rest — Yuja Wang plays 9., 10. and 11.
+    # December and the pool held only the 9th. The evening is the identity.
+    if (href, dt) in seen:
+        continue
+    seen.add((href, dt))
 
     items.append({
         "ensemble": ensemble,

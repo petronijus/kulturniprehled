@@ -44,14 +44,14 @@ seen = set()
 
 for c in cards[1:]:
     h_m = re.search(r'<a href="(/[^"]+)">', c)
-    t_m = re.search(r'<time datetime="([^"]+)"', c)
-    if not (h_m and t_m):
+    # A card carries EVERY evening of the run — two `<time>` elements for a
+    # Wednesday/Thursday pair. Reading only the first, and then discarding
+    # repeats of the URL, threw the other nights away without a trace.
+    stamps = re.findall(r'<time datetime="([^"]+)"', c)
+    if not (h_m and stamps):
         continue
 
     href = h_m.group(1)
-    if href in seen:
-        continue
-    seen.add(href)
 
     # Title is the first decent text snippet after the </picture> close
     title = ""
@@ -65,21 +65,22 @@ for c in cards[1:]:
     if not title:
         continue
 
-    # FOK closes its stamps with `Z` and then prints the same digits as the
-    # local start time — the suffix is decoration, not a timezone.
-    starts_at = stamp(t_m.group(1), trust_offset=False)
-    if starts_at is None:
-        continue
-
-    items.append({
-        "ensemble": ensemble,
-        "venue": None,
-        "title": title,
-        "starts_at": starts_at,
-        "artists": [ensemble],
-        "url": "https://www.fok.cz" + href,
-        "price_czk": None,
-    })
+    for raw in stamps:
+        # FOK closes its stamps with `Z` and then prints the same digits as
+        # the local start time — the suffix is decoration, not a timezone.
+        starts_at = stamp(raw, trust_offset=False)
+        if starts_at is None or (href, starts_at) in seen:
+            continue
+        seen.add((href, starts_at))
+        items.append({
+            "ensemble": ensemble,
+            "venue": None,
+            "title": title,
+            "starts_at": starts_at,
+            "artists": [ensemble],
+            "url": "https://www.fok.cz" + href,
+            "price_czk": None,
+        })
 
 print(json.dumps(items, ensure_ascii=False))
 PY

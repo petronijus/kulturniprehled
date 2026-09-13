@@ -131,6 +131,7 @@ async def test_pool_bulk_upsert_creates(client: AsyncClient) -> None:
         "purged": 0,
         "rekeyed": 0,
         "merged": 0,
+        "collapsed": 0,
     }
 
 
@@ -155,6 +156,7 @@ async def test_pool_reput_is_idempotent(client: AsyncClient) -> None:
         "purged": 0,
         "rekeyed": 0,
         "merged": 0,
+        "collapsed": 0,
     }
 
     after = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
@@ -198,6 +200,7 @@ async def test_pool_update_refreshes_but_preserves_plan_fields(client: AsyncClie
         "purged": 0,
         "rekeyed": 0,
         "merged": 0,
+        "collapsed": 0,
     }
 
     after = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
@@ -588,6 +591,7 @@ async def test_empty_ingest_purges_without_touching_anything_else(
             "purged": 1,
             "rekeyed": 0,
             "merged": 0,
+            "collapsed": 0,
         }
         pool = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
         assert pool.json()["total"] == 1
@@ -826,3 +830,28 @@ async def test_delete_candidate_rejects_an_unknown_id(client: AsyncClient) -> No
         headers=headers,
     )
     assert response.status_code == 404
+
+
+async def test_a_repeated_candidate_is_collapsed_not_reported_as_vetoed(
+    client: AsyncClient,
+) -> None:
+    """Two payload items, one candidate — and not a word about club vetoes.
+
+    The two counts used to share a subtraction, so a scrape that saw one
+    concert twice reported it as refused for its venue. That reading sent a
+    reader hunting through a techno-club veto list for a Rudolfinum evening.
+    """
+
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+
+    response = await client.put(
+        f"/v1/season/plans/{season_id}/pool",
+        json={"items": [_candidate("a"), _candidate("a", title="Same evening, second listing")]},
+        headers=headers,
+    )
+    body = response.json()
+    assert body["created"] == 1
+    assert body["collapsed"] == 1
+    assert body["vetoed"] == 0
+    assert body["total"] == 1

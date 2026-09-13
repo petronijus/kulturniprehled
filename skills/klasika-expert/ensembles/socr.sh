@@ -60,8 +60,6 @@ for m in re.finditer(
     src,
 ):
     href, title_raw, desc = m.groups()
-    if href in seen:
-        continue
 
     # socr.rozhlas.cz has switched between numeric ("15. 6. 2026 v 19.30")
     # and worded ("24. září 2026 ve 20.00") date formats — accept both,
@@ -89,10 +87,13 @@ for m in re.finditer(
         day = int(d_m.group(1))
         mo = CZ_MONTHS[d_m.group(2).lower()]
         yr = int(d_m.group(3))
-    seen.add(href)
-
     hh = int(d_m.group(4)) if d_m.group(4) else 19
     mm = int(d_m.group(5)) if d_m.group(5) else 30
+    # The evening is the identity, not the page: a concert played twice shares
+    # one URL, and deduplicating on the URL alone silently drops a night.
+    if (href, day, mo, yr, hh, mm) in seen:
+        continue
+    seen.add((href, day, mo, yr, hh, mm))
 
     title = html.unescape(title_raw).strip()
     venue = desc.split(',', 1)[0].strip() or None

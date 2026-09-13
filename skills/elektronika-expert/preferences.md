@@ -52,12 +52,6 @@ Primary (club sites — Petrovy kluby, kandidáti odsud jsou vždy fér):
 
 - https://www.palacakropolis.cz — Palác Akropolis
 - ~~https://punctum.cz~~ — nahrazeno scraperem `venues/punctum.sh` (viz výše)
-- ~~https://lunchmeat.cz~~ — **web je mrtvý** (ověřeno 2026-09-13): apex vrací
-  jen splash „Choose your path" bez jediného odkazu, `festival.lunchmeat.cz`
-  hlásí WEDOS 503 origin error, `/robots.txt` i `/sitemap.xml` jsou 404. Není
-  co scrapovat — není to naše chyba, ale ani to nesmí tiše vracet `[]`.
-  Lunchmeat prodává přes GoOut, takže dokud jejich web nenaběhne, jede
-  program přes `goout.sh` na jejich pořadatelské stránce.
 - https://www.archa-plus.cz/cz/program/ — Archa+ (bývalé Divadlo Archa; správná doména je archa-plus.cz — holé archaplus.cz od 2026-08 servíruje cizí web. Program je WebFetch-readable, detaily mají URL …/program/detail/<id>/<datum>-<slug>)
 - https://www.meetfactory.cz/cs/program — MeetFactory <!-- TODO(Petr): verify URL -->
 
@@ -78,5 +72,12 @@ Dedup against primary sources by dedup_key):
 (`SEASON_VENUE_VETO`) — kandidáta z těchto míst pool odmítne bez ohledu na
 interpreta a existující řádky při dalším scrapu smaže. Dřívější výjimka pro
 Favourite artists tím padá; kdyby ji Petr chtěl zpátky, musí se změnit obojí.
+
+### Vyřazené zdroje — nepřidávat zpět
+
+- **lunchmeat.cz** — vyhozeno 2026-09-13 (Petr). Web je mrtvý: apex vrací
+  splash „Choose your path" bez jediného odkazu, `festival.lunchmeat.cz`
+  hlásí WEDOS 503, `/robots.txt` i `/sitemap.xml` jsou 404. Jednorázovky
+  Lunchmeatu, pokud budou, přijdou přes GoOut jako cokoli jiného.
 
 *(přidávej dle libosti: Lethargy, Sonic Visions, Fuchs2, …)*

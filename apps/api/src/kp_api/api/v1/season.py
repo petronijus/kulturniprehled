@@ -11,7 +11,14 @@ credentials (interactive JWT, unscoped PAT) pass both.
 Ingest invariant (the contract the whole feature rests on): a pool upsert
 refreshes scraped fields and always bumps `last_seen_at`, bumps `version`
 only when the content hash changed, and never touches the user-owned fields
-(`first_seen_at`, `plan_status`, `plan_status_at`, `note`).
+(`first_seen_at`, `plan_status`, `plan_status_at`, `note`) except to carry
+them onto the survivor of a merge.
+
+A `dedup_key` is only as stable as the URL it hashes, so the ingest reads
+`candidate_identity` as a second opinion: a row whose venue rewrote its slug
+is rekeyed in place, and a fork an earlier rewrite already created is folded
+back into it. Both are counted in the result — silent identity changes are
+exactly the kind of thing you want to see in a scrape log.
 """
 
 from __future__ import annotations
@@ -36,6 +43,7 @@ from kp_api.adapters.calendar_ics import (
 )
 from kp_api.adapters.spotify import SpotifyUnavailable, access_token
 from kp_api.api.deps import SessionDep, SettingsDep, require_scope
+from kp_api.domain.candidate_identity import candidate_identity
 from kp_api.domain.enums import PlanStatus, SeasonLane, SeasonStatus
 from kp_api.domain.models import (
     Event,
@@ -161,7 +169,7 @@ def _is_vetoed_venue(item: CandidateUpsert, veto: tuple[str, ...]) -> bool:
     return bool(veto) and _matches_veto(item.venue, item.source_name, veto)
 
 
-async def _purge_vetoed(session: AsyncSession, season: SeasonPlan, veto: tuple[str, ...]) -> int:
+def _purge_vetoed(pool: list[SeasonCandidate], veto: tuple[str, ...], now: datetime) -> int:
     """Soft-delete pool rows sitting at a vetoed venue. Returns the count.
 
     Runs on every ingest so a newly added veto cleans up after itself. Only
@@ -171,20 +179,75 @@ async def _purge_vetoed(session: AsyncSession, season: SeasonPlan, veto: tuple[s
 
     if not veto:
         return 0
-    rows = await session.scalars(
-        select(SeasonCandidate).where(
-            SeasonCandidate.season_id == season.id,
-            SeasonCandidate.deleted_at.is_(None),
-        )
-    )
-    now = _utcnow()
     purged = 0
-    for row in rows.all():
+    for row in pool:
         if _matches_veto(row.venue, row.source_name, veto):
             row.deleted_at = now
             row.version += 1
             purged += 1
     return purged
+
+
+def _collapse_by_identity(by_key: dict[str, CandidateUpsert]) -> dict[str, CandidateUpsert]:
+    """Drop payload items that are one event spelled as two URLs.
+
+    A scrape that walks both a venue's listing and its own archive can emit
+    the pre- and post-rewrite slug of the same concert in one run. They hash
+    to two keys, so `by_key` keeps both and the ingest would create a row for
+    one and immediately merge it into the other. Last occurrence wins, the
+    same rule the key-level collapse above uses.
+    """
+
+    winner_by_identity: dict[str, str] = {}
+    for key, item in by_key.items():
+        identity = candidate_identity(item.url, item.starts_at)
+        if identity is not None:
+            winner_by_identity[identity] = key
+    kept = set(winner_by_identity.values())
+    return {
+        key: item
+        for key, item in by_key.items()
+        if candidate_identity(item.url, item.starts_at) is None or key in kept
+    }
+
+
+def _merge_candidate(
+    loser: SeasonCandidate,
+    winner: SeasonCandidate,
+    scenarios: list[SeasonScenario],
+    now: datetime,
+) -> None:
+    """Fold a duplicate row into the row that survives, then retire it.
+
+    Everything the user put on the losing row moves across — a decision, a
+    note, and the earlier `first_seen_at`, without which the survivor would
+    keep reporting itself as a novelty every week. Scenario membership is
+    rewritten rather than dropped: `apply` skips ids it cannot resolve, so a
+    silent delete would quietly shrink every dramaturgy the row appears in.
+    """
+
+    if winner.plan_status == PlanStatus.UNDECIDED and loser.plan_status != PlanStatus.UNDECIDED:
+        winner.plan_status = loser.plan_status
+        winner.plan_status_at = loser.plan_status_at
+    if winner.note is None:
+        winner.note = loser.note
+    winner.first_seen_at = min(winner.first_seen_at, loser.first_seen_at)
+    winner.version += 1
+
+    loser_id, winner_id = str(loser.id), str(winner.id)
+    for scenario in scenarios:
+        if loser_id not in scenario.candidate_ids:
+            continue
+        rewritten: list[str] = []
+        for member in scenario.candidate_ids:
+            member = winner_id if member == loser_id else member
+            if member not in rewritten:
+                rewritten.append(member)
+        scenario.candidate_ids = rewritten
+        scenario.version += 1
+
+    loser.deleted_at = now
+    loser.version += 1
 
 
 def _content_hash(item: CandidateUpsert) -> str:
@@ -322,25 +385,72 @@ async def put_pool(
         item.dedup_key: item for item in body.items if not _is_vetoed_venue(item, veto)
     }
     vetoed = len(body.items) - len(by_key)
+    # …and the same twice under two spellings of one URL, which `by_key`
+    # cannot see because the spelling is what the key hashes.
+    by_key = _collapse_by_identity(by_key)
+
+    pool = list(
+        (
+            await session.scalars(
+                select(SeasonCandidate).where(
+                    SeasonCandidate.season_id == season.id,
+                    SeasonCandidate.deleted_at.is_(None),
+                )
+            )
+        ).all()
+    )
+    now = _utcnow()
+
     # The veto is retroactive: candidates ingested before a venue was vetoed
     # (or before this backstop existed) disappear on the next scrape instead
     # of lingering in the pool forever.
-    purged = await _purge_vetoed(session, season, veto)
+    purged = _purge_vetoed(pool, veto, now)
+    live = [row for row in pool if row.deleted_at is None]
 
-    existing_rows = await session.scalars(
-        select(SeasonCandidate).where(
-            SeasonCandidate.season_id == season.id,
-            SeasonCandidate.dedup_key.in_(by_key.keys()),
-            SeasonCandidate.deleted_at.is_(None),
-        )
-    )
-    existing = {row.dedup_key: row for row in existing_rows.all()}
+    by_dedup_key = {row.dedup_key: row for row in live}
+    by_identity: dict[str, list[SeasonCandidate]] = {}
+    for stored in live:
+        stored_identity = candidate_identity(stored.url, stored.starts_at)
+        if stored_identity is not None:
+            by_identity.setdefault(stored_identity, []).append(stored)
 
-    now = _utcnow()
-    created = updated = unchanged = 0
+    # Loaded lazily: a merge has to carry scenario membership over to the
+    # surviving row, and most ingests never merge anything.
+    scenarios: list[SeasonScenario] | None = None
+
+    created = updated = unchanged = rekeyed = merged = 0
     for key, item in by_key.items():
         digest = _content_hash(item)
-        row = existing.get(key)
+        row = by_dedup_key.get(key)
+        identity = candidate_identity(item.url, item.starts_at)
+        twins = [twin for twin in by_identity.get(identity or "", ()) if twin.deleted_at is None]
+
+        if twins:
+            if row is None:
+                # Same event, new slug: adopt the incoming key on the row
+                # that already carries Petr's decision instead of forking a
+                # novelty off it.
+                row = max(twins, key=lambda twin: twin.last_seen_at)
+                row.dedup_key = key
+                by_dedup_key[key] = row
+                rekeyed += 1
+            losers = [twin for twin in twins if twin is not row]
+            if losers and scenarios is None:
+                scenarios = list(
+                    (
+                        await session.scalars(
+                            select(SeasonScenario).where(
+                                SeasonScenario.season_id == season.id,
+                                SeasonScenario.deleted_at.is_(None),
+                            )
+                        )
+                    ).all()
+                )
+            for twin in losers:
+                _merge_candidate(twin, row, scenarios or [], now)
+                by_dedup_key.pop(twin.dedup_key, None)
+                merged += 1
+
         if row is None:
             data = item.model_dump()
             candidate = SeasonCandidate(
@@ -355,6 +465,9 @@ async def put_pool(
             )
             session.add(candidate)
             created += 1
+            if identity is not None:
+                by_identity.setdefault(identity, []).append(candidate)
+            by_dedup_key[key] = candidate
         elif row.content_hash == digest:
             row.last_seen_at = now
             unchanged += 1
@@ -374,6 +487,8 @@ async def put_pool(
         total=len(by_key),
         vetoed=vetoed,
         purged=purged,
+        rekeyed=rekeyed,
+        merged=merged,
     )
 
 
@@ -872,6 +987,48 @@ async def patch_candidate(
     await session.commit()
     await session.refresh(candidate)
     return CandidateResponse.model_validate(candidate)
+
+
+@router.delete("/candidates/{candidate_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_candidate(
+    candidate_id: UUID,
+    version: Annotated[
+        int, Query(ge=1, description="Last seen version; server rejects on mismatch.")
+    ],
+    session: SessionDep,
+    user: SeasonWriter,
+) -> Response:
+    """Retire one candidate from the pool — a soft delete, like everything here.
+
+    For the rows a scrape will never take back: an evening that has already
+    happened, or one event that two sources published under two unrelated
+    URLs, which `candidate_identity` deliberately refuses to merge on its
+    own. Scenario membership is left alone — `apply` skips ids it cannot
+    resolve, and a manual delete means "not this event", not "this one
+    instead". Re-appearing in a later scrape resurrects nothing: the unique
+    index ignores deleted rows, so the ingest simply creates the row anew.
+    """
+
+    workspace = await _user_workspace(session, user)
+    candidate = await session.scalar(
+        select(SeasonCandidate).where(
+            SeasonCandidate.id == candidate_id,
+            SeasonCandidate.workspace_id == workspace.id,
+            SeasonCandidate.deleted_at.is_(None),
+        )
+    )
+    if candidate is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "candidate not found")
+    if candidate.version != version:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            {"code": "version_mismatch", "current_version": candidate.version},
+        )
+
+    candidate.deleted_at = _utcnow()
+    candidate.version += 1
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/scenarios/{scenario_id}/apply", response_model=PlanSummaryResponse)

@@ -5,6 +5,9 @@
 
 set -u
 
+# Shared Prague-time helper (see lib/prague_time.py).
+export PYTHONPATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib${PYTHONPATH:+:$PYTHONPATH}"
+
 URL="https://www.fok.cz/cs/program"
 UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'
 ENSEMBLE_NAME="FOK – Symfonický orchestr hl. m. Prahy"
@@ -31,6 +34,7 @@ done
 
 HTML_PATH="$TMP" ENSEMBLE="$ENSEMBLE_NAME" python3 - <<'PY'
 import os, re, html, json
+from prague_time import stamp
 src = open(os.environ["HTML_PATH"], encoding="utf-8").read()
 ensemble = os.environ["ENSEMBLE"]
 
@@ -61,11 +65,17 @@ for c in cards[1:]:
     if not title:
         continue
 
+    # FOK closes its stamps with `Z` and then prints the same digits as the
+    # local start time — the suffix is decoration, not a timezone.
+    starts_at = stamp(t_m.group(1), trust_offset=False)
+    if starts_at is None:
+        continue
+
     items.append({
         "ensemble": ensemble,
         "venue": None,
         "title": title,
-        "starts_at": t_m.group(1),
+        "starts_at": starts_at,
         "artists": [ensemble],
         "url": "https://www.fok.cz" + href,
         "price_czk": None,

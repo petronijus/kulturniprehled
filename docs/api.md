@@ -94,6 +94,23 @@ touches the user-owned plan fields (`plan_status`, `plan_status_at`,
 `novelty_ack_at` is a monotonic cursor for the weekly novelty routine.
 The season tables are web-only — they do not participate in `/v1/sync`.
 
+A `dedup_key` hashes the event's canonical URL, so a venue that rewrites
+its slugs hands the ingest a new key for a concert nobody moved. The upsert
+therefore falls back on the CMS id inside the URL plus the local date
+(`domain/candidate_identity.py`): a matching row is **rekeyed** in place,
+keeping its decision, its note and its `first_seen_at`, and any fork an
+earlier rewrite already created is **merged** into it — scenario membership
+rewritten to the survivor, the duplicate soft-deleted. Both counts come
+back in the `PUT …/pool` result. Two sources publishing one concert under
+two unrelated URLs is deliberately left alone; the expert skills merge that
+case, and a server-side title rule would collapse genuinely distinct events.
+
+`DELETE /v1/season/candidates/{id}?version=N` retires one pool row (soft
+delete, version-checked like the PATCH). It is for what a scrape will never
+take back — an evening that has already happened, a cross-source twin — and
+it does not blacklist anything: a later scrape that still lists the event
+creates it again.
+
 Full request/response schemas live in OpenAPI — fetch
 `https://kulturniprehled.example.com/openapi.json` for prod, or
 `http://localhost:18000/openapi.json` against the dev compose stack.

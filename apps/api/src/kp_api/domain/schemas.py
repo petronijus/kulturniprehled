@@ -388,6 +388,12 @@ class SeasonPoolPutResult(BaseModel):
     vetoed: int = 0
     # Already-stored candidates at a vetoed venue, soft-deleted by this run.
     purged: int = 0
+    # Stored rows that kept their identity but took on a new `dedup_key`,
+    # because the venue rewrote the slug the old key hashed.
+    rekeyed: int = 0
+    # Rows folded into another row of the same event and retired — the pool's
+    # own leftovers from a slug rewrite that already forked them.
+    merged: int = 0
 
 
 class CandidateResponse(BaseModel):

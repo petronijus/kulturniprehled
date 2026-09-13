@@ -6,6 +6,9 @@
 
 set -u
 
+# Shared Prague-time helper (see lib/prague_time.py).
+export PYTHONPATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib${PYTHONPATH:+:$PYTHONPATH}"
+
 URL="https://www.prgphil.cz/koncerty-a-vstupenky"
 UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'
 ENSEMBLE_NAME="PKF – Prague Philharmonia"
@@ -17,6 +20,7 @@ curl -sS -L -A "$UA" --max-time 30 -o "$TMP" "$URL" 2>/dev/null || { echo '[]'; 
 
 HTML_PATH="$TMP" ENSEMBLE="$ENSEMBLE_NAME" python3 - <<'PY'
 import os, re, html, json
+from prague_time import prague_parts
 src = open(os.environ["HTML_PATH"], encoding="utf-8").read()
 ensemble = os.environ["ENSEMBLE"]
 
@@ -52,7 +56,7 @@ for c in cards[1:]:
         "ensemble": ensemble,
         "venue": None,
         "title": title,
-        "starts_at": f"{yr:04d}-{mo:02d}-{day:02d}T{hh:02d}:{mm:02d}:00+02:00",
+        "starts_at": prague_parts(yr, mo, day, hh, mm),
         "artists": [ensemble],
         "url": "https://www.prgphil.cz" + href,
         "price_czk": None,

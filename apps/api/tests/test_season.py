@@ -7,13 +7,17 @@ import hashlib
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import patch
+from uuid import UUID, uuid4
 
 from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api.config import get_settings
+from kp_api.domain.models import SeasonCandidate
 from tests.conftest import auth_header, login_as
 
 
@@ -125,6 +129,8 @@ async def test_pool_bulk_upsert_creates(client: AsyncClient) -> None:
         "total": 3,
         "vetoed": 0,
         "purged": 0,
+        "rekeyed": 0,
+        "merged": 0,
     }
 
 
@@ -147,6 +153,8 @@ async def test_pool_reput_is_idempotent(client: AsyncClient) -> None:
         "total": 2,
         "vetoed": 0,
         "purged": 0,
+        "rekeyed": 0,
+        "merged": 0,
     }
 
     after = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
@@ -188,6 +196,8 @@ async def test_pool_update_refreshes_but_preserves_plan_fields(client: AsyncClie
         "total": 1,
         "vetoed": 0,
         "purged": 0,
+        "rekeyed": 0,
+        "merged": 0,
     }
 
     after = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
@@ -576,6 +586,243 @@ async def test_empty_ingest_purges_without_touching_anything_else(
             "total": 0,
             "vetoed": 0,
             "purged": 1,
+            "rekeyed": 0,
+            "merged": 0,
         }
         pool = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
         assert pool.json()["total"] == 1
+
+
+def _cf(seed: str, slug: str, **overrides: Any) -> dict[str, Any]:
+    """A ČF-shaped candidate: `/event/<id>-<slug>`, the id stable, the slug not."""
+
+    url = f"https://www.ceskafilharmonie.cz/event/35524-{slug}/"
+    payload = _candidate(seed, url=url, title="Ceska filharmonie - Simon Rattle")
+    payload.update(overrides)
+    # The real recipe: the canonical URL and the local date, never the title.
+    payload["dedup_key"] = _key(f"{url}|{payload['starts_at'][:10]}")
+    return payload
+
+
+async def test_slug_rewrite_rekeys_the_row_instead_of_forking_a_novelty(
+    client: AsyncClient,
+) -> None:
+    """The 2026-09-12 ČF rewrite, replayed: same concert, new slug, new key.
+
+    Petr's decision has to come through it — a fork would have left him
+    deciding the same concert twice and shown it as "new" all over again.
+    """
+
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+
+    await client.put(
+        f"/v1/season/plans/{season_id}/pool",
+        json={"items": [_cf("old", "simon-rattle-ceska-filharmonie")]},
+        headers=headers,
+    )
+    pool = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
+    seeded = pool.json()["items"][0]
+    await client.patch(
+        f"/v1/season/candidates/{seeded['id']}",
+        json={"version": seeded["version"], "plan_status": "selected", "note": "balkon"},
+        headers=headers,
+    )
+
+    # The rewrite also fixed the venue's timezone handling, so the hour moves.
+    rewritten = _cf("new", "ceska-filharmonie-simon-rattle", starts_at="2025-10-14T20:30:00+02:00")
+    response = await client.put(
+        f"/v1/season/plans/{season_id}/pool", json={"items": [rewritten]}, headers=headers
+    )
+    body = response.json()
+    assert (body["created"], body["rekeyed"], body["merged"]) == (0, 1, 0)
+
+    after = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
+    assert after.json()["total"] == 1
+    row = after.json()["items"][0]
+    assert row["id"] == seeded["id"]
+    assert row["dedup_key"] == rewritten["dedup_key"]
+    assert row["plan_status"] == "selected"
+    assert row["note"] == "balkon"
+    assert row["first_seen_at"] == seeded["first_seen_at"]
+    assert datetime.fromisoformat(row["starts_at"]) == datetime(2025, 10, 14, 18, 30, tzinfo=UTC)
+
+
+async def test_ingest_merges_a_fork_the_pool_already_carries(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """The state a rewrite left behind before the ingest knew how to rekey.
+
+    Both spellings sit in the pool as two rows; the next scrape has to fold
+    them back into one, carry the decision across, and take every scenario
+    that pointed at the retired row with it.
+    """
+
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+    await client.put(
+        f"/v1/season/plans/{season_id}/pool",
+        json={"items": [_cf("old", "simon-rattle-ceska-filharmonie"), _candidate("other")]},
+        headers=headers,
+    )
+    pool = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
+    stale = next(c for c in pool.json()["items"] if "35524" in (c["url"] or ""))
+    await client.patch(
+        f"/v1/season/candidates/{stale['id']}",
+        json={"version": stale["version"], "plan_status": "selected", "note": "balkon"},
+        headers=headers,
+    )
+
+    owner = await db_session.scalar(
+        select(SeasonCandidate.created_by).where(SeasonCandidate.id == UUID(stale["id"]))
+    )
+    # The fork is the younger row — the rewrite happened after the original
+    # had been sitting in the pool for weeks.
+    forked_seen = datetime.fromisoformat(stale["first_seen_at"]) + timedelta(days=7)
+    forked = _cf("new", "ceska-filharmonie-simon-rattle")
+    fresh = SeasonCandidate(
+        season_id=UUID(season_id),
+        workspace_id=UUID(stale["workspace_id"]),
+        dedup_key=forked["dedup_key"],
+        content_hash="0" * 64,
+        lane="klasika",
+        title=forked["title"],
+        starts_at=datetime(2025, 10, 14, 18, 30, tzinfo=UTC),
+        url=forked["url"],
+        created_by=owner,
+        first_seen_at=forked_seen,
+        last_seen_at=forked_seen,
+    )
+    db_session.add(fresh)
+    await db_session.commit()
+
+    await client.put(
+        f"/v1/season/plans/{season_id}/scenarios",
+        json={
+            "scenarios": [
+                {
+                    "name": "Velka symfonika",
+                    "rank": 1,
+                    "generated_at": "2025-09-30T12:00:00Z",
+                    "candidate_keys": [stale["dedup_key"], _key("other")],
+                }
+            ],
+            "replace": True,
+        },
+        headers=headers,
+    )
+
+    response = await client.put(
+        f"/v1/season/plans/{season_id}/pool",
+        json={"items": [forked, _candidate("other")]},
+        headers=headers,
+    )
+    body = response.json()
+    assert (body["created"], body["merged"]) == (0, 1)
+
+    after = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
+    rows = {c["dedup_key"]: c for c in after.json()["items"]}
+    assert after.json()["total"] == 2
+    survivor = rows[forked["dedup_key"]]
+    assert survivor["id"] == str(fresh.id)
+    assert survivor["plan_status"] == "selected"
+    assert survivor["note"] == "balkon"
+    # The retired row was in the pool first; the survivor inherits that, or it
+    # reports itself as a novelty every week from here on.
+    assert survivor["first_seen_at"] == stale["first_seen_at"]
+
+    scenarios = await client.get(f"/v1/season/plans/{season_id}/scenarios", headers=headers)
+    members = scenarios.json()["items"][0]["candidate_ids"]
+    assert str(fresh.id) in members
+    assert stale["id"] not in members
+    assert len(members) == 2
+
+
+async def test_one_payload_carrying_both_spellings_lands_as_one_row(
+    client: AsyncClient,
+) -> None:
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+
+    response = await client.put(
+        f"/v1/season/plans/{season_id}/pool",
+        json={
+            "items": [
+                _cf("old", "simon-rattle-ceska-filharmonie"),
+                _cf("new", "ceska-filharmonie-simon-rattle"),
+            ]
+        },
+        headers=headers,
+    )
+    assert response.json()["created"] == 1
+    assert response.json()["total"] == 1
+
+    pool = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
+    assert pool.json()["total"] == 1
+
+
+async def test_identity_keeps_the_nights_of_one_production_apart(
+    client: AsyncClient,
+) -> None:
+    """Same URL, two evenings — two candidates, and no merge between them."""
+
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+
+    response = await client.put(
+        f"/v1/season/plans/{season_id}/pool",
+        json={
+            "items": [
+                _cf("night-one", "rattle", starts_at="2025-10-14T19:30:00+02:00"),
+                _cf("night-two", "rattle", starts_at="2025-10-15T19:30:00+02:00"),
+            ]
+        },
+        headers=headers,
+    )
+    assert response.json()["created"] == 2
+    assert response.json()["merged"] == 0
+
+
+async def test_delete_candidate_retires_it_from_the_pool(client: AsyncClient) -> None:
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+    await client.put(
+        f"/v1/season/plans/{season_id}/pool",
+        json={"items": [_candidate("gone"), _candidate("stays")]},
+        headers=headers,
+    )
+    pool = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
+    doomed = next(c for c in pool.json()["items"] if c["dedup_key"] == _key("gone"))
+
+    stale = await client.delete(
+        f"/v1/season/candidates/{doomed['id']}?version={doomed['version'] + 1}",
+        headers=headers,
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["current_version"] == doomed["version"]
+
+    response = await client.delete(
+        f"/v1/season/candidates/{doomed['id']}?version={doomed['version']}", headers=headers
+    )
+    assert response.status_code == 204
+
+    after = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
+    assert [c["dedup_key"] for c in after.json()["items"]] == [_key("stays")]
+
+    # Gone means gone from the pool, not blacklisted: a later scrape that still
+    # lists the event simply creates it again.
+    again = await client.put(
+        f"/v1/season/plans/{season_id}/pool",
+        json={"items": [_candidate("gone")]},
+        headers=headers,
+    )
+    assert again.json()["created"] == 1
+
+
+async def test_delete_candidate_rejects_an_unknown_id(client: AsyncClient) -> None:
+    headers = await _auth(client)
+    response = await client.delete(
+        f"/v1/season/candidates/{uuid4()}?version=1",
+        headers=headers,
+    )
+    assert response.status_code == 404

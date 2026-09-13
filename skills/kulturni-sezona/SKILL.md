@@ -22,7 +22,10 @@ capable token (the local unrestricted PAT qualifies):
 
 - `GET  /v1/season/plans/current` → active season `{id, label, starts_on, ends_on, novelty_ack_at}` (404 = none)
 - `POST /v1/season/plans` `{label, starts_on, ends_on, archive_current}` (409 `active_season_exists` without the flag)
-- `PUT  /v1/season/plans/{id}/pool` `{items: [CandidateUpsert]}` → `{created, updated, unchanged, total}`
+- `PUT  /v1/season/plans/{id}/pool` `{items: [CandidateUpsert]}` → `{created, updated, unchanged, total, vetoed, purged, rekeyed, merged}`
+- `DELETE /v1/season/candidates/{id}?version=N` → 204; retires one pool row
+  (past evenings, a cross-source twin). Soft delete — a later scrape that
+  still lists the event simply creates it again.
 - `GET  /v1/season/plans/{id}/pool?limit=1000&offset=N` → `{items, total}` (enrichment check)
 - `PUT  /v1/season/plans/{id}/scenarios` `{scenarios: [{name, description_cs, rank, generated_at, candidate_keys, reserved_slots}], replace: true}`
 - `POST /v1/season/plans/{id}/novelties/ack` `{through: <iso>}` — call after the initial push so week one's novelty email doesn't replay the whole pool
@@ -66,6 +69,16 @@ def dedup_key(lane, title, url, starts_at_date):
 The date stays in the key — multi-date productions share one URL.
 **Never retitle a candidate after its key is computed; the key must be
 derived from the raw scraped record.**
+
+**A slug rewrite is the server's problem, not yours.** On 2026-09-12
+ceskafilharmonie.cz flipped every slug from `<artist>-<series>` to
+`<series>-<artist>` (old URLs still 301) and 38 concerts came back as
+novelties next to their originals. The ingest now recognises the CMS id
+inside the URL — `/event/35524-…` — plus the local date, rekeys the
+existing row and merges the fork, reporting `rekeyed` / `merged` in the
+`PUT …/pool` result. So: emit whatever URL the site serves today and never
+hand-patch keys to chase a rewrite. Non-zero `merged` in a run is worth a
+line in the report; it means the pool was carrying a fork.
 
 **Cross-source merge (one event, two URLs).** A festival page and the
 ensemble's own page publish the same concert under different URLs (ČF

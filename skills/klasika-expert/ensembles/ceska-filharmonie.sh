@@ -9,6 +9,9 @@
 
 set -u
 
+# Shared Prague-time helper (see lib/prague_time.py).
+export PYTHONPATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib${PYTHONPATH:+:$PYTHONPATH}"
+
 URL="https://www.ceskafilharmonie.cz/program"
 UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'
 ENSEMBLE_NAME="Česká filharmonie"
@@ -42,6 +45,7 @@ done
 
 HTML_PATH="$TMP" ENSEMBLE="$ENSEMBLE_NAME" python3 - <<'PY'
 import os, re, html, json
+from prague_time import stamp
 src = open(os.environ["HTML_PATH"], encoding="utf-8").read()
 ensemble = os.environ["ENSEMBLE"]
 
@@ -66,10 +70,10 @@ for c in cards[1:]:
     title = html.unescape(re.sub(r'<[^>]+>', '', raw_title))
     title = re.sub(r'\s+', ' ', title).strip()
 
-    # datetime looks like "2026-05-25T15:30:00.0000000" — strip fractional second
-    dt = re.sub(r'\.\d+$', '', t_m.group(1))
-    if 'T' in dt and len(dt) < 25:
-        dt = dt + '+02:00'
+    # Bare Prague wall time until 2026-09, an entity-escaped offset since.
+    dt = stamp(t_m.group(1))
+    if dt is None:
+        continue
 
     items.append({
         "ensemble": ensemble,

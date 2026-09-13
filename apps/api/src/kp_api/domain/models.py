@@ -536,10 +536,14 @@ class SeasonCandidate(Base):
     a separate plan table would only add a join and a second version counter).
 
     Identity across re-scrapes is `dedup_key`, computed by the skills as
-    `sha256(lane|normalized_title|starts_at.date())[:64]`; the server only
-    validates its shape. `content_hash` is server-computed over the scraped
-    fields so an identical re-push is detected as unchanged and bumps
-    neither `version` nor `updated_at` — only `last_seen_at`.
+    `sha256(lane|canonical_url|starts_at.date())[:64]`; the server only
+    validates its shape. When a venue rewrites its slugs the key changes for
+    events that did not, so the ingest falls back on `candidate_identity`
+    (the CMS id inside the URL plus the local date) and moves the new key
+    onto the existing row instead of forking it. `content_hash` is
+    server-computed over the scraped fields so an identical re-push is
+    detected as unchanged and bumps neither `version` nor `updated_at` —
+    only `last_seen_at`.
 
     Ingest never touches `first_seen_at`, `plan_status`, `plan_status_at`
     or `note`; those belong to the user.

@@ -7,6 +7,9 @@
 
 set -u
 
+# Shared Prague-time helper (see lib/prague_time.py).
+export PYTHONPATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib${PYTHONPATH:+:$PYTHONPATH}"
+
 URL="https://www.berg.cz"
 UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'
 ENSEMBLE_NAME="Orchestr Berg"
@@ -19,6 +22,7 @@ curl -sS -L -A "$UA" --max-time 30 -o "$TMP" "$URL" 2>/dev/null || { echo '[]'; 
 HTML_PATH="$TMP" ENSEMBLE="$ENSEMBLE_NAME" python3 - <<'PY'
 import os, re, html, json
 from datetime import date, datetime
+from prague_time import prague_parts
 
 src = open(os.environ["HTML_PATH"], encoding="cp1250", errors="replace").read()
 ensemble = os.environ["ENSEMBLE"]
@@ -80,7 +84,7 @@ for href, ymd in hrefs:
         "ensemble": ensemble,
         "venue": None,
         "title": title,
-        "starts_at": f"{yr:04d}-{mo:02d}-{day:02d}T19:30:00+02:00",
+        "starts_at": prague_parts(yr, mo, day, 19, 30),
         "artists": [ensemble],
         "url": f"https://www.berg.cz/{href}",
         "price_czk": None,

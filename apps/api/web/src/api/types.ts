@@ -191,3 +191,39 @@ export interface CalendarView {
   conflicts: CalendarConflict[];
   entries: CalendarEntry[];
 }
+
+export type SeatWatchState = "active" | "found" | "stopped" | "expired";
+
+/** A standing instruction to look at a sold-out hall.
+ *
+ * One timer serves every watch, so creating one is the whole of scheduling
+ * it. `hall_url` is the ticketing system's own link — it carries the session
+ * that lets the runner read the seat map, which is also why it expires and
+ * `last_error` may ask for a fresh one.
+ */
+export interface SeatWatch {
+  id: string;
+  workspace_id: string;
+  candidate_id: string | null;
+  label: string;
+  starts_at: string | null;
+  hall_url: string;
+  min_adjacent: number;
+  exclude_categories: string[] | null;
+  max_price_czk: number | null;
+  state: SeatWatchState;
+  last_checked_at: string | null;
+  last_free_seats: number | null;
+  last_error: string | null;
+  found_at: string | null;
+  found_seats: Record<string, unknown>[] | null;
+  notified_at: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SeatWatchListResponse {
+  items: SeatWatch[];
+  total: number;
+}

@@ -22,6 +22,7 @@ from kp_api.domain.enums import (
     PlanStatus,
     SeasonLane,
     SeasonStatus,
+    SeatWatchState,
     WatchlistKind,
 )
 
@@ -607,3 +608,78 @@ class SeasonBookedItem(BaseModel):
 
 class SeasonBookedResponse(BaseModel):
     items: list[SeasonBookedItem]
+
+
+class SeatWatchCreate(BaseModel):
+    """Start watching a sold-out hall.
+
+    `hall_url` is pasted from the ticketing system's own page — that link
+    carries the session, which is what lets the runner look without a
+    browser or a login.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(min_length=1, max_length=255)
+    hall_url: str = Field(min_length=1, max_length=2048)
+    candidate_id: UUID | None = None
+    starts_at: datetime | None = None
+    min_adjacent: int = Field(default=2, ge=1, le=10)
+    exclude_categories: list[str] | None = None
+    max_price_czk: int | None = Field(default=None, ge=0)
+
+
+class SeatWatchUpdate(BaseModel):
+    """Stop a watch, revive one, or hand it a fresh link when the old expired."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: int = Field(ge=1, description="Last seen version; server rejects on mismatch.")
+    state: SeatWatchState | None = None
+    hall_url: str | None = Field(default=None, min_length=1, max_length=2048)
+    min_adjacent: int | None = Field(default=None, ge=1, le=10)
+    exclude_categories: list[str] | None = None
+    max_price_czk: int | None = Field(default=None, ge=0)
+
+
+class SeatWatchCheckResult(BaseModel):
+    """One pass of the runner, reported back.
+
+    Seats found is terminal: the watch flips to `found` and stops being
+    handed out, so the same free pair is never announced twice.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    free_seats: int = Field(ge=0)
+    found_seats: list[dict[str, object]] | None = None
+    error: str | None = None
+
+
+class SeatWatchResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    workspace_id: UUID
+    candidate_id: UUID | None
+    label: str
+    starts_at: datetime | None
+    hall_url: str
+    min_adjacent: int
+    exclude_categories: list[str] | None
+    max_price_czk: int | None
+    state: SeatWatchState
+    last_checked_at: datetime | None
+    last_free_seats: int | None
+    last_error: str | None
+    found_at: datetime | None
+    found_seats: list[dict[str, object]] | None
+    notified_at: datetime | None
+    version: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class SeatWatchListResponse(BaseModel):
+    items: list[SeatWatchResponse]
+    total: int

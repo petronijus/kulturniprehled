@@ -1,0 +1,126 @@
+.button,
+.confirm,
+.plain {
+  font: inherit;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+}
+
+.button:hover,
+.confirm:hover,
+.plain:hover {
+  border-color: var(--text-faint);
+}
+
+.button:disabled,
+.confirm:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.confirm {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.plain {
+  border-color: transparent;
+  color: var(--text-faint);
+  padding: 0.25rem 0.4rem;
+}
+
+/* A running watch is ambient, not an action — it should read as a state the
+   card is in, the way the sold-out line does. */
+.active {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-faint);
+}
+
+.status {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+}
+
+.detail {
+  font-size: var(--text-xs);
+}
+
+/* A hit is the one thing on this card worth interrupting for. */
+.found {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ok) 12%, var(--surface));
+  border: 1px solid var(--ok);
+}
+
+.foundText {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ok);
+}
+
+.foundLink {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.prompt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  margin-top: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken, var(--surface));
+}
+
+.label {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+
+.hint {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  margin: 0;
+}
+
+.input,
+.number {
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.input {
+  width: 100%;
+}
+
+.number {
+  width: 4rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}

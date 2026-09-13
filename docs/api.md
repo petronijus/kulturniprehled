@@ -105,6 +105,20 @@ back in the `PUT …/pool` result. Two sources publishing one concert under
 two unrelated URLs is deliberately left alone; the expert skills merge that
 case, and a server-side title rule would collapse genuinely distinct events.
 
+`/v1/season/watches` is the seat watcher. A sold-out concert leaks seats
+back one cancellation at a time, so POST a watch (`hall_url` = the ticketing
+system's own hall link, `min_adjacent` = how many seats side by side) and a
+single timer on the claudebox works through every open watch — creating the
+row IS scheduling the checking, there is no per-concert cron. The runner
+GETs `?due=true`, reads each hall and POSTs `…/checked` with how many seats
+were free and, when it found a run of neighbours, which ones. A hit flips
+the watch to `found` and takes it out of the due list: seats are worth one
+notification to act on within the twenty-minute hold, not a repeat every ten
+minutes. The hall link carries its own session, so it eventually expires —
+that check reports `content_expired` and the planner asks for a fresh link
+rather than the watch dying quietly. Reading only: nothing in KP puts a seat
+in a basket.
+
 `DELETE /v1/season/candidates/{id}?version=N` retires one pool row (soft
 delete, version-checked like the PATCH). It is for what a scrape will never
 take back — an evening that has already happened, a cross-source twin — and

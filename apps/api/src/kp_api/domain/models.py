@@ -47,6 +47,7 @@ from kp_api.domain.enums import (
     PlanStatus,
     SeasonLane,
     SeasonStatus,
+    SeatWatchState,
     UserRole,
     WatchlistKind,
 )
@@ -725,6 +726,84 @@ class ProgramMediaLink(Base):
     resolved_at: Mapped[datetime] = _created_at()
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
+
+
+class SeatWatch(Base):
+    """Watch a sold-out hall for seats, so a cancellation does not go unseen.
+
+    A concert Petr wants sells out months ahead and then leaks seats back one
+    cancellation at a time, at no particular hour. The watch is the standing
+    instruction — the runner is a single timer that works through whatever
+    watches exist, so adding one in the planner is all it takes to schedule
+    the checking.
+
+    `hall_url` is the ticketing system's session link, pasted from the
+    browser. It carries its own authorization in the path, which is why the
+    runner needs no login and no browser — and also why it expires: a check
+    that comes back `content_expired` sets `last_error` and the planner asks
+    for a fresh link rather than failing silently.
+
+    What counts as a hit is `min_adjacent` seats side by side in one row,
+    optionally capped by price category. Adjacency is geometric: the hall map
+    positions every seat absolutely, so neighbours are seats sharing a row
+    coordinate one seat-pitch apart.
+    """
+
+    __tablename__ = "seat_watches"
+    __table_args__ = (
+        Index(
+            "ix_seat_watches_state",
+            "workspace_id",
+            "state",
+            postgresql_where="deleted_at IS NULL",
+        ),
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    # The pool candidate this watches, when it came from the planner. Kept
+    # nullable so a watch can outlive a re-scrape that retires the row.
+    candidate_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("season_candidates.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    # Denormalised on purpose: the notification has to name the concert even
+    # if the candidate is gone by the time seats appear.
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hall_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    min_adjacent: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    # Price categories to ignore — standing and wheelchair places are not
+    # what "two seats together" means.
+    exclude_categories: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    max_price_czk: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    state: Mapped[SeatWatchState] = mapped_column(
+        String(20), nullable=False, default=SeatWatchState.ACTIVE
+    )
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Seats free at the last check, whether or not they were adjacent — a
+    # watch that never sees a single seat is worth a different look than one
+    # that keeps seeing singles.
+    last_free_seats: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    found_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The seats that fired it: [{row, left, category, price_czk}, …].
+    found_seats: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB, nullable=True)
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class RecommendationFeedback(Base):

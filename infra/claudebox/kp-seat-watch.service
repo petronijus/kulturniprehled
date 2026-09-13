@@ -1,0 +1,20 @@
+[Unit]
+Description=Kulturní Přehled seat watcher (one pass over every open watch)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# One pass: a handful of halls, a couple of seconds each, plus politeness
+# pauses. If it has not finished in five minutes something is wrong.
+TimeoutStartSec=5m
+EnvironmentFile=%h/.config/kulturni-prehled/seat-watch.env
+ExecStart=%h/Documents/Dev/kulturniprehled/infra/claudebox/seat-watch.py
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Nice=15
+# A hall that will not load is a normal outcome — the watch records the
+# reason and the next pass tries again. Never let it mark the unit failed.
+SuccessExitStatus=0 1
+
+[Install]
+WantedBy=default.target

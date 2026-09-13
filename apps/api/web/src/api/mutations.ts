@@ -5,7 +5,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, VersionMismatchError } from "./client";
 import { queryKeys } from "./queries";
-import type { Candidate, PlanStatus, PlanSummary } from "./types";
+import type { Candidate, PlanStatus, PlanSummary, SeatWatch } from "./types";
 
 interface PatchArgs {
   candidate: Candidate;
@@ -59,6 +59,65 @@ export function useApplyScenario(seasonId: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.pool(seasonId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.scenarios(seasonId) });
+    },
+  });
+}
+
+interface WatchArgs {
+  candidate: Candidate;
+  hallUrl: string;
+  minAdjacent: number;
+  excludeCategories: string[] | null;
+}
+
+/** Start watching a sold-out hall — and with it, the checking.
+ *
+ * There is no second step: one timer works through every watch that exists,
+ * so the row IS the schedule.
+ */
+export function useCreateSeatWatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ candidate, hallUrl, minAdjacent, excludeCategories }: WatchArgs) =>
+      api<SeatWatch>("/v1/season/watches", {
+        method: "POST",
+        body: JSON.stringify({
+          candidate_id: candidate.id,
+          label: `${candidate.title} — ${candidate.starts_at.slice(0, 10)}`,
+          starts_at: candidate.starts_at,
+          hall_url: hallUrl,
+          min_adjacent: minAdjacent,
+          exclude_categories: excludeCategories,
+        }),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.watches() });
+    },
+  });
+}
+
+/** Stop a watch, or hand it a fresh link when the old one expired. */
+export function useUpdateSeatWatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ watch, patch }: { watch: SeatWatch; patch: Record<string, unknown> }) =>
+      api<SeatWatch>(`/v1/season/watches/${watch.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ version: watch.version, ...patch }),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.watches() });
+    },
+  });
+}
+
+export function useDeleteSeatWatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (watch: SeatWatch) =>
+      api<void>(`/v1/season/watches/${watch.id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.watches() });
     },
   });
 }

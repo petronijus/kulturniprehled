@@ -1,5 +1,5 @@
 import { useDraggable } from "@dnd-kit/core";
-import type { Candidate, PlanStatus, ProgramMediaLink } from "../../api/types";
+import type { Candidate, PlanStatus, ProgramMediaLink, SeatWatch } from "../../api/types";
 import { candidateDate } from "../../domain/planState";
 import { isPlayable, linkFor } from "../../domain/playQueue";
 import type { ProductionGroup } from "../../domain/productions";
@@ -12,6 +12,7 @@ import { cs } from "../../i18n/cs";
 import { isNew } from "../../state/newSince";
 import styles from "./CandidateCard.module.css";
 import { LaneBadge } from "./LaneBadge";
+import { SeatWatchButton } from "./SeatWatchButton";
 import { SourceBadge } from "./SourceBadge";
 
 interface CandidateCardProps {
@@ -25,6 +26,8 @@ interface CandidateCardProps {
   pinned: boolean;
   onTogglePin: () => void;
   actionsDisabled: boolean;
+  /** The seat watch on this production, if one is running or has fired. */
+  watch: SeatWatch | undefined;
 }
 
 function formatDate(candidate: Candidate): string {
@@ -154,6 +157,7 @@ export function CandidateCard({
   pinned,
   onTogglePin,
   actionsDisabled,
+  watch,
 }: CandidateCardProps) {
   const { primary, richest, candidates } = group;
   const multiDate = candidates.length > 1;
@@ -275,6 +279,9 @@ export function CandidateCard({
       {richest.why_cs !== null && <p className={styles.why}>{richest.why_cs}</p>}
       {!multiDate && primary.tickets_available === false && (
         <p className={styles.soldOut}>⚠ {cs.soldOut}</p>
+      )}
+      {!multiDate && (primary.tickets_available === false || watch !== undefined) && (
+        <SeatWatchButton candidate={primary} watch={watch} disabled={actionsDisabled} />
       )}
       <footer className={styles.actions}>
         {!multiDate && status !== "selected" && (

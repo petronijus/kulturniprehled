@@ -17,6 +17,7 @@ import type {
   ScenarioListResponse,
   Season,
   SeasonBookedResponse,
+  SeatWatchListResponse,
 } from "./types";
 
 export const queryKeys = {
@@ -27,6 +28,7 @@ export const queryKeys = {
   programLinks: ["program-links"] as const,
   calendar: (from: string, to: string) => ["calendar", from, to] as const,
   holidays: (from: string, to: string) => ["holidays", from, to] as const,
+  watches: () => ["seat-watches"] as const,
 };
 
 /** Get the active season, bootstrapping it when none exists.
@@ -214,5 +216,15 @@ export function useHolidays(season: Season | undefined) {
       ),
     enabled: season !== undefined,
     staleTime: 24 * 60 * 60_000,
+  });
+}
+
+/** Every seat watch, open or finished — the planner shows both. */
+export function useSeatWatches() {
+  return useQuery({
+    queryKey: queryKeys.watches(),
+    queryFn: () => api<SeatWatchListResponse>("/v1/season/watches").then((page) => page.items),
+    // A hit arrives from a timer, not from anything the user just did.
+    refetchInterval: 60_000,
   });
 }

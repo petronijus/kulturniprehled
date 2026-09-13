@@ -59,3 +59,41 @@ URL, e-mail goes through `POST /v1/digest/send`).
 
 The `cloud-routine.md` playbook is retired with the /schedule routine —
 kept in git history only.
+
+
+## Seat watcher (`kp-seat-watch.timer`)
+
+A sold-out concert leaks seats back one cancellation at a time, at no
+particular hour. Petr adds a watch in the planner (👁 on a sold-out card,
+pasting the ticketing system's hall link); this timer is the thing that
+actually looks. One timer serves every watch, so nothing needs configuring
+per concert.
+
+```bash
+cp seat-watch.env.example ~/.config/kulturni-prehled/seat-watch.env
+chmod 600 ~/.config/kulturni-prehled/seat-watch.env   # it holds a PAT
+$EDITOR ~/.config/kulturni-prehled/seat-watch.env     # KP_TOKEN, SMTP_*
+mkdir -p ~/.config/systemd/user
+cp kp-seat-watch.{service,timer} ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now kp-seat-watch.timer
+systemctl --user list-timers kp-seat-watch.timer
+```
+
+The PAT needs `season:read` + `season:write` (`scripts/mint-pat.sh`).
+
+Checks every 10 minutes. It reads the hall the way a browser does — through
+the waiting room to the seat map — and needs no login and no browser,
+because the hall link carries its own session in the path. That is also why
+the link expires: the check then reports `content_expired`, the planner shows
+"odkaz vypršel" on the card, and a fresh link revives the watch.
+
+**It never puts a seat in a basket.** A hit sends one mail with the seats and
+the link; the twenty-minute hold is Petr's to start by clicking.
+
+Test the seat logic without a network or a hall:
+
+```bash
+python3 test_seat_watch.py     # stdlib only, same deal as kp_validate
+./seat-watch.py --verbose      # one pass against the real watches
+```

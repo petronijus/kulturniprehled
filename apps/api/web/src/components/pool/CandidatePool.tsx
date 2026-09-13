@@ -1,6 +1,13 @@
 import { useDroppable } from "@dnd-kit/core";
-import { useMemo, useState } from "react";
-import type { BookedEvent, Candidate, PlanStatus, ProgramMediaLink } from "../../api/types";
+import { useCallback, useMemo, useState } from "react";
+import { useSeatWatches } from "../../api/queries";
+import type {
+  BookedEvent,
+  Candidate,
+  PlanStatus,
+  ProgramMediaLink,
+  SeatWatch,
+} from "../../api/types";
 import { decodeFacet, matchesFacet, poolFacets } from "../../domain/facets";
 import { candidateDate } from "../../domain/planState";
 import type { ProductionGroup } from "../../domain/productions";
@@ -43,6 +50,16 @@ export function CandidatePool({
   actionsDisabled,
 }: CandidatePoolProps) {
   const [filters, setFilters] = useState<PoolFilterState>(defaultFilters);
+  const { data: watches = [] } = useSeatWatches();
+  // A watch hangs off one date; the card is a production. Show it on the card
+  // whichever of its evenings is being watched.
+  const watchFor = useCallback(
+    (group: ProductionGroup): SeatWatch | undefined =>
+      group.candidates
+        .map((candidate) => watches.find((w) => w.candidate_id === candidate.id))
+        .find((found) => found !== undefined),
+    [watches],
+  );
   const facets = useMemo(() => poolFacets(pool), [pool]);
   const { setNodeRef, isOver } = useDroppable({ id: "pool", data: { kind: "pool" } });
 
@@ -131,6 +148,7 @@ export function CandidatePool({
             pinned={pinnedKeys.has(group.key)}
             onTogglePin={() => onTogglePin(group)}
             actionsDisabled={actionsDisabled}
+            watch={watchFor(group)}
           />
         ))}
       </div>

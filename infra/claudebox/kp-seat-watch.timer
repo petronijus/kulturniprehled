@@ -1,0 +1,15 @@
+[Unit]
+Description=Check Kulturní Přehled seat watches for freed-up seats
+
+[Timer]
+# Every 10 minutes. A cancellation sits in the system until someone takes it,
+# so this is about catching it the same evening, not the same second — and the
+# box office is someone else's server.
+OnBootSec=5min
+OnUnitActiveSec=10min
+# Spread the load off the exact minute; every watcher on earth polls at :00.
+RandomizedDelaySec=120
+Persistent=false
+
+[Install]
+WantedBy=timers.target

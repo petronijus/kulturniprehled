@@ -46,6 +46,22 @@ export const cs = {
     spotifySearch: "Najít na Spotify",
     youtube: "Přehrát na YouTube",
   },
+  watch: {
+    start: "Hlídat lístky",
+    active: "Hlídám",
+    prompt: "Vlož odkaz na sál z pokladny — ten, kde je plánek s místy.",
+    promptHint:
+      "Odkaz nese přihlášení k sálu, takže hlídač nepotřebuje prohlížeč. Když vyprší, řekne si o nový.",
+    seatsWanted: "Kolik míst vedle sebe",
+    found: (n: number) => `Uvolnilo se ${n} míst vedle sebe`,
+    openHall: "Otevřít sál",
+    checked: (when: string) => `naposledy ${when}`,
+    neverChecked: "ještě nekontrolováno",
+    freeSeats: (n: number) => (n === 0 ? "nic volného" : `${n} volných, ne vedle sebe`),
+    expiredLink: "Odkaz vypršel — vlož nový",
+    stop: "Zrušit hlídání",
+    again: "Hlídat znovu",
+  },
   player: {
     title: "Přehrávání",
     close: "Zavřít přehrávač",

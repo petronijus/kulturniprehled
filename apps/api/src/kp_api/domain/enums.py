@@ -78,3 +78,17 @@ class PlanStatus(StrEnum):
     UNDECIDED = "undecided"
     SELECTED = "selected"
     REJECTED = "rejected"
+
+
+class SeatWatchState(StrEnum):
+    """Where a seat watch is in its life.
+
+    `found` is terminal on purpose: the point of a watch is one notification
+    with seats in it, not a stream. Petr either takes them or starts a new
+    watch — an alert he has already read must never fire again at 3am.
+    """
+
+    ACTIVE = "active"
+    FOUND = "found"
+    STOPPED = "stopped"
+    EXPIRED = "expired"

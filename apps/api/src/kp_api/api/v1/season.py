@@ -44,13 +44,14 @@ from kp_api.adapters.calendar_ics import (
 from kp_api.adapters.spotify import SpotifyUnavailable, access_token
 from kp_api.api.deps import SessionDep, SettingsDep, require_scope
 from kp_api.domain.candidate_identity import candidate_identity
-from kp_api.domain.enums import PlanStatus, SeasonLane, SeasonStatus
+from kp_api.domain.enums import PlanStatus, SeasonLane, SeasonStatus, SeatWatchState
 from kp_api.domain.models import (
     Event,
     ProgramMediaLink,
     SeasonCandidate,
     SeasonPlan,
     SeasonScenario,
+    SeatWatch,
     User,
     Workspace,
     WorkspaceMember,
@@ -82,6 +83,11 @@ from kp_api.domain.schemas import (
     SeasonPoolPutRequest,
     SeasonPoolPutResult,
     SeasonResponse,
+    SeatWatchCheckResult,
+    SeatWatchCreate,
+    SeatWatchListResponse,
+    SeatWatchResponse,
+    SeatWatchUpdate,
     SpotifyTokenResponse,
 )
 from kp_api.domain.scopes import SCOPE_SEASON_READ, SCOPE_SEASON_WRITE
@@ -1137,4 +1143,206 @@ async def ack_novelties(
         season.novelty_ack_at = body.through
         season.version += 1
         await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- seat watches ---------------------------------------------------------
+#
+# One timer serves every watch, so creating a watch is the whole of
+# scheduling it. The runner asks for the due ones, checks each hall, and
+# reports back; nothing here talks to a ticketing system itself.
+
+
+@router.post("/watches", response_model=SeatWatchResponse, status_code=status.HTTP_201_CREATED)
+async def create_watch(
+    body: SeatWatchCreate,
+    session: SessionDep,
+    user: SeasonWriter,
+) -> SeatWatchResponse:
+    """Start watching a hall. Re-watching a candidate revives its old watch.
+
+    Without that, a concert Petr has watched, taken and lost again collects a
+    row per attempt and the runner checks the same hall three times over.
+    """
+
+    workspace = await _user_workspace(session, user)
+    existing = (
+        await session.scalar(
+            select(SeatWatch).where(
+                SeatWatch.workspace_id == workspace.id,
+                SeatWatch.candidate_id == body.candidate_id,
+                SeatWatch.deleted_at.is_(None),
+            )
+        )
+        if body.candidate_id is not None
+        else None
+    )
+    if existing is not None:
+        existing.hall_url = body.hall_url
+        existing.label = body.label
+        existing.starts_at = body.starts_at
+        existing.min_adjacent = body.min_adjacent
+        existing.exclude_categories = body.exclude_categories
+        existing.max_price_czk = body.max_price_czk
+        existing.state = SeatWatchState.ACTIVE
+        existing.last_error = None
+        existing.found_at = None
+        existing.found_seats = None
+        existing.notified_at = None
+        existing.version += 1
+        await session.commit()
+        await session.refresh(existing)
+        return SeatWatchResponse.model_validate(existing)
+
+    watch = SeatWatch(
+        workspace_id=workspace.id,
+        candidate_id=body.candidate_id,
+        label=body.label,
+        starts_at=body.starts_at,
+        hall_url=body.hall_url,
+        min_adjacent=body.min_adjacent,
+        exclude_categories=body.exclude_categories,
+        max_price_czk=body.max_price_czk,
+        state=SeatWatchState.ACTIVE,
+        created_by=user.id,
+        version=1,
+    )
+    session.add(watch)
+    await session.commit()
+    await session.refresh(watch)
+    return SeatWatchResponse.model_validate(watch)
+
+
+@router.get("/watches", response_model=SeatWatchListResponse)
+async def list_watches(
+    session: SessionDep,
+    user: SeasonReader,
+    state: Annotated[SeatWatchState | None, Query()] = None,
+    due: Annotated[
+        bool, Query(description="Only active watches whose event has not happened yet.")
+    ] = False,
+) -> SeatWatchListResponse:
+    workspace = await _user_workspace(session, user)
+    query = select(SeatWatch).where(
+        SeatWatch.workspace_id == workspace.id,
+        SeatWatch.deleted_at.is_(None),
+    )
+    if state is not None:
+        query = query.where(SeatWatch.state == state)
+    if due:
+        # A watch outlives its concert only as clutter; the runner skips it
+        # and the list marks it expired on the next pass.
+        query = query.where(
+            SeatWatch.state == SeatWatchState.ACTIVE,
+            (SeatWatch.starts_at.is_(None)) | (SeatWatch.starts_at > _utcnow()),
+        )
+    rows = await session.scalars(query.order_by(SeatWatch.created_at.asc()))
+    items = [SeatWatchResponse.model_validate(row) for row in rows.all()]
+    return SeatWatchListResponse(items=items, total=len(items))
+
+
+@router.patch("/watches/{watch_id}", response_model=SeatWatchResponse)
+async def patch_watch(
+    watch_id: UUID,
+    body: SeatWatchUpdate,
+    session: SessionDep,
+    user: SeasonWriter,
+) -> SeatWatchResponse:
+    workspace = await _user_workspace(session, user)
+    watch = await session.scalar(
+        select(SeatWatch).where(
+            SeatWatch.id == watch_id,
+            SeatWatch.workspace_id == workspace.id,
+            SeatWatch.deleted_at.is_(None),
+        )
+    )
+    if watch is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "watch not found")
+    if watch.version != body.version:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            {"code": "version_mismatch", "current_version": watch.version},
+        )
+    if body.state is not None:
+        watch.state = body.state
+        if body.state == SeatWatchState.ACTIVE:
+            # Reviving clears the reason it stopped, or the runner keeps
+            # showing an error that no longer applies.
+            watch.last_error = None
+            watch.found_at = None
+            watch.found_seats = None
+            watch.notified_at = None
+    for field in ("hall_url", "min_adjacent", "max_price_czk"):
+        value = getattr(body, field)
+        if value is not None:
+            setattr(watch, field, value)
+    if "exclude_categories" in body.model_fields_set:
+        watch.exclude_categories = body.exclude_categories
+    if body.hall_url is not None:
+        watch.last_error = None
+    watch.version += 1
+    await session.commit()
+    await session.refresh(watch)
+    return SeatWatchResponse.model_validate(watch)
+
+
+@router.post("/watches/{watch_id}/checked", response_model=SeatWatchResponse)
+async def record_check(
+    watch_id: UUID,
+    body: SeatWatchCheckResult,
+    session: SessionDep,
+    user: SeasonWriter,
+) -> SeatWatchResponse:
+    """The runner reporting one pass.
+
+    Seats found ends the watch: a hit is a thing to act on within twenty
+    minutes, not a state to re-announce every five.
+    """
+
+    workspace = await _user_workspace(session, user)
+    watch = await session.scalar(
+        select(SeatWatch).where(
+            SeatWatch.id == watch_id,
+            SeatWatch.workspace_id == workspace.id,
+            SeatWatch.deleted_at.is_(None),
+        )
+    )
+    if watch is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "watch not found")
+
+    now = _utcnow()
+    watch.last_checked_at = now
+    watch.last_free_seats = body.free_seats
+    watch.last_error = body.error
+    if body.found_seats:
+        watch.state = SeatWatchState.FOUND
+        watch.found_at = now
+        watch.found_seats = body.found_seats
+    elif watch.starts_at is not None and watch.starts_at <= now:
+        watch.state = SeatWatchState.EXPIRED
+    watch.version += 1
+    await session.commit()
+    await session.refresh(watch)
+    return SeatWatchResponse.model_validate(watch)
+
+
+@router.delete("/watches/{watch_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_watch(
+    watch_id: UUID,
+    session: SessionDep,
+    user: SeasonWriter,
+) -> Response:
+    workspace = await _user_workspace(session, user)
+    watch = await session.scalar(
+        select(SeatWatch).where(
+            SeatWatch.id == watch_id,
+            SeatWatch.workspace_id == workspace.id,
+            SeatWatch.deleted_at.is_(None),
+        )
+    )
+    if watch is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "watch not found")
+    watch.deleted_at = _utcnow()
+    watch.version += 1
+    await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

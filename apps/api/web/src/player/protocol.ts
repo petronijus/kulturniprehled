@@ -11,13 +11,22 @@
 
 export interface PlayerCommand {
   kind: "load" | "play" | "pause" | "next" | "previous" | "seek";
-  /** For `load`: the whole running order, in playing order. */
+  /** For `load`: a run of TRACK uris, in playing order. Spotify's play
+   * endpoint takes `uris` as tracks only and at most 100 of them — an album
+   * uri in this list makes the whole request fail, and a failed request
+   * leaves the device playing whatever it was playing before. */
   uris?: string[];
-  /** For `load`: where in that list to start. */
+  /** For `load`: an album to play as a context instead of `uris`. Exactly
+   * one of the two is set. */
+  contextUri?: string;
+  /** For `load` with `uris`: where in that list to start. */
   offset?: number;
   /** For `seek`: milliseconds into the current track. */
   position?: number;
 }
+
+/** Spotify's cap on `uris`; a longer list is rejected outright. */
+export const MAX_URIS = 100;
 
 export type PlayerEvent =
   /** The frame's script is live and listening — commands sent before this
@@ -92,8 +101,16 @@ export function asPlayerCommand(data: unknown): PlayerCommand | null {
   if (kind !== "load") {
     return null;
   }
-  const { uris, offset } = record;
-  if (!Array.isArray(uris) || !uris.every((uri): uri is string => typeof uri === "string")) {
+  const { uris, contextUri, offset } = record;
+  if (typeof contextUri === "string" && contextUri.length > 0) {
+    return { kind, contextUri };
+  }
+  if (
+    !Array.isArray(uris) ||
+    uris.length === 0 ||
+    uris.length > MAX_URIS ||
+    !uris.every((uri): uri is string => typeof uri === "string" && uri.startsWith("spotify:track:"))
+  ) {
     return null;
   }
   return { kind, uris, offset: typeof offset === "number" ? offset : 0 };

@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { QueueItem } from "../../domain/playQueue";
+import { buildSegments } from "../../domain/playQueue";
 import { cs } from "../../i18n/cs";
 import type { PlayerCommand } from "../../player/protocol";
 import { asPlayerEvent } from "../../player/protocol";
@@ -47,26 +48,14 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
   // While the slider is being dragged it shows the user's intent, not the
   // device's position; control returns when the device reports the seek.
   const [scrub, setScrub] = useState<number | null>(null);
+  const [segmentIndex, setSegmentIndex] = useState(0);
+  // Where the device is inside the loaded segment, so ⏭ knows when it has
+  // run out of segment and has to load the next one itself.
+  const [offset, setOffset] = useState(0);
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const readyRef = useRef(false);
+  const lastLoadRef = useRef<PlayerCommand | null>(null);
 
-  // One flat running order, plus a way back from "what is playing" to
-  // "which piece and which movement is that".
-  const { uris, positionOf, offsetOfItem } = useMemo(() => {
-    const flat: string[] = [];
-    const where = new Map<string, { item: number; movement: number }>();
-    const offsets: number[] = [];
-    queue.forEach((item, index) => {
-      offsets.push(flat.length);
-      item.uris.forEach((uri, movementIndex) => {
-        if (!where.has(uri)) {
-          where.set(uri, { item: index, movement: movementIndex });
-        }
-        flat.push(uri);
-      });
-    });
-    return { uris: flat, positionOf: where, offsetOfItem: offsets };
-  }, [queue]);
+  const { segments, placeOf, segmentOfItem } = useMemo(() => buildSegments(queue), [queue]);
 
   const send = useCallback((command: PlayerCommand) => {
     frameRef.current?.contentWindow?.postMessage(command, window.location.origin);
@@ -74,11 +63,25 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
 
   const startAt = useCallback(
     (index: number) => {
+      const at = segmentOfItem.get(index);
+      const segment = at === undefined ? undefined : segments[at.segment];
+      if (at === undefined || segment === undefined) {
+        return;
+      }
       setItemIndex(index);
       setMovement(0);
-      send({ kind: "load", uris, offset: offsetOfItem[index] ?? 0 });
+      setSegmentIndex(at.segment);
+      setOffset(at.offset);
+      const command: PlayerCommand =
+        segment.contextUri !== null
+          ? { kind: "load", contextUri: segment.contextUri }
+          : { kind: "load", uris: segment.uris, offset: at.offset };
+      // What the frame replays if it was not listening yet — without this it
+      // replayed the top of the queue over whatever had just been picked.
+      lastLoadRef.current = command;
+      send(command);
     },
-    [send, uris, offsetOfItem],
+    [send, segments, segmentOfItem],
   );
 
   useEffect(() => {
@@ -97,15 +100,12 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
         setFailure(message.reason);
         return;
       }
-      if (message.kind === "hello") {
-        // The frame was not listening when the ▶ was pressed; replay.
-        if (!readyRef.current) {
-          send({ kind: "load", uris, offset: 0 });
+      if (message.kind === "hello" || message.kind === "ready") {
+        // The frame was not listening when the ▶ was pressed; replay exactly
+        // what was asked for, never the top of the queue.
+        if (lastLoadRef.current !== null) {
+          send(lastLoadRef.current);
         }
-        return;
-      }
-      if (message.kind === "ready") {
-        readyRef.current = true;
         return;
       }
       setPaused(message.isPaused);
@@ -118,15 +118,32 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
         duration: message.duration,
         reportedAt: Date.now(),
       });
-      const at = positionOf.get(message.uri);
+      // Resolve the reported track inside the segment that is loaded — the
+      // same recording can appear in more than one piece.
+      const places = placeOf.get(message.uri) ?? [];
+      const at = places.find((place) => place.segment === segmentIndex) ?? places[0];
       if (at !== undefined) {
         setItemIndex(at.item);
         setMovement(at.movement);
+        setSegmentIndex(at.segment);
+        setOffset(at.offset);
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [send, uris, positionOf]);
+  }, [send, placeOf, segmentIndex]);
+
+  // Opening the panel plays the piece the ▶ was pressed on. The frame is
+  // almost never listening this early, so this mostly just records the
+  // intent; `hello` replays it once the device exists.
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || segments.length === 0) {
+      return;
+    }
+    started.current = true;
+    startAt(0);
+  }, [segments, startAt]);
 
   useEffect(() => {
     if (paused || track === null) {
@@ -141,6 +158,30 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
       ? 0
       : Math.min(track.position + (paused ? 0 : now - track.reportedAt), track.duration);
   const elapsed = scrub ?? played;
+
+  // The SDK's own ⏭/⏮ move within the loaded segment and stop at its edge.
+  // At a boundary the panel has to load the neighbouring segment instead,
+  // or the running order simply ends mid-programme.
+  const step = (direction: 1 | -1) => {
+    const segment = segments[segmentIndex];
+    const inside =
+      segment !== undefined &&
+      segment.contextUri === null &&
+      offset + direction >= 0 &&
+      offset + direction < segment.uris.length;
+    if (inside) {
+      send({ kind: direction === 1 ? "next" : "previous" });
+      return;
+    }
+    const neighbour = segments[segmentIndex + direction];
+    if (neighbour === undefined) {
+      return;
+    }
+    const item = direction === 1 ? neighbour.items[0] : neighbour.items[neighbour.items.length - 1];
+    if (item !== undefined) {
+      startAt(item);
+    }
+  };
 
   const commitScrub = () => {
     if (scrub !== null) {
@@ -228,7 +269,7 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
         <button
           type="button"
           className={styles.control}
-          onClick={() => send({ kind: "previous" })}
+          onClick={() => step(-1)}
           title={cs.player.previous}
         >
           ⏮
@@ -236,7 +277,7 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
         <button
           type="button"
           className={styles.control}
-          onClick={() => send({ kind: "next" })}
+          onClick={() => step(1)}
           title={cs.player.next}
         >
           ⏭

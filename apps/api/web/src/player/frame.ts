@@ -77,17 +77,26 @@ async function token(): Promise<string> {
   return body.access_token;
 }
 
-/** Spotify's own queue: hand it the whole running order at once. */
-async function playUris(uris: string[], offset: number): Promise<void> {
+/** Spotify's own queue: hand it a run of tracks, or one album as a context.
+ *
+ * The two cannot be mixed. `uris` means tracks and nothing else; an album
+ * goes in `context_uri` on its own. Getting this wrong is not loud — the
+ * request 400s, the device carries on with whatever it held, and the panel
+ * happily shows the piece you picked while something else plays.
+ */
+async function playUris(body: Record<string, unknown>): Promise<void> {
   if (deviceId === null) {
     return;
   }
   const access = await token();
-  await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+  const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${access}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ uris, offset: { position: offset } }),
+    body: JSON.stringify(body),
   });
+  if (!response.ok) {
+    post({ kind: "failed", reason: `play ${response.status}: ${await response.text()}` });
+  }
 }
 
 /** Make this device the one that actually sounds. */
@@ -110,7 +119,11 @@ function apply(command: PlayerCommand): void {
   }
   switch (command.kind) {
     case "load":
-      void playUris(command.uris ?? [], command.offset ?? 0);
+      void playUris(
+        command.contextUri !== undefined
+          ? { context_uri: command.contextUri }
+          : { uris: command.uris ?? [], offset: { position: command.offset ?? 0 } },
+      );
       break;
     case "play":
       void player.resume();

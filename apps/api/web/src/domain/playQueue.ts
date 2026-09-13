@@ -7,6 +7,7 @@
  */
 
 import type { ProgramMediaLink } from "../api/types";
+import { MAX_URIS } from "../player/protocol";
 import type { ProgramLine } from "./program";
 import { programKey } from "./programKey";
 
@@ -54,17 +55,23 @@ function itemFor(line: ProgramLine, title: string, link: ProgramMediaLink): Queu
       spotifyUrl: link.spotify_url,
     };
   }
-  const albumUri = spotifyUriFromUrl(link.spotify_url);
-  if (albumUri === null) {
+  const uri = spotifyUriFromUrl(link.spotify_url);
+  if (uri === null) {
     return null;
   }
+  // What the link points at decides how it plays, not whether movements were
+  // found. 19 pieces in the 2026/27 pool resolved to a single track with no
+  // movement list; calling those "album" sent a track uri as a play context,
+  // which Spotify rejects — silently, so the panel showed the piece and the
+  // device kept playing whatever came before.
+  const single = uri.startsWith("spotify:track:");
   return {
     key,
     author: line.author,
     work: line.work,
     title,
-    uris: [albumUri],
-    kind: "album",
+    uris: [uri],
+    kind: single ? "tracks" : "album",
     spotifyUrl: link.spotify_url,
   };
 }
@@ -106,4 +113,72 @@ export function buildQueue(
     }
   }
   return queue;
+}
+
+/** One `load` the player frame can accept.
+ *
+ * Spotify's play endpoint takes EITHER a list of track uris OR one context
+ * (an album), never both, and at most `MAX_URIS` of the former. A request
+ * that breaks either rule is rejected — and a rejected request is silent:
+ * the device keeps playing whatever it held, so the panel shows the piece
+ * that was picked while something entirely else comes out of the speakers.
+ * That is what this split exists to prevent.
+ */
+export interface Segment {
+  /** An album to play whole; `null` when this segment is a track run. */
+  contextUri: string | null;
+  /** Indices into the queue this segment covers, in playing order. */
+  items: number[];
+  uris: string[];
+}
+
+/** Where one track uri sits: which piece, which movement, which segment. */
+export interface Place {
+  item: number;
+  movement: number;
+  segment: number;
+  offset: number;
+}
+
+/** Cut the running order into loads, and index every track occurrence.
+ *
+ * Consecutive track-resolved pieces share a segment so their movements run
+ * on without the panel timing anything; an album-only piece is a segment of
+ * its own. Every occurrence of a uri is recorded, not just the first — one
+ * recording can serve two pieces of a programme, and keeping only the first
+ * made the panel jump back to it mid-playback.
+ */
+export function buildSegments(queue: readonly QueueItem[]): {
+  segments: Segment[];
+  placeOf: Map<string, Place[]>;
+  segmentOfItem: Map<number, { segment: number; offset: number }>;
+} {
+  const segments: Segment[] = [];
+  const placeOf = new Map<string, Place[]>();
+  const segmentOfItem = new Map<number, { segment: number; offset: number }>();
+  let run: Segment | null = null;
+
+  queue.forEach((item, index) => {
+    if (item.kind === "album") {
+      segments.push({ contextUri: item.uris[0] ?? null, items: [index], uris: [] });
+      segmentOfItem.set(index, { segment: segments.length - 1, offset: 0 });
+      run = null;
+      return;
+    }
+    if (run === null || run.uris.length + item.uris.length > MAX_URIS) {
+      run = { contextUri: null, items: [], uris: [] };
+      segments.push(run);
+    }
+    const segment = run;
+    const segmentIndex = segments.length - 1;
+    segmentOfItem.set(index, { segment: segmentIndex, offset: segment.uris.length });
+    segment.items.push(index);
+    item.uris.forEach((uri, movement) => {
+      const places = placeOf.get(uri) ?? [];
+      places.push({ item: index, movement, segment: segmentIndex, offset: segment.uris.length });
+      placeOf.set(uri, places);
+      segment.uris.push(uri);
+    });
+  });
+  return { segments, placeOf, segmentOfItem };
 }

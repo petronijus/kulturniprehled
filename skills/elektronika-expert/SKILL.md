@@ -1,6 +1,6 @@
 ---
 name: elektronika-expert
-description: Domain-expert agent for elektronická hudba (experimental, IDM, techno, ambient, dub, modular, live electronics). Pulls Petr's Spotify electronic library + hand-edited preferences, hits a list of club/festival URLs via WebFetch (electronica scene is too dynamic for static scrapers), and produces a ranked top-N list of candidates as structured JSON. **Sends no email — output is consumed by the kulturni-prehled aggregator.** Can also be invoked directly when the user wants an electronica snapshot in chat.
+description: Domain-expert agent for elektronická hudba (experimental, IDM, techno, ambient, dub, modular, live electronics). Pulls Petr's Spotify electronic library + hand-edited preferences, runs the venue scrapers in `venues/` and hits the remaining club/festival URLs via WebFetch, and produces a ranked top-N list of candidates as structured JSON. **Sends no email — output is consumed by the kulturni-prehled aggregator.** Can also be invoked directly when the user wants an electronica snapshot in chat.
 ---
 
 ## Task
@@ -90,7 +90,35 @@ Collect into `$SPOTIFY_TASTE`. On miss: `MISSING_SPOTIFY=1`.
 (No Discogs step — Petr's Discogs is biased toward classical/jazz,
 so it's less useful for electronica.)
 
-### 4. Gather candidates via WebFetch
+### 4a. Run the venue scrapers (static, fast, exact)
+
+Some sources cannot be read by WebFetch at all — punctum.cz serves one SPA
+shell for every path — and some need a parser rather than a prompt. Those
+have scrapers; run them first.
+
+```bash
+CANDIDATES='[]'
+for S in "$SKILL_DIR/venues/punctum.sh"; do
+  OUT=$("$S" 2>/dev/null)
+  printf '%s' "$OUT" | jq -e . >/dev/null 2>&1 \
+    && CANDIDATES=$(jq -n --argjson a "$CANDIDATES" --argjson b "$OUT" '$a + $b') \
+    || echo "WARN: $(basename "$S") returned nothing parseable"
+done
+# goout.sh takes a page: a city listing, a venue, or a promoter.
+for G in "https://goout.net/cs/praha/koncerty/"; do
+  OUT=$("$SKILL_DIR/venues/goout.sh" "$G" 2>/dev/null)
+  printf '%s' "$OUT" | jq -e . >/dev/null 2>&1 \
+    && CANDIDATES=$(jq -n --argjson a "$CANDIDATES" --argjson b "$OUT" '$a + $b')
+done
+```
+
+**An empty lane file is a bug until proven otherwise.** A source that returns
+`[]` twice running has either lost its markup or gone down; find out which,
+write the finding into `preferences.md`, and fix or replace the source. Do
+not let a scrape quietly report nothing — the pool is additive, so a broken
+source never deletes anything and never announces itself either.
+
+### 4b. Gather candidates via WebFetch
 
 For each URL in `$WEBFETCH_URLS`, use **WebFetch** with this prompt:
 

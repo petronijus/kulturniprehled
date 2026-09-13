@@ -150,6 +150,27 @@ Tres minutos") is **several pieces**: resolve each on its own and
 concatenate their tracks in programme order. Link it only when most parts
 resolved — a ▶ that plays one third of the line is worse than none.
 
+**`bin/resolve.py` + `bin/tracks.py` do the mechanical half.** `resolve.py`
+walks the piece list, tries the query forms below in order and scores every
+hit; `tracks.py` turns each accepted album into its movement list. Both take
+`SP_TOKEN` from the environment and write JSON next to the pool. They exist
+so a 280-piece pass is one run rather than 280 tool calls — but they only
+ever *propose*: read the sample they print and drop what is wrong before
+pushing. Four gates earned their place there the hard way (2026-09-13):
+
+- **the kind of piece must agree.** "Klavírní koncert č. 5" matched
+  "Symphony No. 5" on the digit alone until `kind_of` existed.
+- **the composer's SURNAME must appear on the record** — the last real token,
+  not the longest, or "Georg Friedrich Händel" is looked up as "Friedrich"
+  and "Pavel Trojan st." matches "Smetana: Má Vlast" on the "st".
+- **a placeholder is not a piece.** "výběr z díla", "písně", "program
+  upřesní festival", "live set" — resolving one produces a ▶ that plays
+  something nobody asked for.
+- **do not compare a Czech title against an English album title token by
+  token.** That rule looked reasonable and threw away 38 correct matches
+  (Chopin's Mazurky op. 33, Ligeti's Second Quartet, Pták Ohnivák) before it
+  was reverted.
+
 Pick with the same priority the ingest skill uses for playlists:
 
 1. a recording by the performers the candidate lists (check `detail` —

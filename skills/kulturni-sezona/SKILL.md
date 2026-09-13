@@ -50,17 +50,28 @@ import hashlib, re, unicodedata
 # ND links both narodni-divadlo.cz and nationaltheatre.cz).
 HOST_ALIASES = {
     "nationaltheatre.cz": "narodni-divadlo.cz",
+    "palacakropolis.com": "palacakropolis.cz",
 }
+# Sites that keep the event id in the query, not the path. Dropping the whole
+# query there collapses a venue's entire evening listing into one key
+# (found live 2026-09-13: every Akropolis night on one date hashed the same).
+ID_PARAMS = ("event_id", "eventid")
 
 def normalize(s):
     s = unicodedata.normalize("NFD", s.lower())
     s = "".join(c for c in s if unicodedata.category(c) != "Mn")
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", s)).strip()
 def canonical_url(url):
-    u = url.lower().split("#")[0].split("?")[0].rstrip("/")
-    u = re.sub(r"^https?://(www\.)?", "", u)
+    u = re.sub(r"^https?://(www\.)?", "", url.lower().split("#")[0]).rstrip("/")
+    u, _, query = u.partition("?")
     host, _, path = u.partition("/")
-    return f"{HOST_ALIASES.get(host, host)}/{path}" if path else HOST_ALIASES.get(host, host)
+    host = HOST_ALIASES.get(host, host)
+    base = f"{host}/{path}" if path else host
+    for name in ID_PARAMS:
+        found = re.search(rf"(?:^|&){name}=(\d+)", query)
+        if found:
+            return f"{base}?{name}={found.group(1)}"
+    return base
 def dedup_key(lane, title, url, starts_at_date):
     ident = canonical_url(url) if url else normalize(title)
     return hashlib.sha256(f"{lane}|{ident}|{starts_at_date}".encode()).hexdigest()[:64]

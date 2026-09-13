@@ -76,3 +76,31 @@ def test_the_date_is_prague_wall_time() -> None:
         candidate_identity(url, datetime(2026, 12, 15, 23, 30, tzinfo=UTC))
         == "ceskafilharmonie.cz/event/35524|2026-12-16"
     )
+
+
+def test_an_event_id_in_the_query_identifies_the_evening() -> None:
+    """palacakropolis.cz/work/33298?event_id=40543&no=62 — the path is the
+    listing, the query is the concert, and `no` is the page the scrape walked."""
+
+    assert (
+        url_identity("http://www.palacakropolis.cz/work/33298?event_id=40543&no=62&page_id=33824")
+        == "palacakropolis.cz/work/33298?event_id=40543"
+    )
+    assert url_identity("http://palacakropolis.cz/work/33298?event_id=40543&no=62") != url_identity(
+        "http://palacakropolis.cz/work/33298?event_id=40662&no=71"
+    )
+
+
+def test_a_venue_answering_to_two_domains_has_one_identity() -> None:
+    """The same Akropolis night, scraped off .com in August and .cz in September."""
+
+    assert url_identity(
+        "https://www.palacakropolis.com/work/33298?event_id=40543&no=48"
+    ) == url_identity("http://www.palacakropolis.cz/work/33298?event_id=40543&no=62")
+
+
+def test_a_listing_path_without_any_id_still_has_no_identity() -> None:
+    """No id anywhere means no identity — merging a whole listing would be worse
+    than leaving two rows for one evening."""
+
+    assert url_identity("https://palacakropolis.cz/work/33298?no=62&page_id=33824") is None

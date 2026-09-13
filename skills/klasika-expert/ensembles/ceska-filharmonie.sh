@@ -62,7 +62,9 @@ for c in cards[1:]:
     if not (h_m and t_m):
         continue
 
-    href, raw_title = h_m.group(1), h_m.group(2)
+    # The href carries entities too ("…/38700-&#x10D;esk&#xE1;-filharmonie/"),
+    # and an unescaped one becomes both a dead link and an unstable dedup key.
+    href, raw_title = html.unescape(h_m.group(1)), h_m.group(2)
     if href in seen:
         continue
     seen.add(href)

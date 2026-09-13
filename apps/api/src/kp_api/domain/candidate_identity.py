@@ -35,6 +35,14 @@ _PRAGUE = ZoneInfo("Europe/Prague")
 # `/2026` is a year archive, not an event.
 _ID_SLUG = re.compile(r"^(\d+)-.+$")
 _SCHEME_AND_WWW = re.compile(r"^https?://(www\.)?", re.IGNORECASE)
+# Older CMSs keep the event id in the query instead of the path
+# (`palacakropolis.cz/work/33298?event_id=40543&no=62`). The id is the only
+# part that identifies the evening — `no` and `page_id` are listing cursors
+# that change with whatever page the scrape happened to walk.
+_QUERY_ID = re.compile(r"(?:^|&)(?:event_?id|eventid)=(\d+)", re.IGNORECASE)
+# One site, two domains. A venue that answers to both spellings hands out two
+# identities for one evening unless they are folded together here.
+_HOST_ALIASES = {"palacakropolis.com": "palacakropolis.cz"}
 
 
 def url_identity(url: str | None) -> str | None:
@@ -46,21 +54,30 @@ def url_identity(url: str | None) -> str | None:
 
     >>> url_identity("https://www.ceskafilharmonie.cz/event/35524-simon-rattle/")
     'ceskafilharmonie.cz/event/35524'
+    >>> url_identity("http://palacakropolis.com/work/33298?event_id=40543&no=62")
+    'palacakropolis.cz/work/33298?event_id=40543'
     >>> url_identity("https://www.dvorakovapraha.cz/program/concertino-praga")
     """
 
     if not url:
         return None
-    trimmed = _SCHEME_AND_WWW.sub("", url.strip().lower())
-    trimmed = trimmed.split("#")[0].split("?")[0].rstrip("/")
-    if not trimmed:
+    trimmed = _SCHEME_AND_WWW.sub("", url.strip().lower()).split("#")[0]
+    path, _, query = trimmed.partition("?")
+    path = path.rstrip("/")
+    if not path:
         return None
-    segments = trimmed.split("/")
+    segments = path.split("/")
+    segments[0] = _HOST_ALIASES.get(segments[0], segments[0])
+
     match = _ID_SLUG.match(segments[-1])
-    if match is None:
-        return None
-    segments[-1] = match.group(1)
-    return "/".join(segments)
+    if match is not None:
+        segments[-1] = match.group(1)
+        return "/".join(segments)
+
+    query_id = _QUERY_ID.search(query)
+    if query_id is not None:
+        return f"{'/'.join(segments)}?event_id={query_id.group(1)}"
+    return None
 
 
 def candidate_identity(url: str | None, starts_at: datetime) -> str | None:

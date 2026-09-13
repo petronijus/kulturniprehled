@@ -60,7 +60,7 @@ export function CandidatePool({
         if (!filters.showRejected && status === "rejected") {
           return false;
         }
-        if (filters.undecidedOnly && status !== "undecided") {
+        if (filters.selectedOnly && status !== "selected") {
           return false;
         }
         return group.candidates.some((candidate) => {

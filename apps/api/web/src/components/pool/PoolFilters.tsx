@@ -12,7 +12,9 @@ export interface PoolFilterState {
   month: IsoMonth | null;
   /** Encoded `source:…` / `venue:…`, or null for every ensemble and venue. */
   facet: string | null;
-  undecidedOnly: boolean;
+  /** Only the productions Petr has put in the plan — his picks, without
+   * hunting for them among four hundred candidates. */
+  selectedOnly: boolean;
   newOnly: boolean;
   /** Fully rejected productions are hidden unless this is on. */
   showRejected: boolean;
@@ -23,7 +25,7 @@ export const defaultFilters: PoolFilterState = {
   lane: null,
   month: null,
   facet: null,
-  undecidedOnly: false,
+  selectedOnly: false,
   newOnly: false,
   showRejected: false,
   query: "",
@@ -102,10 +104,10 @@ export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersPr
         <label className={styles.toggle}>
           <input
             type="checkbox"
-            checked={filters.undecidedOnly}
-            onChange={(event) => onChange({ ...filters, undecidedOnly: event.target.checked })}
+            checked={filters.selectedOnly}
+            onChange={(event) => onChange({ ...filters, selectedOnly: event.target.checked })}
           />
-          {cs.filters.undecidedOnly}
+          {cs.filters.selectedOnly}
         </label>
         <label className={styles.toggle}>
           <input

@@ -22,7 +22,7 @@ export const cs = {
   undecide: "Vrátit mezi kandidáty",
   filters: {
     all: "Vše",
-    undecidedOnly: "Jen nerozhodnuté",
+    selectedOnly: "Jen vybrané",
     newOnly: "Nové",
     showRejected: "I odmítnuté",
     month: "Měsíc",

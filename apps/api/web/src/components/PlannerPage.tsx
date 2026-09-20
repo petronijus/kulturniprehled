@@ -150,17 +150,16 @@ export function PlannerPage() {
     setHoveredKey(group === null ? null : group.key);
   }, []);
 
-  // Clicking a concert in the calendar answers "what IS this?" — so it pins
-  // the production (lighting up its other dates) and scrolls the pool to the
-  // card. Pinning alone was not enough: with hundreds of cards the one that
-  // lit up was usually somewhere off-screen.
+  // Clicking a concert in the calendar scrolls the pool to its card and
+  // nothing else. It deliberately does NOT pin the production: pinning is a
+  // decision the user makes on the card itself, and having a look at what an
+  // evening is should not leave state behind.
   const onOpenCandidate = useCallback(
     (candidate: Candidate) => {
       const key = groupKeyByCandidate.get(candidate.id);
       if (key === undefined) {
         return;
       }
-      setPinnedKeys((current) => (current.includes(key) ? current : [...current, key]));
       revealGeneration.current += 1;
       setRevealKey({ key, generation: revealGeneration.current });
     },

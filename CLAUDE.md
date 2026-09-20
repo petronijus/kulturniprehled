@@ -74,9 +74,13 @@ docs/              Architecture, API, sync, deployment, handover docs
 - **Commits**: [Conventional Commits](https://www.conventionalcommits.org/) —
   `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`, `perf:`, `ci:`.
 - **Branches**: `main` is always deployable. Work in `feat/*` or `fix/*` branches,
-  open PRs into `main` so each change has a description + release notes get
-  auto-generated. Pushing straight to `main` for one-line typo fixes is fine.
-- **PR template**: change summary, why, test plan, screenshots for UI changes.
+  then **merge into `main` locally** and push — solo dev, no CI, so a pull
+  request is a review round-trip with nobody on the other end. Run the
+  pre-merge checklist below first; that is the gate a PR would otherwise be
+  standing in for. Delete the branch on both ends afterwards. Pushing straight
+  to `main` for one-line typo fixes is fine. Never force-push `main`.
+- **Commit message** carries what a PR description would: change summary, why,
+  test plan, and for UI changes what was verified by looking at it.
 
 ## Code style
 
@@ -103,8 +107,9 @@ docs/              Architecture, API, sync, deployment, handover docs
 1. Code written, formatted, lint passes.
 2. Tests written and green. Every bug fix adds a regression test.
 3. Commit in Conventional Commit format.
-4. Push to a feature branch, open PR (or push to `main` for trivial changes).
-5. Local checks (next section) green before merge.
+4. Local checks (next section) green.
+5. Merge the branch into `main` yourself and push (or commit straight to
+   `main` for trivial changes).
 6. Manual verification (dev compose up, click through UI or curl endpoint).
 
 ## Commit cadence (explicit project policy)

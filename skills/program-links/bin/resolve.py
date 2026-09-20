@@ -103,18 +103,29 @@ PLACEHOLDER = re.compile(
 
 # What KIND of piece it is. A number surviving is not enough — "Klavírní koncert
 # č. 5" matched "Symphony No. 5" on the digit alone until this gate existed.
+# Every pattern has to survive the plural, because a Czech programme names one
+# piece while the record that carries it is usually a collection: "Dechový
+# kvintet, op. 14" lives on "Holst: Quintets, Opp. 3 & 14", and `\bquintet\b`
+# does not match "Quintets". That cost three correct matches outright, and
+# "Violin Concertos Nos. 1 and 2 / Concert Overture" was worse — the plural
+# was missed, "Overture" was not, and the album came back as the wrong KIND
+# entirely and was hard-rejected.
+#
+# English "concert" is deliberately NOT a concerto: "Concert Overture" is an
+# overture, and letting the two collide is how that Szymanowski record was
+# misread in the first place.
 KIND = [
-    ("concerto", r"\bkoncert\b|\bconcerto\b|\bkonzert\b"),
+    ("concerto", r"\bkoncert(y|u|em)?\b|\bconcertos?\b|\bkonzert(e|en)?\b"),
     ("symphony", r"\bsymfoni|\bsymphon|\bsinfoni"),
-    ("quartet",  r"\bkvartet\b|\bquartet\b|\bquatuor\b"),
-    ("quintet",  r"\bkvintet\b|\bquintet\b"),
-    ("trio",     r"\btrio\b"),
-    ("sextet",   r"\bsextet\b"),
-    ("sonata",   r"\bsonat|\bsonata\b"),
-    ("overture", r"\bpredehra\b|\bouvertur|\boverture\b"),
-    ("mass",     r"\bmse\b|\bmass\b|\brequiem\b"),
-    ("cantata",  r"\bkantata\b|\bcantata\b|\boratori"),
-    ("suite",    r"\bsuita\b|\bsuite\b"),
+    ("quartet",  r"\bkvartet(y|u|em)?\b|\bquartets?\b|\bquatuors?\b"),
+    ("quintet",  r"\bkvintet(y|u|em)?\b|\bquintets?\b"),
+    ("trio",     r"\btrios?\b"),
+    ("sextet",   r"\bsextets?\b"),
+    ("sonata",   r"\bsonat"),
+    ("overture", r"\bpredehr|\bouvertur|\bovertures?\b"),
+    ("mass",     r"\bmse\b|\bmasses?\b|\bmass\b|\brequiems?\b"),
+    ("cantata",  r"\bkantat|\bcantatas?\b|\boratori"),
+    ("suite",    r"\bsuit[ay]\b|\bsuites?\b"),
     ("serenade", r"\bserenad"),
     ("fantasia", r"\bfantazie\b|\bfantas"),
     ("variations", r"\bvariace\b|\bvariation"),
@@ -123,10 +134,47 @@ def kind_of(text):
     t = fold(text)
     return {name for name, pat in KIND if re.search(pat, t)}
 NUMBER = re.compile(r"\bno\s*(\d+)\b|\bc\s*(\d+)\b")
+# The work names one number ("č. 5"); the record that carries it often lists
+# several, and rarely with a marker in front of each — "Symphonies 5 & 7-9",
+# "Symphonies Nos. 7, 8, 9". NUMBER finds nothing in either, so a correct
+# album was rejected for "losing" a number it prints twice over. On the album
+# side take every plain integer instead, bounded so catalogue numbers (BWV
+# 1067, K. 216, D 944) stay out of it.
+ALBUM_NUMBERS = re.compile(r"\b(\d{1,3})\b")
+# "Nos. 1 - 3" and "Symphonies Nos. 13-16" name the pieces in between as well.
+ALBUM_RANGE = re.compile(r"\b(\d{1,3})\s*-\s*(\d{1,3})\b")
+# The opus is the other name a piece answers to, and the record often prints
+# that one instead: the programme's "Klavírní kvintet č. 2 A dur, op. 81" is
+# "Piano Quintet, Op. 81" on the sleeve, with no 2 anywhere.
+OPUS = re.compile(r"\bop\s*(\d{1,3})\b")
+# A complete set contains every numbered piece without printing any of them.
+COLLECTION = re.compile(
+    r"\bcomplete\b|\bworks\b|\bintegrale\b|\bsamtliche\b|"
+    r"\b(sonatas|quartets|quintets|trios|concertos|symphonies|sextets|"
+    r"scherzos|sonaty|kvartety|koncerty)\b")
+
+
+def album_numbers(raw_name: str) -> set[str]:
+    """Every piece number the sleeve names, ranges expanded.
+
+    Takes the RAW title, not a folded one: fold() turns every hyphen into a
+    space, so "Nos. 1 - 3" arrives as "1 3" and the range is already lost.
+    """
+
+    found = {n for n in ALBUM_NUMBERS.findall(fold(raw_name)) if 1 <= int(n) <= 120}
+    for low, high in ALBUM_RANGE.findall(raw_name):
+        lo, hi = int(low), int(high)
+        if 1 <= lo < hi <= 120 and hi - lo <= 40:
+            found |= {str(n) for n in range(lo, hi + 1)}
+    return found
 BAD_ALBUM = re.compile(
     r"\b(relaxation|relaxing|chill|sleep|study|best of classical|100 best|greatest hits|"
     r"famous|favourite|favorite|classical music for|essential classics|wedding|"
-    r"meditation|spa|karaoke|ringtone)\b", re.I)
+    r"meditation|spa|karaoke|ringtone|"
+    # A "most popular pieces" record is one movement lifted out of the work —
+    # four of these were sitting in the pool as if they were the symphony.
+    r"\d+ most popular|most popular pieces|essentials?|anthology|antologija|"
+    r"masterpieces|the very best|this is )\b", re.I)
 
 # socr.rozhlas.cz prints the playing time after each title ("Římské pinie
 # (23‘)"). It has to go before fold(), because fold() drops the brackets and
@@ -190,9 +238,17 @@ def score(album: dict, author: str, work: str, hint: str = "") -> int:
     if want and got and not (want & got): return -100
     if want and want & got: s += 2
     # A number in the piece must survive into the recording, or it is another work.
-    nums = {m.group(1) or m.group(2) for m in NUMBER.finditer(fold(work))}
+    # A number in the piece must survive into the recording, or it is another
+    # work — but the record is allowed to say it a different way: by opus, by
+    # a range that spans it, or by being the complete set and naming none.
+    w_f = fold(work)
+    nums = {m.group(1) or m.group(2) for m in NUMBER.finditer(w_f)}
     if nums:
-        if nums & {m.group(1) or m.group(2) for m in NUMBER.finditer(name)}: s += 3
+        on_album = album_numbers(album.get("name") or "")
+        opus = set(OPUS.findall(w_f))
+        if nums & on_album: s += 3
+        elif opus & on_album: s += 2
+        elif not on_album and COLLECTION.search(name): s += 1
         else: return -100
     w_tokens = [t for t in fold(work).split() if len(t) > 3][:6]
     s += sum(1 for t in w_tokens if t in name)

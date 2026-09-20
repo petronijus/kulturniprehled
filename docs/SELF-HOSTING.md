@@ -39,15 +39,18 @@ flutter build apk --release \
   --dart-define=KP_GOOGLE_OAUTH_CLIENT_ID_ANDROID=<android client id>
 ```
 
-> On iOS the OAuth client id can't come from `--dart-define`; it must be static
-> in `ios/Runner/Info.plist`, which ships a `YOUR_IOS_CLIENT_ID` placeholder.
-> Either edit it by hand, or:
+> Two iOS values can't come from `--dart-define` and ship as placeholders: the
+> OAuth client id (`YOUR_IOS_CLIENT_ID` in `ios/Runner/Info.plist`, which has to
+> be static in the plist) and your Apple Developer team id (`YOURTEAMID` in
+> `ios/ExportOptions.plist` and `Runner.xcodeproj/project.pbxproj`, which manual
+> signing bakes in). Either edit them by hand, or:
 >
 > ```
 > export KP_IOS_GOOGLE_CLIENT_ID=<your bare iOS client id>   # before .apps.googleusercontent.com
-> ./scripts/ios-inject-client-id.sh        # placeholder -> your id
+> export KP_IOS_TEAM_ID=<your 10-character Apple team id>
+> ./scripts/ios-inject-private.sh        # placeholders -> your values
 > # build, then:
-> ./scripts/ios-inject-client-id.sh --restore
+> ./scripts/ios-inject-private.sh --restore
 > ```
 >
 > The maintainer's iOS release scripts (`infra/ios/release-*.sh`) do this

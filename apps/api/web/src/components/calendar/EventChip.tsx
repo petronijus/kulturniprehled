@@ -12,15 +12,23 @@ interface EventChipProps {
   violated: boolean;
   dragDisabled: boolean;
   highlighted: boolean;
+  /** Open this concert's card in the pool. */
+  onOpen: (candidate: Candidate) => void;
 }
 
-/** A selected candidate on its calendar day. Draggable out to deselect. */
+/** A selected candidate on its calendar day. Click opens its pool card,
+ * dragging it out of the calendar deselects it.
+ *
+ * Both gestures live on one element because the pointer sensor only starts a
+ * drag after 6px of travel (see PlannerDnd) — under that it is a click, and
+ * the chip was previously swallowing it with nothing on the other side. */
 export function EventChip({
   candidate,
   diff,
   violated,
   dragDisabled,
   highlighted,
+  onOpen,
 }: EventChipProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `chip-${candidate.id}`,
@@ -46,18 +54,21 @@ export function EventChip({
   }
 
   return (
-    <div
+    <button
+      type="button"
       ref={setNodeRef}
-      className={classes.join(" ")}
+      className={`${classes.join(" ")} ${styles.clickable}`}
       style={{ borderInlineStartColor: `var(--lane-${candidate.lane})` }}
       title={candidate.why_cs ?? candidate.title}
+      aria-label={`${cs.calendar.openCard}: ${candidate.title}`}
+      onClick={() => onOpen(candidate)}
       {...listeners}
       {...attributes}
     >
       <span className={styles.time}>{isoToLocalTime(candidate.starts_at)}</span>
       <span className={styles.title}>{candidate.title}</span>
       {candidate.season_event && <span className={styles.season}>★</span>}
-    </div>
+    </button>
   );
 }
 

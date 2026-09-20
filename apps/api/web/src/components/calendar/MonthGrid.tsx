@@ -22,6 +22,7 @@ interface MonthGridProps {
   previewMode: boolean;
   highlightIds: ReadonlySet<string>;
   highlightDates: ReadonlySet<IsoDate>;
+  onOpenCandidate: (candidate: Candidate) => void;
 }
 
 export function MonthGrid({
@@ -40,6 +41,7 @@ export function MonthGrid({
   previewMode,
   highlightIds,
   highlightDates,
+  onOpenCandidate,
 }: MonthGridProps) {
   const [yearStr, monthStr] = month.split("-") as [string, string];
   const monthName = cs.months[Number(monthStr) - 1] ?? month;
@@ -89,6 +91,7 @@ export function MonthGrid({
             previewMode={previewMode}
             highlightIds={highlightIds}
             highlightDates={highlightDates}
+            onOpenCandidate={onOpenCandidate}
           />
         ))}
       </div>

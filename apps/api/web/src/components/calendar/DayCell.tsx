@@ -1,4 +1,5 @@
 import { useDroppable } from "@dnd-kit/core";
+import type { CSSProperties } from "react";
 import type { BookedEvent, CalendarEntry, Candidate } from "../../api/types";
 import { dayTooltip } from "../../domain/calendar";
 import type { IsoDate } from "../../domain/season";
@@ -29,6 +30,7 @@ interface DayCellProps {
   /** Pool-card hover/pin: this cell holds a highlighted candidate's date. */
   highlighted: boolean;
   highlightIds: ReadonlySet<string>;
+  onOpenCandidate: (candidate: Candidate) => void;
 }
 
 export function DayCell({
@@ -46,6 +48,7 @@ export function DayCell({
   previewMode,
   highlighted,
   highlightIds,
+  onOpenCandidate,
 }: DayCellProps) {
   const isTarget = dragTargetDate === date;
   const { setNodeRef, isOver } = useDroppable({
@@ -67,6 +70,15 @@ export function DayCell({
   if (booked.length > 0) {
     classes.push(styles.bookedDay);
   }
+  // A day that carries something of the plan is coloured whole. The chip
+  // alone was too small a mark to find when scanning ten months of grid,
+  // which is the one thing this calendar exists to make easy.
+  if (planned.length > 0) {
+    classes.push(styles.plannedDay);
+  }
+  // The lane of the evening the day is built around — booked events carry no
+  // lane, so a bought day borrows the neutral "booked" colour instead.
+  const dayLane = planned[0]?.lane ?? null;
   if (isTarget) {
     classes.push(styles.target);
   }
@@ -84,7 +96,19 @@ export function DayCell({
   const hiddenPersonal = personal.slice(MAX_PERSONAL_CHIPS);
 
   return (
-    <div ref={setNodeRef} className={classes.join(" ")} data-date={date}>
+    <div
+      ref={setNodeRef}
+      className={classes.join(" ")}
+      data-date={date}
+      style={
+        dayLane === null
+          ? undefined
+          : ({
+              "--day-lane": `var(--lane-${dayLane})`,
+              "--day-lane-bg": `var(--lane-${dayLane}-bg)`,
+            } as CSSProperties)
+      }
+    >
       <span className={styles.dayNumber} title={holiday ?? undefined}>
         {Number(date.slice(8, 10))}
       </span>
@@ -113,6 +137,7 @@ export function DayCell({
             violated={violatedIds.has(candidate.id)}
             dragDisabled={previewMode}
             highlighted={highlightIds.has(candidate.id)}
+            onOpen={onOpenCandidate}
           />
         ))}
       </div>

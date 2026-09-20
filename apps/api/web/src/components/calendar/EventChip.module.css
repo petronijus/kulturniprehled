@@ -18,6 +18,26 @@
   cursor: grabbing;
 }
 
+/* The chip is a <button> so it answers Enter/Space and reads as actionable;
+   these strip the browser's own button skin without losing the focus ring. */
+.clickable {
+  font: inherit;
+  color: inherit;
+  text-align: start;
+  width: 100%;
+  appearance: none;
+}
+
+.clickable:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-hover, var(--surface-raised));
+}
+
+.clickable:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
 .time {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;

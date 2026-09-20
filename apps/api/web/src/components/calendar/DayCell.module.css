@@ -54,6 +54,38 @@
   font-weight: 700;
 }
 
+/* A day holding a plan pick, coloured in that evening's lane. Same weight as
+   a bought day: both are "this evening is spoken for", and reading the whole
+   cell is what makes ten months of grid scannable at a glance. */
+.plannedDay:not(.outside) {
+  background: var(--day-lane-bg);
+  box-shadow: inset 0 0 0 2px var(--day-lane);
+  border-radius: 2px;
+}
+
+.plannedDay .dayNumber {
+  color: var(--day-lane);
+  font-weight: 700;
+}
+
+/* Bought wins the cell when an evening is both: the ticket is the fact, the
+   pick is only an intention. The lane still shows on the chip's own border. */
+.plannedDay.bookedDay:not(.outside) {
+  background: var(--booked-day-bg);
+  box-shadow: inset 0 0 0 2px var(--booked-day-ring);
+}
+
+.plannedDay.bookedDay .dayNumber {
+  color: var(--booked-day-ring);
+}
+
+/* Outside-month days keep their sunken background but still need to show a
+   pick, or the last week of a month looks empty while it is not. */
+.plannedDay.outside .dayNumber,
+.bookedDay.outside .dayNumber {
+  font-weight: 700;
+}
+
 .target {
   outline: 2px dashed var(--focus-ring);
   outline-offset: -2px;

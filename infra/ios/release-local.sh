@@ -42,8 +42,8 @@ GOOG_CLIENT_ID=$(op-cache "Kulturni prehled google Web OAuth client" "client ID"
 
 # Inject the real iOS OAuth client id (Info.plist ships a placeholder); restore
 # it on exit so the placeholder stays in git.
-"$REPO_ROOT/scripts/ios-inject-client-id.sh"
-trap '"$REPO_ROOT/scripts/ios-inject-client-id.sh" --restore >/dev/null 2>&1 || true' EXIT
+"$REPO_ROOT/scripts/ios-inject-private.sh"
+trap '"$REPO_ROOT/scripts/ios-inject-private.sh" --restore >/dev/null 2>&1 || true' EXIT
 
 info "Building IPA..."
 cd "$MOBILE_DIR"

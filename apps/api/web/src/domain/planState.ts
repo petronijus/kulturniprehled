@@ -1,6 +1,7 @@
 /** Derivations from the raw pool into what the calendar + rules consume. */
 
 import type { BookedEvent, Candidate } from "../api/types";
+import { isCandidateBooked } from "./productions";
 import { programLines } from "./program";
 import type { IsoDate } from "./season";
 import { isoToLocalDate } from "./season";
@@ -44,7 +45,10 @@ export function toPlannedItems(
 ): PlannedItem[] {
   const items: PlannedItem[] = [];
   for (const candidate of pool) {
-    if (selectedIds.has(candidate.id)) {
+    // A bought evening is already in `booked` below. Counting the pick as
+    // well made the concert collide with itself: two events on one night,
+    // nought days apart, week cap spent twice.
+    if (selectedIds.has(candidate.id) && !isCandidateBooked(candidate, booked)) {
       items.push({
         id: candidate.id,
         title: candidate.title,

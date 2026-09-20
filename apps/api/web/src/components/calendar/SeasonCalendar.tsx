@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BookedEvent, CalendarEntry, Candidate, ReservedSlot, Season } from "../../api/types";
 import { candidateDate } from "../../domain/planState";
+import { isCandidateBooked } from "../../domain/productions";
 import type { IsoDate, IsoMonth } from "../../domain/season";
 import { isoToLocalDate, isoWeek, monthOf, monthsBetween } from "../../domain/season";
 import type { Violation } from "../../domain/violations";
@@ -77,6 +78,12 @@ export function SeasonCalendar({
       if (!visibleIds.has(candidate.id)) {
         continue;
       }
+      // Once the evening is bought its BookedChip says so; a second chip for
+      // the same concert is just the pick that never got cleared, and it was
+      // not even clickable, because buying retires the card it points at.
+      if (isCandidateBooked(candidate, booked)) {
+        continue;
+      }
       const date = candidateDate(candidate);
       const bucket = byDate.get(date);
       if (bucket === undefined) {
@@ -86,7 +93,7 @@ export function SeasonCalendar({
       }
     }
     return byDate;
-  }, [pool, visibleIds]);
+  }, [pool, visibleIds, booked]);
 
   const bookedByDate = useMemo(() => {
     const byDate = new Map<IsoDate, BookedEvent[]>();

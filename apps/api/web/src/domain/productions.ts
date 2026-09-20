@@ -9,7 +9,6 @@
 
 import type { BookedEvent, Candidate, PlanStatus } from "../api/types";
 import { candidateDate } from "./planState";
-import type { IsoDate } from "./season";
 import { isoToLocalDate } from "./season";
 
 /** Venues serving the same pages under more than one hostname — mirror of
@@ -162,41 +161,42 @@ function significantTokens(title: string): Set<string> {
   return tokens;
 }
 
-/** True when one of the production's dates has been bought: a booked KP
- * event on the same local day whose title shares at least one significant
- * token. Booked events carry no URL, so the title is all there is to
- * match on — same-day narrows it enough for one token to be safe. */
-export function isProductionBooked(
-  group: ProductionGroup,
-  booked: readonly BookedEvent[],
-): boolean {
+/** True when THIS evening has been bought: a booked KP event on the same
+ * local day whose title shares at least one significant token. Booked events
+ * carry no URL, so the title is all there is to match on — same-day narrows
+ * it enough for one token to be safe.
+ *
+ * The plan has to ask this too, not just the pool. A bought concert stayed
+ * `selected` in the pool, so the rule engine saw the ticket and the pick as
+ * two separate evenings and reported them as colliding with each other:
+ * "Víkingur Ólafsson" against "Český spolek pro komorní hudbu • Víkingur
+ * Ólafsson", nought days apart, on 18 April.
+ */
+export function isCandidateBooked(candidate: Candidate, booked: readonly BookedEvent[]): boolean {
   if (booked.length === 0) {
     return false;
   }
-  const bookedTokensByDate = new Map<IsoDate, Set<string>[]>();
+  const own = significantTokens(candidate.title);
+  const date = candidateDate(candidate);
   for (const event of booked) {
-    const date = isoToLocalDate(event.starts_at);
-    const bucket = bookedTokensByDate.get(date);
-    const tokens = significantTokens(event.title);
-    if (bucket === undefined) {
-      bookedTokensByDate.set(date, [tokens]);
-    } else {
-      bucket.push(tokens);
-    }
-  }
-  for (const candidate of group.candidates) {
-    const sameDay = bookedTokensByDate.get(candidateDate(candidate));
-    if (sameDay === undefined) {
+    if (isoToLocalDate(event.starts_at) !== date) {
       continue;
     }
-    const own = significantTokens(candidate.title);
-    for (const tokens of sameDay) {
-      for (const token of own) {
-        if (tokens.has(token)) {
-          return true;
-        }
+    const tokens = significantTokens(event.title);
+    for (const token of own) {
+      if (tokens.has(token)) {
+        return true;
       }
     }
   }
   return false;
+}
+
+/** True when any of the production's dates has been bought — one ticket
+ * retires the whole production from the pool. */
+export function isProductionBooked(
+  group: ProductionGroup,
+  booked: readonly BookedEvent[],
+): boolean {
+  return group.candidates.some((candidate) => isCandidateBooked(candidate, booked));
 }

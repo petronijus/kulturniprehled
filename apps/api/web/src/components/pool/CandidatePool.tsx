@@ -130,10 +130,18 @@ export function CandidatePool({
       return;
     }
     if (!visible.some((group) => group.key === revealKey.key)) {
-      // Same reference when already default, so React bails out and this
-      // cannot spin: a production with no card at all (already bought) just
-      // stays unreachable.
-      setFilters(defaultFilters);
+      if (filters !== defaultFilters) {
+        // Clear them once and let the next pass look again.
+        setFilters(defaultFilters);
+        return;
+      }
+      // Default filters and still no card — the production has none at all,
+      // because buying one of its dates retires it from the pool. Mark the
+      // click handled anyway. Leaving it unhandled kept this effect armed,
+      // and since `visible` is a dependency it then re-ran on every filter
+      // change and snapped the filters straight back to default: ticking
+      // "jen vybrané" looked like a dead checkbox.
+      revealedGeneration.current = revealKey.generation;
       return;
     }
     const card = cardsRef.current?.querySelector(`[data-group-key="${CSS.escape(revealKey.key)}"]`);
@@ -142,7 +150,7 @@ export function CandidatePool({
     }
     revealedGeneration.current = revealKey.generation;
     card.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [revealKey, visible]);
+  }, [revealKey, visible, filters]);
 
   if (pool.length === 0) {
     // The season exists but the scrape hasn't filled it yet — explain the

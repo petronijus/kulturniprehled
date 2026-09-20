@@ -108,5 +108,14 @@ for m in re.finditer(
         "price_czk": None,
     })
 
+# The listing knows the title and the evening; the programme lives on the
+# detail page. Reading it here — once per production URL, not once per
+# evening — is what keeps a card from reaching the planner empty. Set
+# KP_SKIP_DETAILS=1 to emit the listing alone (faster, for parser work on
+# the listing itself).
+if not os.environ.get("KP_SKIP_DETAILS"):
+    import detail
+    detail.enrich(items, "socr")
+
 print(json.dumps(items, ensure_ascii=False))
 PY

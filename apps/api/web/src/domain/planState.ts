@@ -1,6 +1,7 @@
 /** Derivations from the raw pool into what the calendar + rules consume. */
 
 import type { BookedEvent, Candidate } from "../api/types";
+import { programLines } from "./program";
 import type { IsoDate } from "./season";
 import { isoToLocalDate } from "./season";
 import type { PlannedItem } from "./violations";
@@ -10,16 +11,21 @@ export function candidateDate(candidate: Candidate): IsoDate {
   return isoToLocalDate(candidate.starts_at);
 }
 
+/** Work keys for the duplicate-work rule — only from fully named pieces.
+ *
+ * Built on `programLines` so this cannot drift from what the card prints.
+ * The hand-rolled version used `??`, which passes an empty string through,
+ * and a scrape that had read a composer off the title but no work turned
+ * into the key `"joseph haydn|"`. Two such concerts then collided and the
+ * planner reported a duplicate work where neither work was even known —
+ * `kp_validate.work_keys` never had the bug, because `"" or …` is falsy in
+ * Python and the entry falls out on its own.
+ */
 export function candidateWorkKeys(candidate: Candidate): string[] {
-  if (candidate.program === null) {
-    return [];
-  }
   const keys: string[] = [];
-  for (const entry of candidate.program) {
-    const author = entry.composer ?? entry.author ?? entry.director;
-    const work = entry.work ?? entry.play ?? entry.film;
-    if (typeof author === "string" && typeof work === "string") {
-      keys.push(workKey(author, work));
+  for (const line of programLines(candidate.program)) {
+    if (line.author !== null && line.work !== null) {
+      keys.push(workKey(line.author, line.work));
     }
   }
   return keys;

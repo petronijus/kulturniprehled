@@ -22,7 +22,7 @@ Env vars are NOT used — shell state resets between Bash calls.
 | Candidate window | rolling 180 days | fixed season: Sep 1 – Jun 30 of `season=` (run in Jul/Aug → the upcoming season) |
 | Output file | `/tmp/kp-digest-CW<n>/klasika.json` (`<n>` = `date +%V`) | `/tmp/kp-season-<season>/klasika.json` |
 | Candidate count (step 7) | 8–12 | 30–60, **no trimming** — every above-threshold event |
-| Detail enrichment (step 5d) | cap 50, skip candidates already enriched in the backend pool | cap 60, same pool skip |
+| Detail enrichment (step 5d) | cap 50 **productions**, skip what the scrapers and the backend pool already filled | cap 60, same skips |
 | History dedup | as written | same rules over the whole season |
 
 Everything not listed behaves identically in both modes.
@@ -223,6 +223,20 @@ DISCOGS_TASTE=$(echo "$ARTISTS" | sort -u | sed '/^$/d')
 
 #### 5a. Run ensemble scrapers (static, fast)
 
+The four ensemble scrapers read the programme themselves, off each venue's
+own detail page (`ensembles/lib/detail.py`) — one fetch per production URL,
+shared by every evening of a run. So their candidates arrive with `program`,
+`soloists`, `conductor` and `price_czk` already filled and cost step 5d
+nothing. Budget about a second per production: ~40 s for SOČR, ~2 min for
+Česká filharmonie.
+
+A page the parser could not read prints `MISSING_PROGRAM=<url>` on the
+scraper's stderr (kept in `/tmp/kp-klasika-<ensemble>.err`); a page whose
+venue has not published a programme yet prints `PROGRAM_UNPUBLISHED=<url>`
+and carries a `program_note` instead. Only the first kind is worth a
+WebFetch in step 5d — re-reading the second would buy nothing.
+
+
 ```bash
 CANDIDATES='[]'
 for E in $ENSEMBLE_SCRAPERS; do
@@ -308,12 +322,33 @@ SEASON_UUID=$(curl -sS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
 
 No active season (404) → skip the check and enrich normally.
 
-Cap fresh WebFetch enrichment at the top 50 candidates (weekly) / 60
-(season) by simple pre-rank (ensemble bias + date proximity +
-composer-in-title hits) to keep WebFetch usage bounded. With a 6-month
-horizon the scraped pool is typically 200+ events; the cap covers all
-favourite-ensemble subscriptions + festival headliners without burning
-hundreds of WebFetch calls per run.
+**Count productions, never rows, and never let one source take the lot.**
+Both halves of that sentence were learned the hard way in 2026-09, when FOK
+sat at 43 of 66 productions with no programme and SOČR at 21 of 33, eight
+runs into the season:
+
+* A subscription concert played on three evenings is three pool rows behind
+  **one** detail URL. Charging the cap per row spent a quarter of every
+  run's budget re-reading pages it had already read that same run. Group
+  the survivors by detail URL first, spend one WebFetch per group, and
+  merge the result onto every evening of it.
+* The pre-rank is deterministic, so whichever source it favours wins again
+  every single run while the others never come up — and because
+  `enriched_at` is paid once ever, the losers stay empty for good. Fill the
+  budget **round-robin across `source_name`** (one production from each
+  source in turn, best-ranked first within a source) so a source with 111
+  productions cannot starve one with 33. Runs before this rule gave the
+  whole 55-call budget to Česká filharmonie twice in a row.
+
+Cap fresh WebFetch enrichment at 50 productions (weekly) / 60 (season),
+pre-ranking within each source by date proximity + composer-in-title hits.
+Skip anything the ensemble scrapers already filled (step 5a) and anything
+the pool already carries — in practice the cap now falls on the festival
+and `objev` sources, which is what it was for.
+
+If any production is still without a programme when the budget runs out,
+say so in the run log (`UNENRICHED=<n> productions`, worst source first) —
+a silent shortfall is how the last one lasted eight runs.
 
 For each surviving candidate, call WebFetch with this prompt:
 

@@ -207,6 +207,7 @@ export function CandidateCard({
     <article
       ref={setNodeRef}
       className={classes.join(" ")}
+      data-group-key={group.key}
       onMouseEnter={() => onHoverChange(group)}
       onMouseLeave={() => onHoverChange(null)}
       onFocus={() => onHoverChange(group)}

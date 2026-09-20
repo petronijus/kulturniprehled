@@ -1,5 +1,5 @@
 import { useDroppable } from "@dnd-kit/core";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSeatWatches } from "../../api/queries";
 import type {
   BookedEvent,
@@ -34,6 +34,8 @@ interface CandidatePoolProps {
   pinnedKeys: ReadonlySet<string>;
   onTogglePin: (group: ProductionGroup) => void;
   actionsDisabled: boolean;
+  /** Scroll this production's card into view; `generation` re-fires it. */
+  revealKey: { key: string; generation: number } | null;
 }
 
 export function CandidatePool({
@@ -48,6 +50,7 @@ export function CandidatePool({
   pinnedKeys,
   onTogglePin,
   actionsDisabled,
+  revealKey,
 }: CandidatePoolProps) {
   const [filters, setFilters] = useState<PoolFilterState>(defaultFilters);
   const { data: watches = [] } = useSeatWatches();
@@ -62,6 +65,7 @@ export function CandidatePool({
   );
   const facets = useMemo(() => poolFacets(pool), [pool]);
   const { setNodeRef, isOver } = useDroppable({ id: "pool", data: { kind: "pool" } });
+  const cardsRef = useRef<HTMLDivElement>(null);
 
   // Filters apply at production level: a group passes when ANY of its dates
   // does, so a month filter shows every production reaching into that month.
@@ -117,6 +121,29 @@ export function CandidatePool({
       });
   }, [groups, booked, filters]);
 
+  // Bring the card the calendar just asked for into view. When a filter is
+  // hiding it the click would otherwise look broken, so the filters give way
+  // — the user pointed at this concert, that outranks a filter set earlier.
+  const revealedGeneration = useRef(-1);
+  useEffect(() => {
+    if (revealKey === null || revealedGeneration.current === revealKey.generation) {
+      return;
+    }
+    if (!visible.some((group) => group.key === revealKey.key)) {
+      // Same reference when already default, so React bails out and this
+      // cannot spin: a production with no card at all (already bought) just
+      // stays unreachable.
+      setFilters(defaultFilters);
+      return;
+    }
+    const card = cardsRef.current?.querySelector(`[data-group-key="${CSS.escape(revealKey.key)}"]`);
+    if (card === null || card === undefined) {
+      return;
+    }
+    revealedGeneration.current = revealKey.generation;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [revealKey, visible]);
+
   if (pool.length === 0) {
     // The season exists but the scrape hasn't filled it yet — explain the
     // one manual step instead of showing a bare "no results".
@@ -135,7 +162,7 @@ export function CandidatePool({
   return (
     <div ref={setNodeRef} className={`${styles.pool} ${isOver ? styles.dropTarget : ""}`}>
       <PoolFilters filters={filters} months={months} facets={facets} onChange={setFilters} />
-      <div className={styles.cards}>
+      <div className={styles.cards} ref={cardsRef}>
         {visible.length === 0 && <p className={styles.empty}>{cs.poolEmpty}</p>}
         {visible.map((group) => (
           <CandidateCard

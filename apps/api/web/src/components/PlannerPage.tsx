@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApplyScenario, usePatchCandidate } from "../api/mutations";
 import {
   useBookedEvents,
@@ -59,10 +59,19 @@ export function PlannerPage() {
   // ▶ starts at the top of its own queue.
   const [play, setPlay] = useState<{ queue: QueueItem[]; generation: number } | null>(null);
   const [pinnedKeys, setPinnedKeys] = useState<string[]>([]);
+  // `generation` makes a second click on the same concert scroll again.
+  const [revealKey, setRevealKey] = useState<{ key: string; generation: number } | null>(null);
+  const revealGeneration = useRef(0);
 
   const pool = useMemo(() => poolQuery.data ?? [], [poolQuery.data]);
   const groups = useMemo(() => groupProductions(pool), [pool]);
   const groupsByKey = useMemo(() => new Map(groups.map((group) => [group.key, group])), [groups]);
+  // A production can be published under two URLs, so its group key is not
+  // always `productionKey` of a given date — ask the grouping itself.
+  const groupKeyByCandidate = useMemo(
+    () => new Map(groups.flatMap((group) => group.candidates.map((c) => [c.id, group.key]))),
+    [groups],
+  );
   const scenarios = useMemo(() => scenariosQuery.data ?? [], [scenariosQuery.data]);
   const booked = useMemo(() => bookedQuery.data ?? [], [bookedQuery.data]);
   const blockedDays = useMemo(() => blockedDaysOf(calendarQuery.data), [calendarQuery.data]);
@@ -140,6 +149,23 @@ export function PlannerPage() {
   const onHoverChange = useCallback((group: ProductionGroup | null) => {
     setHoveredKey(group === null ? null : group.key);
   }, []);
+
+  // Clicking a concert in the calendar answers "what IS this?" — so it pins
+  // the production (lighting up its other dates) and scrolls the pool to the
+  // card. Pinning alone was not enough: with hundreds of cards the one that
+  // lit up was usually somewhere off-screen.
+  const onOpenCandidate = useCallback(
+    (candidate: Candidate) => {
+      const key = groupKeyByCandidate.get(candidate.id);
+      if (key === undefined) {
+        return;
+      }
+      setPinnedKeys((current) => (current.includes(key) ? current : [...current, key]));
+      revealGeneration.current += 1;
+      setRevealKey({ key, generation: revealGeneration.current });
+    },
+    [groupKeyByCandidate],
+  );
 
   // A hovered or pinned card lights up every date of its production.
   const { highlightIds, highlightDates, scrollTarget } = useMemo(() => {
@@ -252,6 +278,7 @@ export function PlannerPage() {
               highlightIds={highlightIds}
               highlightDates={highlightDates}
               scrollTarget={scrollTarget}
+              onOpenCandidate={onOpenCandidate}
             />
             <CandidatePool
               pool={pool}
@@ -265,6 +292,7 @@ export function PlannerPage() {
               pinnedKeys={new Set(pinnedKeys)}
               onTogglePin={togglePin}
               actionsDisabled={previewMode}
+              revealKey={revealKey}
             />
             {play !== null && (
               <ProgramPlayer

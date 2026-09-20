@@ -50,9 +50,6 @@ for c in cards[1:]:
         continue
 
     href = h_m.group(1)
-    if href in seen:
-        continue
-    seen.add(href)
 
     title = html.unescape(re.sub(r'<[^>]+>', '', title_m.group(1)).strip())
     title = re.sub(r'\s+', ' ', title)
@@ -65,6 +62,14 @@ for c in cards[1:]:
         hh, mm = 19, 30
 
     starts_at = prague_parts(yr, mo, day, hh, mm)
+    # The evening is the identity, not the page: prgphil.cz prints one card
+    # per evening but a repeated concert shares its detail URL, so keying the
+    # dedup on the href alone silently threw the second night away — the same
+    # bug fok.cz and socr.rozhlas.cz were fixed for in 2026-09.
+    if (href, starts_at) in seen:
+        continue
+    seen.add((href, starts_at))
+
     # The listing is chronological. A date that goes backwards means the
     # pairing has slipped again — say so instead of emitting a wrong evening.
     if previous is not None and starts_at < previous:
@@ -82,6 +87,15 @@ for c in cards[1:]:
         "url": "https://www.prgphil.cz" + href,
         "price_czk": None,
     })
+
+# The listing knows the title and the evening; the programme lives on the
+# detail page. Reading it here — once per production URL, not once per
+# evening — is what keeps a card from reaching the planner empty. Set
+# KP_SKIP_DETAILS=1 to emit the listing alone (faster, for parser work on
+# the listing itself).
+if not os.environ.get("KP_SKIP_DETAILS"):
+    import detail
+    detail.enrich(items, "pkf")
 
 print(json.dumps(items, ensure_ascii=False))
 PY

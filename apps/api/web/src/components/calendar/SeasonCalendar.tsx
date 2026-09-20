@@ -30,6 +30,7 @@ interface SeasonCalendarProps {
   highlightDates: ReadonlySet<IsoDate>;
   /** Where the calendar should scroll (last hover/pin interaction). */
   scrollTarget: IsoDate | null;
+  onOpenCandidate: (candidate: Candidate) => void;
 }
 
 export function SeasonCalendar({
@@ -48,6 +49,7 @@ export function SeasonCalendar({
   highlightIds,
   highlightDates,
   scrollTarget,
+  onOpenCandidate,
 }: SeasonCalendarProps) {
   const months = useMemo(
     () => monthsBetween(season.starts_on, season.ends_on),
@@ -180,7 +182,7 @@ export function SeasonCalendar({
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            const month = (entry.target as HTMLElement).dataset["month"];
+            const month = (entry.target as HTMLElement).dataset.month;
             if (month !== undefined) {
               setActiveMonth(month);
             }
@@ -247,6 +249,7 @@ export function SeasonCalendar({
             previewMode={previewMode}
             highlightIds={highlightIds}
             highlightDates={highlightDates}
+            onOpenCandidate={onOpenCandidate}
           />
         ))}
       </div>

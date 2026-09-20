@@ -23,6 +23,7 @@ interface WeekRowProps {
   previewMode: boolean;
   highlightIds: ReadonlySet<string>;
   highlightDates: ReadonlySet<IsoDate>;
+  onOpenCandidate: (candidate: Candidate) => void;
 }
 
 export function WeekRow({
@@ -41,6 +42,7 @@ export function WeekRow({
   previewMode,
   highlightIds,
   highlightDates,
+  onOpenCandidate,
 }: WeekRowProps) {
   const weekId = isoWeek(week.start);
   const load = weekLoad.get(weekId) ?? 0;
@@ -78,6 +80,7 @@ export function WeekRow({
           previewMode={previewMode}
           highlighted={highlightDates.has(date)}
           highlightIds={highlightIds}
+          onOpenCandidate={onOpenCandidate}
         />
       ))}
     </div>

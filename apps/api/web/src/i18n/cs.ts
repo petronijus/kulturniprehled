@@ -129,6 +129,7 @@ export const cs = {
     refresh: "Načíst kalendář znovu",
     refreshing: "Načítám kalendář…",
     refreshFailed: "Kalendář se nepodařilo obnovit.",
+    openCard: "Otevřít kartu koncertu",
   },
   poolEmpty: "Žádní kandidáti pro zvolené filtry.",
   counts: (selected: number, undecided: number) =>

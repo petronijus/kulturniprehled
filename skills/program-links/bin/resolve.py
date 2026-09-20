@@ -172,7 +172,7 @@ def api(url: str, token: str) -> dict:
             time.sleep(2)
     return {}
 
-def score(album: dict, author: str, work: str) -> int:
+def score(album: dict, author: str, work: str, hint: str = "") -> int:
     name = fold(album.get("name"))
     artists = fold(" ".join(a["name"] for a in album.get("artists", [])))
     hay = name + " " + artists
@@ -196,11 +196,76 @@ def score(album: dict, author: str, work: str) -> int:
         else: return -100
     w_tokens = [t for t in fold(work).split() if len(t) > 3][:6]
     s += sum(1 for t in w_tokens if t in name)
+    # A retry carries the catalogue title someone supplied by hand. Its words
+    # landing on the record is the evidence that the title was right, and a
+    # Czech title contributes almost nothing to the line above — without this
+    # Górecki's "Three Pieces in the Old Style" scored exactly at the cutoff.
+    if hint:
+        s += min(sum(1 for t in [t for t in fold(hint).split() if len(t) > 3][:6] if t in name), 4)
     for pat, rep in TITLE:
         if re.search(pat, fold(work)) and fold(rep).split()[0] in name: s += 2; break
     if album.get("album_type") == "album": s += 1
     if (album.get("total_tracks") or 0) > 40: s -= 1     # box sets drown the work
     return s
+
+def retry() -> int:
+    """Second pass: search again with catalogue titles supplied by hand.
+
+    The first pass can only translate what the TITLE table happens to hold —
+    two dozen entries against a whole season's repertoire — so everything
+    else lands in unsure.json. Until 2026-09 nothing ever read that file, and
+    "Tři kusy ve starém stylu" stayed unresolved although "Three Pieces in
+    the Old Style" is the first hit. This turns that file into a work queue.
+
+    Reads retry_titles.json: [{"author", "work", "title"}, …] where `title`
+    is what the catalogue calls the piece. The scoring gates are unchanged —
+    a supplied title still has to survive the composer, kind and number
+    checks, because a confident guess is not a recording.
+    """
+
+    token = os.environ["SP_TOKEN"]
+    unsure = json.load(open(f"{SD}/unsure.json"))
+    supplied = json.load(open(f"{SD}/retry_titles.json"))
+    if isinstance(supplied, dict):
+        supplied = [{"author": k.split("|")[0], "work": k.split("|")[-1], "title": v}
+                    for k, v in supplied.items()]
+    by_key = {(fold(t["author"]), fold(t["work"])): t["title"] for t in supplied}
+
+    resolved = json.load(open(f"{SD}/resolved.json"))
+    still, added = [], 0
+    for p in unsure:
+        title = by_key.get((fold(p["author"]), fold(p["work"])))
+        if not title:
+            still.append(p)
+            continue
+        a_f = fold(p["author"])
+        a_en = COMPOSER.get(a_f) or COMPOSER.get(a_f.split()[-1] if a_f else "") or p["author"]
+        best = None
+        for q in (f"{a_en} {title}", title):
+            url = ("https://api.spotify.com/v1/search?"
+                   + urllib.parse.urlencode({"q": q, "type": "album", "limit": 5, "market": "CZ"}))
+            for alb in api(url, token).get("albums", {}).get("items", []):
+                sc = score(alb, p["author"], p["work"], hint=title)
+                if best is None or sc > best[0]:
+                    best = (sc, alb, q)
+            if best and best[0] >= 6:
+                break
+            time.sleep(0.08)
+        if best is None or best[0] < 4:
+            still.append({**p, "why": f"retry with '{title}' still found nothing"})
+            continue
+        sc, alb, q = best
+        resolved.append({"author": p["author"], "work": p["work"],
+                         "spotify_url": alb["external_urls"]["spotify"],
+                         "match_label": f"{alb['artists'][0]['name']} — {alb['name']}",
+                         "_score": sc, "_query": q, "_album_id": alb["id"],
+                         "_total_tracks": alb.get("total_tracks"), "_retry_title": title})
+        added += 1
+    json.dump(resolved, open(f"{SD}/resolved.json", "w"), ensure_ascii=False)
+    json.dump(still, open(f"{SD}/unsure.json", "w"), ensure_ascii=False)
+    print(f"retry resolved: {added}   still unresolved: {len(still)}")
+    return 0
+
 
 def main() -> int:
     token = os.environ["SP_TOKEN"]
@@ -244,4 +309,4 @@ def main() -> int:
     return 0
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(retry() if "--retry" in sys.argv else main())

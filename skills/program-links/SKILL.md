@@ -196,6 +196,38 @@ Take the album URL from `external_urls.spotify` in the response (never
 build it by hand) and set `match_label` to `"<artist> — <album>"` so a
 wrong pick is visible in the planner tooltip without opening it.
 
+### 4b. Work `unsure.json` — this is the step that was missing
+
+`resolve.py` writes every piece it could not place to `$SEASON_DIR/unsure.json`
+with a reason. **Until 2026-09 nothing ever read that file**, so a piece the
+`TITLE` table did not happen to cover was simply lost: "Tři kusy ve starém
+stylu" stayed unresolved for a whole season although searching "Górecki Three
+Pieces in the Old Style" returns it as the first hit. The table is two dozen
+hand-written entries against a whole season's repertoire — it will never cover
+the repertoire, and **you** are the part of this skill that knows what the
+catalogue calls a piece.
+
+So: read `unsure.json`, and for every entry whose `why` is "no plausible
+album", write down the title the catalogue actually uses. Skip the
+placeholders — "program upřesní festival" has no catalogue title.
+
+```bash
+cat > "$SEASON_DIR/retry_titles.json" <<'JSON'
+[{"author": "Henryk Mikołaj Górecki", "work": "Tři kusy ve starém stylu",
+  "title": "Three Pieces in the Old Style"},
+ {"author": "Leonard Bernstein", "work": "Symfonie č. 2 „Věk úzkosti“",
+  "title": "Symphony No. 2 The Age of Anxiety"}]
+JSON
+SP_TOKEN="$SP_TOKEN" KP_SEASON_DIR="$SEASON_DIR" bin/resolve.py --retry
+```
+
+It searches again with your title, merges what passes into `resolved.json`
+and leaves the rest in `unsure.json`. The scoring gates are unchanged, so a
+title you got wrong still has to survive the composer, kind and number checks
+— a confident guess is not a recording. Report how many the retry recovered;
+a pass that recovers nothing means the titles were wrong, not that the
+pieces are unfindable.
+
 **A work is its movements.** The planner plays the programme in place, one
 piece after another, so a symphony must arrive as the track list of that
 symphony — not as "the album", which would run on into whatever else the

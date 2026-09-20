@@ -130,6 +130,32 @@ KIND = [
     ("fantasia", r"\bfantazie\b|\bfantas"),
     ("variations", r"\bvariace\b|\bvariation"),
 ]
+# The solo instrument, which KIND cannot see: a concerto is a concerto whether
+# it is for flute or for horn, and "Koncert pro flétnu a orchestr č. 2" was
+# being answered with "Mozart: Horn Concerto No. 2" — right composer, right
+# kind, right number, wrong instrument entirely.
+INSTRUMENT = [
+    ("violin", r"\bhousl|\bviolin"),
+    ("piano",  r"\bklavir|\bpiano\b|\bklavier"),
+    ("cello",  r"\bvioloncell|\bcello\b"),
+    ("viola",  r"\bviola\b"),
+    ("flute",  r"\bfletn|\bflute\b|\bflote\b"),
+    ("oboe",   r"\bhoboj|\boboe\b"),
+    ("clarinet", r"\bklarinet|\bclarinet"),
+    ("bassoon", r"\bfagot|\bbassoon"),
+    ("horn",   r"\blesni roh\b|\bhorn\b|\bcorno\b"),
+    ("trumpet", r"\btrubk|\btrumpet"),
+    ("organ",  r"\bvarhan|\borgan\b"),
+    ("harp",   r"\bharf|\bharp\b"),
+    ("guitar", r"\bkytar|\bguitar"),
+]
+
+
+def instruments_of(text):
+    t = fold(text)
+    return {name for name, pat in INSTRUMENT if re.search(pat, t)}
+
+
 def kind_of(text):
     t = fold(text)
     return {name for name, pat in KIND if re.search(pat, t)}
@@ -237,6 +263,9 @@ def score(album: dict, author: str, work: str, hint: str = "") -> int:
     want, got = kind_of(work), kind_of(album.get("name"))
     if want and got and not (want & got): return -100
     if want and want & got: s += 2
+    w_instr, a_instr = instruments_of(work), instruments_of(album.get("name") or "")
+    if w_instr and a_instr and not (w_instr & a_instr): return -100
+    if w_instr and w_instr & a_instr: s += 2
     # A number in the piece must survive into the recording, or it is another work.
     # A number in the piece must survive into the recording, or it is another
     # work — but the record is allowed to say it a different way: by opus, by
@@ -245,8 +274,13 @@ def score(album: dict, author: str, work: str, hint: str = "") -> int:
     nums = {m.group(1) or m.group(2) for m in NUMBER.finditer(w_f)}
     if nums:
         on_album = album_numbers(album.get("name") or "")
+        # Ordinals the sleeve states outright. When it names pieces by number
+        # and ours is not among them, no fallback may rescue it: "Piano Sonata
+        # No. 14 … Op. 27 No. 2" shares its opus with sonata 13 and IS NOT IT.
+        stated = {m.group(1) or m.group(2) for m in NUMBER.finditer(name)}
         opus = set(OPUS.findall(w_f))
         if nums & on_album: s += 3
+        elif stated: return -100
         elif opus & on_album: s += 2
         elif not on_album and COLLECTION.search(name): s += 1
         else: return -100

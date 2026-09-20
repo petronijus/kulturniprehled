@@ -79,13 +79,6 @@
   color: var(--booked-day-ring);
 }
 
-/* Outside-month days keep their sunken background but still need to show a
-   pick, or the last week of a month looks empty while it is not. */
-.plannedDay.outside .dayNumber,
-.bookedDay.outside .dayNumber {
-  font-weight: 700;
-}
-
 .target {
   outline: 2px dashed var(--focus-ring);
   outline-offset: -2px;

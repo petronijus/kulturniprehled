@@ -21,7 +21,11 @@
 /* The chip is a <button> so it answers Enter/Space and reads as actionable;
    these strip the browser's own button skin without losing the focus ring. */
 .clickable {
-  font: inherit;
+  /* Only the family. `font: inherit` is a shorthand and also pulls size and
+     line-height off the parent cell, which quietly overrode .chip's own
+     --text-xs and made every picked concert bigger than the booked ones
+     beside it. The button's UA font-size loses to .chip regardless. */
+  font-family: inherit;
   color: inherit;
   text-align: start;
   width: 100%;

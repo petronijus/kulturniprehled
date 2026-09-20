@@ -151,6 +151,14 @@ def _tickets(page: str, buy: tuple[str, ...]) -> bool | None:
     return True if any(token.lower() in lowered for token in buy) else None
 
 
+# socr.rozhlas.cz prints each piece's playing time after the title —
+# "Římské pinie (23‘)". It is not part of the work and no catalogue carries
+# it, so leaving it in poisons the Spotify lookup: the stray number reaches
+# `program-links` as another digit to match on, and Bernstein's "Symfonie
+# č. 2 „Věk úzkosti“ (35´)" came back as Bach and Semafor.
+_DURATION = re.compile(r"\s*[(\[]\s*\d{1,3}\s*['‘’´ʹ′]?\s*[)\]]\s*$")
+
+
 def _entry(composer: str, work: str | None = None) -> dict[str, str]:
     """One programme line. `work` stays absent when the page names none.
 
@@ -165,7 +173,7 @@ def _entry(composer: str, work: str | None = None) -> dict[str, str]:
     trimmed = composer.strip(" .:–—-")
     if work is None:
         return {"composer": trimmed}
-    return {"composer": trimmed, "work": work.strip(" .:–—-")}
+    return {"composer": trimmed, "work": _DURATION.sub("", work).strip(" .:–—-")}
 
 
 # --------------------------------------------------------------------------

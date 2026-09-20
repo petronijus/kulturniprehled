@@ -128,7 +128,18 @@ BAD_ALBUM = re.compile(
     r"famous|favourite|favorite|classical music for|essential classics|wedding|"
     r"meditation|spa|karaoke|ringtone)\b", re.I)
 
+# socr.rozhlas.cz prints the playing time after each title ("Římské pinie
+# (23‘)"). It has to go before fold(), because fold() drops the brackets and
+# leaves a bare number that is indistinguishable from an opus number — strip
+# it afterwards and "op. 26" loses its 26. Left in, it competes with the
+# work's own number: Bernstein's Symphony No. 2 came back as Bach's
+# Orchestral Suite No. 2. The scrapers strip it at the source now; this
+# catches rows stored before that and any venue that takes up the habit.
+DURATION = re.compile(r"\s*[(\[]\s*\d{1,3}\s*['\u2018\u2019\u00b4\u02b9\u2032]?\s*[)\]]\s*$")
+
+
 def variants(author: str, work: str) -> list[str]:
+    work = DURATION.sub("", work)
     a_f, w_f = fold(author), fold(work)
     a_en = COMPOSER.get(a_f) or COMPOSER.get(a_f.split()[-1] if a_f else "") or author
     w_clean = w_f

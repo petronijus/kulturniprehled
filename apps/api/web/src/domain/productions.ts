@@ -38,6 +38,14 @@ function canonicalUrl(url: string): string {
   const slash = bare.indexOf("/");
   const host = slash === -1 ? bare : bare.slice(0, slash);
   const path = slash === -1 ? "" : bare.slice(slash);
+  // The CMS row id in the path stays part of the identity. Stripping it looks
+  // tempting — ceskafilharmonie.cz publishes one repeated family concert as
+  // /event/37246-muzikanti-co-delate and /event/36988-muzikanti-co-delate, so
+  // the pool shows it as two identical cards — but ČF slugs name only the
+  // conductor, and the id is the ONLY thing telling three different Byčkov
+  // programmes apart (Dvořák in October, Rachmaninov in January, Beethoven's
+  // Ninth in April). One cosmetic duplicate beats one card claiming nine
+  // dates and three programmes at once.
   return `${HOST_ALIASES[host] ?? host}${path}`;
 }
 

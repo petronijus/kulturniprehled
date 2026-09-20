@@ -20,9 +20,11 @@ suggesting a ticket (e.g. `vstupenky`, `ticket`, `eTicket`, `listek`, a
 festival name, etc.). One event can have multiple ticket files.
 
 **Filename gotcha.** Some browsers save tickets with brackets in the name
-(`[object Object]_5330.pdf`). `curl` interprets `[...]` as a glob range
-and will refuse to upload — `cp` each affected file to `/tmp/<clean>.pdf`
-first and feed the copy into steps 7 and 10 instead of the original.
+(`[object Object]_5330.pdf`). `curl` interprets `[...]` as a glob range and
+will refuse to upload — `cp` each affected file to
+`~/.workspace-mcp/attachments/<clean>.pdf` and feed the copy into steps 7 and
+9 instead of the original. That directory is also the only place the Drive
+tool will read from (step 9), so one copy covers both.
 
 ### 2. Extract metadata from the tickets
 
@@ -130,9 +132,19 @@ PATCH the event with the public URL — see step 6.5 below.
 
 ### 4. Journey time from home (Svatovítská 16, Praha)
 
-Use `WebSearch` / `WebFetch` against Google Maps or Mapy.cz to look up the
-public-transport journey time to the venue on the day of the event. Compute
-the departure time so the user arrives **15 minutes before the start**:
+Look up the public-transport journey time to the venue, then compute the
+departure so the user arrives **15 minutes before the start**:
+
+**Don't expect a number back from a map site.** Google Maps and Mapy.cz
+render their journey planners in JavaScript, so `WebFetch` returns the page
+furniture and `WebSearch` returns links to the planners rather than a time —
+this step used to promise a lookup that has never actually worked. Ask
+`spojeni.dpp.cz` or `idos.cz` if you can get a concrete connection out of
+them; otherwise estimate from the line and stop count (for Prague, ~2 min per
+tram stop, ~1.5 min per metro stop, plus the walks at both ends) and say in
+the notes that it is an estimate. A departure time that is five minutes
+pessimistic is useful; a missing one costs Petr the "leave in 10 min"
+notification entirely.
 
 ```
 departure = concert_start - 15 min - journey_time
@@ -458,12 +470,26 @@ For each ticket file use `mcp__google-workspace__create_drive_file`:
 - `file_name`: human-readable, e.g.
   `Anoushka Shankar — Rudolfinum 22.11.2026 — místo 19.pdf`
 - `mime_type`: `application/pdf`
-- `fileUrl`: `file://<absolute local path>` (the `/tmp/<clean>.pdf`
-  copy from step 1 if applicable)
+- `fileUrl`: `file://$HOME/.workspace-mcp/attachments/<name>.pdf`
+
+**The path is not free.** The Drive tool refuses anything outside
+`~/.workspace-mcp/attachments` ("path is outside permitted directories"), so
+`~/Downloads/...` and the `/tmp/<clean>.pdf` copy this skill used to send are
+both rejected. Stage the file first — and stage it there rather than in
+`/tmp`, so the same copy serves the bracket-filename workaround in step 1 and
+this upload:
+
+```bash
+mkdir -p ~/.workspace-mcp/attachments
+cp "$PDF_PATH" ~/.workspace-mcp/attachments/"$CLEAN_NAME".pdf
+```
 
 ### 10. Create the calendar event
 
-Use `mcp__google-workspace__create_event`:
+Use `mcp__google-workspace__manage_event` with `action: "create"`. There is
+**no** `create_event` tool — the one call the skill documented by name was the
+one name the server does not register, and it fails with "No such tool
+available" every run:
 
 - `user_google_email`: `petronijus@example.com`
 - `calendar_id`:

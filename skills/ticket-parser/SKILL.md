@@ -492,9 +492,19 @@ one name the server does not register, and it fails with "No such tool
 available" every run:
 
 - `user_google_email`: `petronijus@example.com`
-- `calendar_id`:
-  `c_9a5bbccc4605dfbee65ff6ec08e3259596e8fc63bb131db50438b28e9cfece87@group.calendar.google.com`
-  (Kocourek&Prdelcicka)
+- `calendar_id`: the shared household calendar — read it at run time, it is
+  deliberately not in this file:
+
+  ```bash
+  CALENDAR_ID=$(op item get 'Kulturni prehled shared calendar' \
+    --fields label=calendar_id --reveal)
+  ```
+
+  This repo is public and a Google calendar ID cannot be rotated: once it is
+  out, it is out for good, and the day someone ticks "make available to
+  public" on the calendar it becomes a readable ICS feed for anyone who read
+  this file. It grants nothing on its own — the calendar is private — but it
+  is the one identifier here that is both personal and permanent.
 - `summary`: emoji + performer + venue, e.g.
   `🎹 Grigorij Sokolov — Rudolfinum`
   (`🎹` for classical, `🎸` for rock/jazz, `🎭` for theatre, `🎬` for

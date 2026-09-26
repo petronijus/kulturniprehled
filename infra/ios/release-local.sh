@@ -4,7 +4,7 @@
 #
 # Prerequisites:
 #   - Run bootstrap-signing.sh once (imports cert + profile)
-#   - Flutter 3.44.0, SPM disabled
+#   - Flutter 3.47.5, SPM disabled
 #   - 1Password CLI (op-cache)
 #
 # Usage:
@@ -29,8 +29,8 @@ info "Pre-flight checks..."
 security find-identity -v -p codesigning | grep -q "Apple Distribution" \
   || die "No Distribution cert in keychain. Run bootstrap-signing.sh first."
 
-flutter --version 2>/dev/null | grep -q "3.44" \
-  || echo "  ⚠ Flutter version is not 3.44.x — build may fail"
+flutter --version 2>/dev/null | grep -q "Flutter 3.47.5 " \
+  || echo "  ⚠ Flutter version is not 3.47.5 — build may fail"
 
 ### 2. Read version ##########################################################
 VERSION=$(grep '^version:' "$MOBILE_DIR/pubspec.yaml" | awk '{print $2}')

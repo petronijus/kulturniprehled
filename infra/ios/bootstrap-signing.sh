@@ -87,7 +87,7 @@ ok "Ready — this machine can now build signed IPAs"
 
 echo ""
 echo "Next steps:"
-echo "  1. Ensure Flutter 3.44.0 is installed"
+echo "  1. Ensure Flutter 3.47.5 is installed"
 echo "  2. Run: flutter config --no-enable-swift-package-manager"
 echo "  3. Build: infra/ios/release-local.sh"
 

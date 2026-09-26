@@ -5,7 +5,7 @@ version: 1.1.0+21
 
 environment:
   sdk: ^3.11.5
-  flutter: ">=3.41.0"
+  flutter: ">=3.47.5"
 
 dependencies:
   flutter:
@@ -20,7 +20,7 @@ dependencies:
   google_sign_in: ^6.2.2
   intl: ^0.20.1
   path: ^1.9.0
-  pdfrx: ^1.1.0
+  pdfrx: ^2.6.5
   sentry_flutter: ^9.7.0
   table_calendar: ^3.1.2
   url_launcher: ^6.3.1

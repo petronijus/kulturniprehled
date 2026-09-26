@@ -41,7 +41,7 @@ tickets and creates events automatically.
 
 - **Backend** — Python 3.12, FastAPI, SQLAlchemy 2.0 async, PostgreSQL 16,
   Alembic, MinIO (S3-compatible).
-- **Mobile** — Flutter 3.44.0 (Android primary, iOS feature parity), drift
+- **Mobile** — Flutter 3.47.5 (Android primary, iOS feature parity), drift
   (SQLite), Riverpod, go_router, Material 3, pdfrx, workmanager
   (federated), sensors_plus, flutter_local_notifications.
 - **LLM** — Anthropic Claude API behind a `LLMProvider` abstraction.
@@ -84,7 +84,7 @@ docs/                Architecture, API, sync, deployment, handover notes
 Prerequisites:
 - Docker and Docker Compose v2
 - Python 3.12+ (only needed for running backend tests outside Docker)
-- Flutter 3.44.0 (only needed for the mobile app)
+- Flutter 3.47.5 (only needed for the mobile app)
 
 ```bash
 cp .env.example .env

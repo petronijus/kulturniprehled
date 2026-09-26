@@ -15,6 +15,9 @@ analyzer:
     - "**/*.freezed.dart"
     - "**/*.mocks.dart"
     - "lib/data/api_client/generated/**"
+    - build/**
+    - android/**
+    - ios/**
 
 linter:
   rules:

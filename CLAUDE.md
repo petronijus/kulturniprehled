@@ -9,7 +9,7 @@ extended Claude Code skill.
 | Layer        | Choice                                                                |
 | ------------ | --------------------------------------------------------------------- |
 | Backend      | Python 3.12, FastAPI, SQLAlchemy 2.0 async, PostgreSQL 16, Alembic    |
-| Mobile       | Flutter 3.44.0 (Android primary, iOS parity), drift (SQLite), Riverpod |
+| Mobile       | Flutter 3.47.5 (Android primary, iOS parity), drift (SQLite), Riverpod |
 | Object store | MinIO (S3-compatible), self-hosted                                    |
 | LLM          | Anthropic Claude API behind a `LLMProvider` abstraction               |
 | Hosting      | Proxmox VM, Docker Compose, Cloudflare Tunnel                         |
@@ -31,12 +31,15 @@ Cupertino-only widgets while still feeling native enough.
 
 ## Toolchain pinning
 
-- **Flutter 3.44.0** across every dev machine (Linux dev box, MacBook,
-  Proxmox MacOS VM). The repo no longer builds on 3.41 — between 3.41
-  and 3.44 `CupertinoPageTransitionsBuilder` moved out of
-  `material.dart`, and `ReorderableSliverList.onReorder` was replaced by
-  `onReorderItem`. Pin via `cd $(flutter --version --machine | jq -r
-  .flutterRoot) && git checkout 3.44.0`.
+- **Flutter 3.47.5** across every dev machine (Linux dev box, MacBook,
+  Proxmox MacOS VM), enforced by `environment.flutter` in `pubspec.yaml`.
+  The repo no longer builds on 3.41 — between 3.41 and 3.44
+  `CupertinoPageTransitionsBuilder` moved out of `material.dart`, and
+  `ReorderableSliverList.onReorder` was replaced by `onReorderItem`.
+  Flutter 3.44 cannot run `flutter build ios --simulator` on Xcode 27
+  (`lipo -verify_arch` with two architectures); 3.47 fixed that. Pin via
+  `cd $(flutter --version --machine | jq -r .flutterRoot) && git fetch
+  --tags && git checkout 3.47.5`.
 - **Swift Package Manager disabled** per machine —
   `flutter config --no-enable-swift-package-manager`. Three of our
   iOS-side plugins (`workmanager_apple`, `flutter_secure_storage`,
@@ -303,7 +306,7 @@ Linux. Two paths now exist:
 
 - **Local Mac (MacBook).** Original recipe — kept here for the case
   when you're sitting at the MacBook and just want to ship. Petr's
-  MacBook should be on Flutter 3.44.0 (the `assets-source/brand`
+  MacBook should be on Flutter 3.47.5 (the `assets-source/brand`
   contract, the `import 'package:flutter/cupertino.dart'` change to
   `theme.dart`, and the manual-signing pbxproj edits all depend on
   3.44+; see [docs/handover.md](./docs/handover.md) 2026-05-22 entry

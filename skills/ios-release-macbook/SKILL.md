@@ -70,7 +70,7 @@ ASC_ISSUER=$(op-cache "Kulturni prehled ASC API Key" "issuer_id")
 ### Bootstrap step 3: Verify Flutter + SPM
 
 ```bash
-flutter --version  # Must be 3.44.0
+flutter --version  # Must be 3.47.5
 flutter config --no-enable-swift-package-manager  # One-time per machine
 ```
 

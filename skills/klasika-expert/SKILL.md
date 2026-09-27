@@ -96,11 +96,14 @@ aggregator renders these as a colored badge in the email:
 | `source_type` | Meaning | Badge color | Example `source_name` |
 |---|---|---|---|
 | `festival` | One-off festival event | orange | "Dvořákova Praha", "Pražské jaro", "Prague Sounds" |
-| `sezona` | Regular ensemble subscription concert | grey | "Česká filharmonie", "FOK", "PKF" |
+| `sezona` | Regular ensemble subscription concert | grey | "Česká filharmonie", "FOK – Symfonický orchestr hl. m. Prahy", "PKF – Prague Philharmonia" |
 | `objev` | Off-radar pick, not from usual sources | green | "MeetFactory program", "tip from Spotify" |
 
 The expert sets `source_type` based on where it found the candidate:
-- Ensemble scraper → `sezona`, `source_name` = ensemble name
+- Ensemble scraper → `sezona`, `source_name` = the scraper's `ensemble`
+  field, verbatim. Never shorten it: the pool keeps whatever it is sent, and
+  a weekly "FOK" against a seasonal "FOK – Symfonický orchestr hl. m. Prahy"
+  splits one ensemble's badge in two.
 - Festival WebFetch → `festival`, `source_name` = festival name
 - Spotify/other discovery → `objev`, `source_name` = how it was found
 

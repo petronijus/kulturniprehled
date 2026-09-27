@@ -33,6 +33,10 @@ capable token (the local unrestricted PAT qualifies):
 `CandidateUpsert`: `{dedup_key, lane, title, starts_at, ends_at?, venue?,
 url?, price_czk?, program?, detail?, enriched_at?, score?, why_cs?,
 source_type?, source_name?, season_event?, tickets_available?}`.
+Updating a known key merges: omitted fields keep their stored value, and
+enrichment (`program`, `detail`, `enriched_at`, `score`, `why_cs`,
+`source_type`, `source_name`) is never cleared by null — send a value to
+replace it. Details in `docs/api.md`.
 
 **`dedup_key` recipe (identity across re-scrapes — never change casually;
 changed once 2026-08-10, title→URL, with a DB key migration):**

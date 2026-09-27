@@ -94,6 +94,21 @@ touches the user-owned plan fields (`plan_status`, `plan_status_at`,
 `novelty_ack_at` is a monotonic cursor for the weekly novelty routine.
 The season tables are web-only — they do not participate in `/v1/sync`.
 
+An update to an existing pool row is a **merge**, not a replacement. A field
+the item leaves out keeps its stored value, so a scraper can push bare
+listing rows for keys the season run already enriched. The enrichment
+fields (`program`, `detail`, `enriched_at`, `score`, `why_cs`,
+`source_type`, `source_name`) go further: null keeps them too, because null
+from a scrape means "not looked up". Ingest can replace enrichment, never
+clear it. A scraped fact (`price_czk`, `venue`, `ends_at`,
+`tickets_available`, …) sent as null is cleared — the venue stopped listing
+it. The content hash covers the merged state with datetimes compared as
+instants, so re-sending the same concert in another UTC offset is
+`unchanged`. (Until 2026-09-27 an update replaced every scraped field, and a
+weekly push of bare rows wiped score and blurb on hundreds of rows.
+Migration `0018` rehashed the stored rows into the merged-state form, so the
+change did not count the whole pool as `updated`.)
+
 A `dedup_key` hashes the event's canonical URL, so a venue that rewrites
 its slugs hands the ingest a new key for a concert nobody moved. The upsert
 therefore falls back on the CMS id inside the URL plus the local date

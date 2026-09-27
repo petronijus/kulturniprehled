@@ -4,10 +4,12 @@ plan mutations and the novelty cursor."""
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 from uuid import UUID, uuid4
@@ -210,6 +212,155 @@ async def test_pool_update_refreshes_but_preserves_plan_fields(client: AsyncClie
     assert row["plan_status"] == "selected"
     assert row["note"] == "front row"
     assert row["version"] == patched.json()["version"] + 1
+
+
+_ENRICHED = {
+    "detail": {"conductor": "Semyon Bychkov", "soloists": [], "program_note": "Adagietto"},
+    "enriched_at": "2025-09-01T10:00:00+00:00",
+}
+
+
+def _bare(seed: str, **overrides: Any) -> dict[str, Any]:
+    """What a weekly scrape pushes for a key the season run already enriched:
+    the venue listing only — no score, blurb, programme, detail or source."""
+
+    payload = _candidate(seed, **overrides)
+    for field in ("program", "score", "why_cs", "source_type", "source_name"):
+        payload.pop(field, None)
+    return payload
+
+
+async def _pool_row(client: AsyncClient, headers: dict[str, str], season_id: str) -> dict[str, Any]:
+    pool = await client.get(f"/v1/season/plans/{season_id}/pool", headers=headers)
+    items = pool.json()["items"]
+    assert len(items) == 1
+    return dict(items[0])
+
+
+async def test_bare_rescrape_keeps_the_enrichment(client: AsyncClient) -> None:
+    # 2026-09-27: the weekly run pushed bare scraper rows and the wholesale
+    # update nulled score on 266 pool rows and why_cs on 205.
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+    url = f"/v1/season/plans/{season_id}/pool"
+    await client.put(url, json={"items": [_candidate("a", **_ENRICHED)]}, headers=headers)
+    before = await _pool_row(client, headers, season_id)
+
+    same = await client.put(url, json={"items": [_bare("a")]}, headers=headers)
+    assert same.json()["unchanged"] == 1, same.json()
+    bookkeeping = {"last_seen_at", "updated_at"}
+    after = await _pool_row(client, headers, season_id)
+    assert {k: v for k, v in after.items() if k not in bookkeeping} == {
+        k: v for k, v in before.items() if k not in bookkeeping
+    }
+
+    moved = await client.put(
+        url,
+        json={"items": [_bare("a", price_czk="600-1800", tickets_available=False)]},
+        headers=headers,
+    )
+    assert moved.json()["updated"] == 1, moved.json()
+    row = await _pool_row(client, headers, season_id)
+    assert row["price_czk"] == "600-1800"
+    assert row["tickets_available"] is False
+    for field in ("program", "detail", "score", "why_cs", "source_type", "source_name"):
+        assert row[field] == before[field], field
+    assert row["version"] == before["version"] + 1
+
+
+async def test_null_never_clears_enrichment_but_does_clear_a_scraped_fact(
+    client: AsyncClient,
+) -> None:
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+    url = f"/v1/season/plans/{season_id}/pool"
+    await client.put(url, json={"items": [_candidate("a", **_ENRICHED)]}, headers=headers)
+    before = await _pool_row(client, headers, season_id)
+
+    nulls = {
+        "program": None,
+        "detail": None,
+        "enriched_at": None,
+        "score": None,
+        "why_cs": None,
+        "source_type": None,
+        "source_name": None,
+        "price_czk": None,
+    }
+    response = await client.put(url, json={"items": [_candidate("a", **nulls)]}, headers=headers)
+    assert response.json()["updated"] == 1, response.json()
+    row = await _pool_row(client, headers, season_id)
+    for field in (
+        "program",
+        "detail",
+        "enriched_at",
+        "score",
+        "why_cs",
+        "source_type",
+        "source_name",
+    ):
+        assert row[field] == before[field], field
+    # The venue stopped listing a price — that is news, not a lookup gap.
+    assert row["price_czk"] is None
+
+
+async def test_a_fresh_enrichment_replaces_the_old_one(client: AsyncClient) -> None:
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+    url = f"/v1/season/plans/{season_id}/pool"
+    await client.put(url, json={"items": [_candidate("a", **_ENRICHED)]}, headers=headers)
+
+    rescored = _candidate("a", score=0.4, why_cs="Jiny program nez loni.")
+    response = await client.put(url, json={"items": [rescored]}, headers=headers)
+    assert response.json()["updated"] == 1, response.json()
+    row = await _pool_row(client, headers, season_id)
+    assert row["score"] == 0.4
+    assert row["why_cs"] == "Jiny program nez loni."
+    assert row["detail"] == _ENRICHED["detail"]  # left out, so kept
+
+
+async def test_the_same_instant_in_another_offset_is_unchanged(client: AsyncClient) -> None:
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+    url = f"/v1/season/plans/{season_id}/pool"
+    await client.put(url, json={"items": [_candidate("a", **_ENRICHED)]}, headers=headers)
+
+    utc = _candidate("a", starts_at="2025-10-14T17:30:00Z", **_ENRICHED)
+    response = await client.put(url, json={"items": [utc]}, headers=headers)
+    assert response.json()["unchanged"] == 1, response.json()
+
+
+def _load_migration(name: str) -> Any:
+    path = Path(__file__).resolve().parents[1] / "alembic" / "versions" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+async def test_migration_0018_hash_matches_runtime(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    # 0018 rehashes stored rows with a frozen copy of the hash. If the two
+    # drift, every row counts as changed on the first push after deploy.
+    migration = _load_migration("0018_candidate_hash_merged_state")
+    headers = await _auth(client)
+    season_id = await _make_season(client, headers)
+    await client.put(
+        f"/v1/season/plans/{season_id}/pool",
+        json={"items": [_candidate("a", **_ENRICHED), _candidate("b", ends_at=None)]},
+        headers=headers,
+    )
+    rows = (
+        await db_session.scalars(
+            select(SeasonCandidate).where(SeasonCandidate.season_id == UUID(season_id))
+        )
+    ).all()
+    assert len(rows) == 2
+    for row in rows:
+        values = {field: getattr(row, field) for field in migration.CONTENT_FIELDS}
+        assert migration.content_hash(values) == row.content_hash
 
 
 async def test_pool_filters(client: AsyncClient) -> None:

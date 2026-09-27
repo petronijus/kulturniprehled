@@ -17,13 +17,21 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 CFG_DIR="${CFG_DIR:-$HOME/.config/kulturni-prehled}"
 LOGDIR="$CFG_DIR/logs"; mkdir -p "$LOGDIR"
+RUN="sezona"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-LOG="$LOGDIR/sezona-$STAMP.log"
+LOG="$LOGDIR/$RUN-$STAMP.log"
 
-git -C "$REPO" pull --ff-only -q || echo "[warn] git pull failed, running on the existing checkout"
+# shellcheck source=infra/claudebox/lib.sh
+. "$HERE/lib.sh"
+install_run_trap
 
+RUN_STAGE="sync"
+sync_checkout
+require_claude_login
+
+RUN_STAGE="token"
 KP_TOKEN="$(op item get 'Kulturni Prehled API Token' --account my --fields label=credential --reveal)"
-[ -n "$KP_TOKEN" ] || { echo "FATAL: could not fetch the KP PAT from 1Password"; exit 1; }
+[ -n "$KP_TOKEN" ] || fail "could not fetch the KP PAT from 1Password"
 export KP_TOKEN
 export KP_API_BASE="${KP_API_BASE:-https://kulturniprehled.bastla.com}"
 
@@ -37,13 +45,18 @@ google-workspace MCP here — skip Spotify (missing_sources); blocked.json
 comes from GET /v1/season/calendar exactly as SKILL.md step 1 says
 (available:false → empty blocked set, note it in the report). Experts run via the Skill
 tool in season mode; scrapers and kp_validate.py run natively from the
-checkout at $REPO. Today (UTC): $STAMP."
+checkout at $REPO. Edits to that checkout do not outlive this run (the
+runner saves them as a patch and stashes them), so report every one — file,
+what was wrong, how it was verified — and never leave work there for
+approval. Today (UTC): $STAMP."
 
 echo "[$(date -u +%FT%TZ)] launching kulturni-sezona; log=$LOG"
+RUN_STAGE="claude"
 claude -p "$PROMPT" \
   --allowedTools "$ALLOWED" \
   --add-dir "$REPO" \
   --output-format text \
   2>&1 | tee "$LOG"
 
+RUN_STAGE="done"
 echo "[$(date -u +%FT%TZ)] season run finished; report in $LOG"

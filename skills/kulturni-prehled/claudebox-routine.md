@@ -41,3 +41,12 @@ Unchanged from the local flow (unlike the old cloud routine):
 - One email per run; only novelties; never re-recommend the pool.
 - Guardrails from SKILL.md apply verbatim (additive pool, no plan-state
   writes, max once per day).
+- **The checkout is not yours to keep changes in.** It is the code every
+  later run loads (`~/.claude/skills` links into it). If a bug would corrupt
+  this run's data — a scraper misreading dates, say — you may fix it in
+  place so the run is right, but the fix does not outlive the run:
+  `run-weekly.sh` saves whatever you leave as a patch next to the log,
+  stashes it and alerts. So give every such edit its own section in the
+  report: file, what was wrong, how it was verified, so it can be
+  committed upstream. Never commit, and never leave work "for approval" in
+  the tree.

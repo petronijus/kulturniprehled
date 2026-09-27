@@ -1,7 +1,9 @@
 # Tool allow-list for the headless kulturni-prehled runs (weekly + sezona).
-# Comma-joined by the run scripts. Deliberately absent: Edit/Write to the
-# repo is fine (scratch under /tmp), but there is no git push, no gh, no
-# email connector — the only send path is the KP API itself.
+# Comma-joined by the run scripts. Edit/Write are allowed: scratch lives under
+# /tmp, and a run may patch the checkout when a bug would otherwise poison its
+# own data — but such edits do not survive the run (lib.sh parks them as a
+# patch + stash and alerts). Deliberately absent: git push, gh, any email
+# connector — the only send path is the KP API itself.
 Bash
 Read
 Write

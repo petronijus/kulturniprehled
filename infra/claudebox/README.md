@@ -14,8 +14,9 @@ Two runs live here:
 
 ## One-time setup
 
-1. Repo checkout at `~/Documents/Dev/kulturniprehled` (run scripts
-   `git pull --ff-only` on every start).
+1. Repo checkout at `~/Documents/Dev/kulturniprehled`, on `main` tracking
+   `origin/main`. The run scripts sync it on every start and refuse to run
+   on anything else — see [Checkout discipline](#checkout-discipline).
 2. KP skills symlinked into `~/.claude/skills` (loop in
    `skills/kulturni-prehled/README.md`).
 3. **Scoped PAT** — mint on the prod VM and place on the claudebox
@@ -46,8 +47,41 @@ Two runs live here:
    systemctl --user enable --now kulturni-prehled-weekly.timer
    ```
 
-6. Optional notify hook: executable `~/.config/kulturni-prehled/notify`
-   receives the run log on stdin (wire HA push / e-mail there).
+6. Notify hook: executable `~/.config/kulturni-prehled/notify`, called as
+   `notify "<subject>"` with a Markdown body on stdin, for anything that
+   needs a human — a failed run, a missing login, changes parked out of the
+   checkout. Non-zero exit = delivery failed. The box's hook forwards to
+   Ústředna's `/alert` endpoint (Home Assistant push); it lives in the
+   private overlay (`private/claudebox/notify`) because it names internal
+   hosts. Without a hook the alert only reaches the journal — which is how
+   three stale weekly runs went unnoticed in 2026-09, so install one.
+   Successful runs do not notify: the digest e-mail is the report.
+
+## Checkout discipline
+
+The checkout is not scratch space: `~/.claude/skills` links into it, so its
+working tree is the code every run loads. `lib.sh` (shared by both run
+scripts) holds three rules:
+
+- **Clean before and after.** Anything found in the working tree — before a
+  run, or left by the agent after one — is saved as
+  `logs/<run>-<stamp>-{pre,post}-run.patch`, stashed with the same label
+  (`git stash list`), and alerted. Nothing is discarded; nothing lingers.
+  A run may still patch a scraper in place when a bug would poison its own
+  data (the playbook says so), but the fix only lands for good by being
+  committed upstream.
+- **Origin or nothing.** A failed fetch or a checkout that cannot
+  fast-forward fails the run. The old `pull || echo "[warn] …"` let the
+  2026-09-05 run's uncommitted scraper fix block every later pull, and three
+  weekly runs went out on code frozen at 2026-08-31.
+- **Fail loudly.** A missing `claude` login is checked up front, and any
+  non-zero exit sends an alert with the stage and the tail of the log.
+
+`test_lib.sh` covers these without network, box or claude:
+
+```bash
+infra/claudebox/test_lib.sh
+```
 
 ## Environment differences (vs. the old Anthropic-cloud routine)
 

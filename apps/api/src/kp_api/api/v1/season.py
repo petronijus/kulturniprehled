@@ -14,6 +14,12 @@ only when the content hash changed, and never touches the user-owned fields
 (`first_seen_at`, `plan_status`, `plan_status_at`, `note`) except to carry
 them onto the survivor of a merge.
 
+An update is a merge, not a replacement: a field the item leaves out keeps
+its stored value, and an enrichment field (`_ENRICHMENT_FIELDS`) keeps it
+even when the item sends null. The weekly run pushes bare scraper rows for
+keys the season run already enriched; replacing wholesale wiped score,
+why_cs, programme and detail on hundreds of rows per push (found 2026-09-27).
+
 A `dedup_key` is only as stable as the URL it hashes, so the ingest reads
 `candidate_identity` as a second opinion: a row whose venue rewrote its slug
 is rekeyed in place, and a fork an earlier rewrite already created is folded
@@ -26,7 +32,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from datetime import UTC, date, datetime, time, timedelta
+from enum import Enum
 from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -256,16 +264,50 @@ def _merge_candidate(
     loser.version += 1
 
 
-def _content_hash(item: CandidateUpsert) -> str:
-    """Deterministic hash over the scraped fields.
+def _canonical(value: object) -> object:
+    """JSON-stable form of one content value.
 
-    `dedup_key` is excluded — it is the identity, not the content. JSON mode
-    dump turns datetimes into ISO strings so serialization is stable.
+    Datetimes are compared as instants: a scrape sending `+02:00` and the
+    database handing back UTC describe the same concert, and must hash alike
+    or every merged row would count as changed.
     """
 
-    payload = item.model_dump(mode="json", exclude={"dedup_key"})
+    if isinstance(value, datetime):
+        aware = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+        return aware.astimezone(UTC).isoformat()
+    if isinstance(value, Enum):
+        return value.value
+    return value
+
+
+def _content_hash(content: Mapping[str, object]) -> str:
+    """Deterministic hash over the scraped fields of one candidate.
+
+    Takes the resolved field values — an incoming item for a new row, the
+    merged state for an update — so an identical re-push hashes identically
+    whichever of the two produced it. `dedup_key` is not content.
+    """
+
+    payload = {field: _canonical(content[field]) for field in _SCRAPED_FIELDS}
     canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _merged_content(row: SeasonCandidate, item: CandidateUpsert) -> dict[str, object]:
+    """The content a row carries once `item` is applied to it.
+
+    Only fields the item actually sent are taken, and an enrichment field is
+    taken only when it carries a value: a scrape knows what a venue lists,
+    not what an earlier enrichment pass learned about it.
+    """
+
+    content: dict[str, object] = {field: getattr(row, field) for field in _SCRAPED_FIELDS}
+    for field in item.model_fields_set & set(_SCRAPED_FIELDS):
+        value = getattr(item, field)
+        if value is None and field in _ENRICHMENT_FIELDS:
+            continue
+        content[field] = value
+    return content
 
 
 # Scraped columns refreshed on every content change. Deliberately excludes
@@ -287,6 +329,13 @@ _SCRAPED_FIELDS = (
     "source_name",
     "season_event",
     "tickets_available",
+)
+
+# What an enrichment pass adds on top of the venue listing. Ingest can set or
+# replace these but never clear them — null from a scraper means "not looked
+# up", and there is no pass whose job is to forget a programme.
+_ENRICHMENT_FIELDS = frozenset(
+    {"program", "detail", "enriched_at", "score", "why_cs", "source_type", "source_name"}
 )
 
 
@@ -431,7 +480,6 @@ async def put_pool(
 
     created = updated = unchanged = rekeyed = merged = 0
     for key, item in by_key.items():
-        digest = _content_hash(item)
         row = by_dedup_key.get(key)
         identity = candidate_identity(item.url, item.starts_at)
         twins = [twin for twin in by_identity.get(identity or "", ()) if twin.deleted_at is None]
@@ -467,7 +515,7 @@ async def put_pool(
             candidate = SeasonCandidate(
                 season_id=season.id,
                 workspace_id=workspace.id,
-                content_hash=digest,
+                content_hash=_content_hash(data),
                 created_by=user.id,
                 version=1,
                 first_seen_at=now,
@@ -479,12 +527,16 @@ async def put_pool(
             if identity is not None:
                 by_identity.setdefault(identity, []).append(candidate)
             by_dedup_key[key] = candidate
-        elif row.content_hash == digest:
+            continue
+
+        content = _merged_content(row, item)
+        digest = _content_hash(content)
+        if row.content_hash == digest:
             row.last_seen_at = now
             unchanged += 1
         else:
-            for field in _SCRAPED_FIELDS:
-                setattr(row, field, getattr(item, field))
+            for field, value in content.items():
+                setattr(row, field, value)
             row.content_hash = digest
             row.last_seen_at = now
             row.version += 1

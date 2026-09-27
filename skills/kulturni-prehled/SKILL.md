@@ -112,7 +112,11 @@ Enrich novelties that still lack `program` (cap ~15 per lane), then
 **push the entire scraped set** via `PUT …/pool` in chunks of ~100 —
 content hashing makes unchanged rows free, `last_seen_at` stays fresh,
 and this is what grows elektronika/film coverage all season. User-owned
-plan fields are never touched by the upsert.
+plan fields are never touched by the upsert. Bare scraper rows are safe
+for known keys: the upsert merges, so an omitted or null `score`,
+`why_cs`, `program`, `detail` or `source_*` keeps what the season run
+stored — do not rebuild rows from `pool.json` before pushing. Send an
+enrichment field only when this run actually produced a new value for it.
 
 ### 5. Score + fit-check novelties
 

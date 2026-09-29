@@ -24,10 +24,16 @@ same upload. Until 1.2.0 it was a sideloaded APK on GitHub Releases.
   `CN=Kulturni Prehled upload, O=Bastla, C=CZ`. If it is lost or leaked,
   request an upload key reset in Play Console; the app signing key stays
   with Google.
-- **Google Sign-In**: the Android OAuth client in Google Cloud must carry the
-  SHA-1 of the **app signing key** (Play Console → Test and release → App
-  integrity → App signing), not of the upload key. A wrong SHA-1 shows up as
-  a sign-in that fails right after the account is picked.
+- **Google Sign-In**: Google Cloud (project `petr-apps`, Google Auth Platform
+  → Clients) needs an Android OAuth client for every **app signing**
+  certificate, not for the upload key. Play signs KP with quantum-ready
+  hybrid signing, so there are three: `deployment`, `hybrid classical` and
+  `hybrid PQC` (Play Console → Protected with Play → Play Store distribution
+  → Play app signing → download the certificates; `keytool -printcert -file`
+  gives each SHA-1). They are the clients `KP Mobile (Play, deployment)`,
+  `KP Mobile (Play, hybrid classical)` and `KP Mobile (Play, hybrid PQC)`;
+  `KP Mobile (debug)` stays for debug builds. A missing SHA-1 shows up as a
+  sign-in that fails right after the account is picked.
 - **Moving a phone from the old APK**: the sideloaded APK was signed with the
   retired `kp-release.keystore`, so Play cannot update it in place. Uninstall
   it once, then install from the testers' opt-in link. Everything that

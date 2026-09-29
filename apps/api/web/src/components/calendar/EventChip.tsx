@@ -2,7 +2,7 @@ import { useDraggable } from "@dnd-kit/core";
 import type { CalendarEntry, Candidate } from "../../api/types";
 import { entryLabel } from "../../domain/calendar";
 import { isoToLocalTime } from "../../domain/season";
-import { cs } from "../../i18n/cs";
+import { en } from "../../i18n/en";
 import styles from "./EventChip.module.css";
 
 interface EventChipProps {
@@ -60,7 +60,7 @@ export function EventChip({
       className={`${classes.join(" ")} ${styles.clickable}`}
       style={{ borderInlineStartColor: `var(--lane-${candidate.lane})` }}
       title={candidate.why_cs ?? candidate.title}
-      aria-label={`${cs.calendar.openCard}: ${candidate.title}`}
+      aria-label={`${en.calendar.openCard}: ${candidate.title}`}
       onClick={() => onOpen(candidate)}
       {...listeners}
       {...attributes}
@@ -75,7 +75,7 @@ export function EventChip({
 /** Immutable chip for an already-booked KP event. */
 export function BookedChip({ title }: { title: string }) {
   return (
-    <div className={`${styles.chip} ${styles.booked}`} title={`${cs.bookedEvent}: ${title}`}>
+    <div className={`${styles.chip} ${styles.booked}`} title={`${en.bookedEvent}: ${title}`}>
       <span className={styles.title}>{title}</span>
     </div>
   );
@@ -90,7 +90,7 @@ export function PersonalChip({ entry }: { entry: CalendarEntry }) {
     classes.push(styles.personalBlocking);
   }
   return (
-    <div className={classes.join(" ")} title={`${cs.calendar.chipPrefix}: ${entryLabel(entry)}`}>
+    <div className={classes.join(" ")} title={`${en.calendar.chipPrefix}: ${entryLabel(entry)}`}>
       <span className={styles.title}>{entryLabel(entry)}</span>
     </div>
   );
@@ -102,9 +102,9 @@ export function ReservedChip({ lane, note }: { lane: string; note: string | null
     <div
       className={`${styles.chip} ${styles.reserved}`}
       style={{ borderInlineStartColor: `var(--lane-${lane})` }}
-      title={note ?? cs.reservedSlot}
+      title={note ?? en.reservedSlot}
     >
-      <span className={styles.title}>{cs.reservedSlot}</span>
+      <span className={styles.title}>{en.reservedSlot}</span>
     </div>
   );
 }

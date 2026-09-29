@@ -1,5 +1,5 @@
 import type { Scenario } from "../../api/types";
-import { cs } from "../../i18n/cs";
+import { en } from "../../i18n/en";
 import styles from "./ScenarioTabs.module.css";
 
 interface ScenarioTabsProps {
@@ -29,7 +29,7 @@ export function ScenarioTabs({
           className={`${styles.tab} ${previewScenarioId === null ? styles.active : ""}`}
           onClick={() => onPreview(null)}
         >
-          {cs.myPlan}
+          {en.myPlan}
         </button>
         {scenarios.map((scenario) => (
           <button
@@ -48,7 +48,7 @@ export function ScenarioTabs({
       {preview !== undefined && (
         <div className={styles.previewBar}>
           <span className={styles.previewLabel}>
-            {cs.scenarioPreview}: <strong>{preview.name}</strong>
+            {en.scenarioPreview}: <strong>{preview.name}</strong>
             {preview.description_cs !== null && (
               <span className={styles.motto}> — {preview.description_cs}</span>
             )}
@@ -60,7 +60,7 @@ export function ScenarioTabs({
               onClick={() => onApply("replace")}
               disabled={applying}
             >
-              {cs.applyScenario}
+              {en.applyScenario}
             </button>
             <button
               type="button"
@@ -68,10 +68,10 @@ export function ScenarioTabs({
               onClick={() => onApply("merge")}
               disabled={applying}
             >
-              {cs.applyScenarioMerge}
+              {en.applyScenarioMerge}
             </button>
             <button type="button" className={styles.exitButton} onClick={() => onPreview(null)}>
-              {cs.exitPreview}
+              {en.exitPreview}
             </button>
           </div>
         </div>

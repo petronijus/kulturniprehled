@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import type { BookedEvent, CalendarEntry, Candidate } from "../../api/types";
 import { dayTooltip } from "../../domain/calendar";
 import type { IsoDate } from "../../domain/season";
-import { cs } from "../../i18n/cs";
+import { en } from "../../i18n/en";
 import styles from "./DayCell.module.css";
 import { BookedChip, EventChip, PersonalChip } from "./EventChip";
 
@@ -123,7 +123,7 @@ export function DayCell({
         ))}
         {hiddenPersonal.length > 0 && (
           <span className={styles.personalMore} title={dayTooltip(hiddenPersonal)}>
-            {cs.calendar.more(hiddenPersonal.length)}
+            {en.calendar.more(hiddenPersonal.length)}
           </span>
         )}
         {booked.map((event) => (

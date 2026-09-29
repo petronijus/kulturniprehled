@@ -1,6 +1,6 @@
 import type { CalendarView, Candidate, Season } from "../../api/types";
 import type { Violation } from "../../domain/violations";
-import { cs } from "../../i18n/cs";
+import { en } from "../../i18n/en";
 import styles from "./HeaderBar.module.css";
 import { ThemeToggle } from "./ThemeToggle";
 import { ViolationsSummary } from "./ViolationsSummary";
@@ -21,11 +21,11 @@ function fetchedAtLabel(calendar: CalendarView | undefined): string | null {
   if (calendar?.fetched_at === undefined || calendar.fetched_at === null) {
     return null;
   }
-  const time = new Date(calendar.fetched_at).toLocaleTimeString("cs-CZ", {
+  const time = new Date(calendar.fetched_at).toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
   });
-  return cs.calendar.updated(time);
+  return en.calendar.updated(time);
 }
 
 export function HeaderBar({
@@ -42,25 +42,25 @@ export function HeaderBar({
   const undecided = pool.filter((candidate) => candidate.plan_status === "undecided").length;
   const fetchedAt = fetchedAtLabel(calendar);
   const refreshTitle = calendarRefreshing
-    ? cs.calendar.refreshing
+    ? en.calendar.refreshing
     : fetchedAt === null
-      ? cs.calendar.refresh
-      : `${cs.calendar.refresh} · ${fetchedAt}`;
+      ? en.calendar.refresh
+      : `${en.calendar.refresh} · ${fetchedAt}`;
 
   return (
     <header className={styles.bar}>
       <div className={styles.titleBlock}>
         <h1 className={styles.title}>
-          {cs.appTitle} <span className={styles.seasonLabel}>{season.label}</span>
+          {en.appTitle} <span className={styles.seasonLabel}>{season.label}</span>
         </h1>
-        <p className={styles.counts}>{cs.counts(selected, undecided)}</p>
+        <p className={styles.counts}>{en.counts(selected, undecided)}</p>
       </div>
       <div className={styles.tools}>
         {calendar !== undefined && calendar.available === false && (
           <span className={styles.calendarWarning}>
             {calendar.unavailable_reason === "not_configured"
-              ? cs.calendar.notConfigured
-              : cs.calendar.unavailable}
+              ? en.calendar.notConfigured
+              : en.calendar.unavailable}
           </span>
         )}
         <button
@@ -68,9 +68,9 @@ export function HeaderBar({
           className={`${styles.calendarToggle} ${calendarVisible ? "" : styles.calendarOff}`}
           onClick={onToggleCalendar}
           aria-pressed={calendarVisible}
-          title={calendarVisible ? cs.calendar.hide : cs.calendar.show}
+          title={calendarVisible ? en.calendar.hide : en.calendar.show}
         >
-          <span aria-hidden="true">🗓</span> {cs.calendar.layerLabel}
+          <span aria-hidden="true">🗓</span> {en.calendar.layerLabel}
         </button>
         <button
           type="button"
@@ -78,7 +78,7 @@ export function HeaderBar({
           onClick={onRefreshCalendar}
           disabled={calendarRefreshing}
           title={refreshTitle}
-          aria-label={cs.calendar.refresh}
+          aria-label={en.calendar.refresh}
         >
           <span
             className={`${styles.refreshIcon} ${calendarRefreshing ? styles.spinning : ""}`}

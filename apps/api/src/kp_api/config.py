@@ -90,7 +90,7 @@ class Settings(BaseSettings):
     # any configuration. Empty disables the marks.
     holidays_ics_url: str = (
         "https://calendar.google.com/calendar/ical/"
-        "cs.czech%23holiday%40group.v.calendar.google.com/public/basic.ics"
+        "en.czech%23holiday%40group.v.calendar.google.com/public/basic.ics"
     )
 
     allowed_emails: str = ""

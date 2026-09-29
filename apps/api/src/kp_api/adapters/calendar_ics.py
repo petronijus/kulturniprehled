@@ -191,7 +191,7 @@ def _classify(
     end_prop = component.get("DTEND")
     raw_end = end_prop.dt if end_prop is not None else None
 
-    title = _text(component, "SUMMARY") or "(bez názvu)"
+    title = _text(component, "SUMMARY") or "(untitled)"
     uid = _text(component, "UID") or title
 
     all_day = isinstance(raw_start, date) and not isinstance(raw_start, datetime)

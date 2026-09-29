@@ -8,7 +8,7 @@ import type { ProgramLine } from "../../domain/program";
 import { programLines } from "../../domain/program";
 import { programQuery } from "../../domain/programKey";
 import { isoToLocalTime, weekday } from "../../domain/season";
-import { cs } from "../../i18n/cs";
+import { en } from "../../i18n/en";
 import { isNew } from "../../state/newSince";
 import styles from "./CandidateCard.module.css";
 import { LaneBadge } from "./LaneBadge";
@@ -32,9 +32,10 @@ interface CandidateCardProps {
 
 function formatDate(candidate: Candidate): string {
   const date = candidateDate(candidate);
-  const dayName = cs.weekdaysShort[weekday(date) - 1] ?? "";
+  const dayName = en.weekdaysShort[weekday(date) - 1] ?? "";
   const [, month, day] = date.split("-");
-  return `${dayName} ${Number(day)}. ${Number(month)}. · ${isoToLocalTime(candidate.starts_at)}`;
+  const monthName = en.monthsShort[Number(month) - 1] ?? month;
+  return `${dayName} ${Number(day)} ${monthName} · ${isoToLocalTime(candidate.starts_at)}`;
 }
 
 function spotifySearchUrl(query: string): string {
@@ -60,7 +61,7 @@ function PlayLinks({
   onPlay: () => void;
 }) {
   const query = programQuery(line.author, line.work);
-  const label = playable ? cs.play.spotify : cs.play.spotifySearch;
+  const label = playable ? en.play.spotify : en.play.spotifySearch;
   const title =
     link?.match_label === undefined || link.match_label === null
       ? label
@@ -98,8 +99,8 @@ function PlayLinks({
           href={link.youtube_url}
           target="_blank"
           rel="noreferrer"
-          title={cs.play.youtube}
-          aria-label={`${cs.play.youtube}: ${query}`}
+          title={en.play.youtube}
+          aria-label={`${en.play.youtube}: ${query}`}
           onPointerDown={(event) => event.stopPropagation()}
         >
           ▶▶
@@ -129,10 +130,10 @@ function DateRow({
     classes.push(styles.dateRejected);
   }
   const title = rejected
-    ? cs.production.dateRejected
+    ? en.production.dateRejected
     : selected
-      ? cs.production.deselectDate
-      : cs.production.selectDate;
+      ? en.production.deselectDate
+      : en.production.selectDate;
   return (
     <button
       type="button"
@@ -143,7 +144,7 @@ function DateRow({
     >
       <span className={styles.dateLabel}>{formatDate(candidate)}</span>
       {candidate.tickets_available === false && <span className={styles.dateSoldOut}>⚠</span>}
-      {selected && <span className={styles.dateMark}>✓ {cs.production.inPlan}</span>}
+      {selected && <span className={styles.dateMark}>✓ {en.production.inPlan}</span>}
     </button>
   );
 }
@@ -229,8 +230,8 @@ export function CandidateCard({
       <header className={styles.header}>
         <LaneBadge lane={primary.lane} />
         <SourceBadge sourceType={richest.source_type} sourceName={richest.source_name} />
-        {seasonEvent && <span className={styles.seasonBadge}>★ {cs.seasonEventBadge}</span>}
-        {anyNew && <span className={styles.newBadge}>{cs.newBadge}</span>}
+        {seasonEvent && <span className={styles.seasonBadge}>★ {en.seasonEventBadge}</span>}
+        {anyNew && <span className={styles.newBadge}>{en.newBadge}</span>}
         {richest.score !== null && (
           <span className={styles.score} title={richest.why_cs ?? ""}>
             {Math.round(richest.score * 100)}
@@ -239,9 +240,9 @@ export function CandidateCard({
       </header>
       <h3 className={styles.title}>{richest.title}</h3>
       <p className={styles.meta}>
-        {multiDate ? cs.production.dates(candidates.length) : formatDate(primary)}
+        {multiDate ? en.production.dates(candidates.length) : formatDate(primary)}
         {primary.venue !== null && ` · ${primary.venue}`}
-        {richest.price_czk !== null && ` · ${richest.price_czk} Kč`}
+        {richest.price_czk !== null && ` · ${richest.price_czk} CZK`}
       </p>
       {multiDate && (
         <div className={styles.dates}>
@@ -279,7 +280,7 @@ export function CandidateCard({
       )}
       {richest.why_cs !== null && <p className={styles.why}>{richest.why_cs}</p>}
       {!multiDate && primary.tickets_available === false && (
-        <p className={styles.soldOut}>⚠ {cs.soldOut}</p>
+        <p className={styles.soldOut}>⚠ {en.soldOut}</p>
       )}
       {!multiDate && (primary.tickets_available === false || watch !== undefined) && (
         <SeatWatchButton candidate={primary} watch={watch} disabled={actionsDisabled} />
@@ -292,7 +293,7 @@ export function CandidateCard({
             onClick={() => onSetStatus(primary, "selected")}
             disabled={actionsDisabled}
           >
-            ✓ {cs.select}
+            ✓ {en.select}
           </button>
         )}
         {status === "undecided" && (
@@ -302,7 +303,7 @@ export function CandidateCard({
             onClick={rejectAll}
             disabled={actionsDisabled}
           >
-            ✕ {cs.reject}
+            ✕ {en.reject}
           </button>
         )}
         {status !== "undecided" && (
@@ -312,7 +313,7 @@ export function CandidateCard({
             onClick={undecideAll}
             disabled={actionsDisabled}
           >
-            ↩ {cs.undecide}
+            ↩ {en.undecide}
           </button>
         )}
         {richest.url !== null && (

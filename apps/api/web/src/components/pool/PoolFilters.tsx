@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { Lane } from "../../api/types";
 import type { PoolFacets } from "../../domain/facets";
 import type { IsoMonth } from "../../domain/season";
-import { cs } from "../../i18n/cs";
+import { en } from "../../i18n/en";
 import type { SelectOption } from "../ui/Select";
 import { Select } from "../ui/Select";
 import styles from "./PoolFilters.module.css";
@@ -45,7 +45,7 @@ export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersPr
     () =>
       months.map((month) => ({
         value: month,
-        label: `${cs.months[Number(month.slice(5)) - 1] ?? month} ${month.slice(0, 4)}`,
+        label: `${en.months[Number(month.slice(5)) - 1] ?? month} ${month.slice(0, 4)}`,
       })),
     [months],
   );
@@ -55,12 +55,12 @@ export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersPr
       ...facets.sources.map((name) => ({
         value: `source:${name}`,
         label: name,
-        group: cs.filters.facetSources,
+        group: en.filters.facetSources,
       })),
       ...facets.venues.map((name) => ({
         value: `venue:${name}`,
         label: name,
-        group: cs.filters.facetVenues,
+        group: en.filters.facetVenues,
       })),
     ],
     [facets],
@@ -74,7 +74,7 @@ export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersPr
           className={`${styles.chip} ${filters.lane === null ? styles.chipActive : ""}`}
           onClick={() => onChange({ ...filters, lane: null })}
         >
-          {cs.filters.all}
+          {en.filters.all}
         </button>
         {LANES.map((lane) => (
           <button
@@ -84,7 +84,7 @@ export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersPr
             style={filters.lane === lane ? { color: `var(--lane-${lane})` } : undefined}
             onClick={() => onChange({ ...filters, lane: filters.lane === lane ? null : lane })}
           >
-            {cs.lanes[lane]}
+            {en.lanes[lane]}
           </button>
         ))}
       </div>
@@ -92,13 +92,13 @@ export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersPr
         <Select
           value={filters.month ?? ""}
           options={monthOptions}
-          placeholder={cs.filters.month}
+          placeholder={en.filters.month}
           onChange={(value) => onChange({ ...filters, month: value === "" ? null : value })}
         />
         <Select
           value={filters.facet ?? ""}
           options={facetOptions}
-          placeholder={cs.filters.facet}
+          placeholder={en.filters.facet}
           onChange={(value) => onChange({ ...filters, facet: value === "" ? null : value })}
         />
         <label className={styles.toggle}>
@@ -107,7 +107,7 @@ export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersPr
             checked={filters.selectedOnly}
             onChange={(event) => onChange({ ...filters, selectedOnly: event.target.checked })}
           />
-          {cs.filters.selectedOnly}
+          {en.filters.selectedOnly}
         </label>
         <label className={styles.toggle}>
           <input
@@ -115,7 +115,7 @@ export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersPr
             checked={filters.newOnly}
             onChange={(event) => onChange({ ...filters, newOnly: event.target.checked })}
           />
-          {cs.filters.newOnly}
+          {en.filters.newOnly}
         </label>
         <label className={styles.toggle}>
           <input
@@ -123,13 +123,13 @@ export function PoolFilters({ filters, months, facets, onChange }: PoolFiltersPr
             checked={filters.showRejected}
             onChange={(event) => onChange({ ...filters, showRejected: event.target.checked })}
           />
-          {cs.filters.showRejected}
+          {en.filters.showRejected}
         </label>
       </div>
       <input
         type="search"
         className={styles.search}
-        placeholder={cs.filters.search}
+        placeholder={en.filters.search}
         value={filters.query}
         onChange={(event) => onChange({ ...filters, query: event.target.value })}
       />

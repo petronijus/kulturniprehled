@@ -165,7 +165,7 @@ Tell the user (in Czech):
 
 ## Reference
 
-- VM: `192.0.2.154` (macOS 26.5, OpenCore 1.0.7, Flutter 3.44.0)
+- VM: `192.0.2.154` (macOS 26.5, OpenCore 1.0.7, Flutter 3.47.5 since 2026-09-29)
 - Proxmox: `root@192.0.2.100` (VM 108 = macOS, VM 106 = Windows)
 - Signing: manual, `Apple Distribution: Petr Parkan Janda (YOURTEAMID)`,
   profile `KP Distribution`

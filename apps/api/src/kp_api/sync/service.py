@@ -361,7 +361,7 @@ async def _compute_watchlist_position(
             )
         return item
 
-    def scope_filter(stmt: Select[tuple[float]]) -> Select[tuple[float]]:
+    def scope_filter(stmt: Select[float]) -> Select[float]:
         stmt = stmt.where(
             WatchlistItem.workspace_id == workspace.id,
             WatchlistItem.deleted_at.is_(None),

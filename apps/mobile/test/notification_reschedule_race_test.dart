@@ -43,7 +43,7 @@ class _RecordingPlugin implements FlutterLocalNotificationsPlugin {
       return Future<void>.delayed(const Duration(milliseconds: 2));
     }
     if (invocation.memberName == #zonedSchedule) {
-      calls.add('schedule:${invocation.positionalArguments[1]}');
+      calls.add('schedule:${invocation.namedArguments[#title]}');
       return Future<void>.delayed(const Duration(milliseconds: 2));
     }
     if (invocation.memberName == #resolvePlatformSpecificImplementation) {

@@ -147,5 +147,6 @@ and lets the commit through. Lines already in the repo are the monthly
 | a Swift file is "skipped" by `format.sh` | swift-format ships with Xcode; run `just fmt` on the MacBook |
 | `uv run` reinstalls packages or Python | `apps/api/.python-version` pins 3.12 like the image; the dev tools are the `dev` dependency group, installed by default |
 | ruff disagrees between machines | always call it through `uv run --project apps/api ruff` (the locked version), never a global `ruff` |
+| `Unresolved reference` in a plugin's Kotlin after a dependency upgrade (seen with `sentry_flutter`) | stale incremental build from the old plugin version: `cd apps/mobile/android && ./gradlew --stop`, then `flutter clean` in `apps/mobile` |
 | a scraper run (`fok.sh`) takes minutes | expected: it fetches every detail page |
 | the commit is refused with `pii-scan` | replace the value with a placeholder and put the real one in `private/` |

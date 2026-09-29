@@ -197,8 +197,8 @@ class KpDatabase extends _$KpDatabase {
       }
       if (from < 4) {
         // Backend dropped multi-currency in 0006; align the local cache.
-        // ALTER TABLE DROP COLUMN works on SQLite 3.35+ (Drift bundles
-        // a newer build via sqlite3_flutter_libs).
+        // ALTER TABLE DROP COLUMN works on SQLite 3.35+; package:sqlite3
+        // ships its own upstream build rather than the OS copy.
         await m.database.customStatement(
           'ALTER TABLE cached_costs DROP COLUMN currency',
         );

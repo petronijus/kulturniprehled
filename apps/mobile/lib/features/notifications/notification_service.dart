@@ -22,7 +22,10 @@ import 'package:kp_mobile/features/events/events_repository.dart';
 /// done, alarms fire even when the app is closed.
 class NotificationService {
   NotificationService(this._plugin, {Future<String> Function()? localTimezone})
-    : _localTimezone = localTimezone ?? FlutterTimezone.getLocalTimezone;
+    : _localTimezone = localTimezone ?? _deviceTimezone;
+
+  static Future<String> _deviceTimezone() async =>
+      (await FlutterTimezone.getLocalTimezone()).identifier;
 
   final FlutterLocalNotificationsPlugin _plugin;
   final Future<String> Function() _localTimezone;
@@ -67,7 +70,7 @@ class NotificationService {
       android: android,
       iOS: ios,
     );
-    await _plugin.initialize(init);
+    await _plugin.initialize(settings: init);
     _pluginReady = true;
   }
 
@@ -119,10 +122,10 @@ class NotificationService {
         : when;
     final String? cover = await _fetchCoverToFile(coverImageUrl);
     await _plugin.show(
-      _idForEvent(eventId, 'new'),
-      'Nová akce: $title',
-      body,
-      _detailsWithCover(
+      id: _idForEvent(eventId, 'new'),
+      title: 'Nová akce: $title',
+      body: body,
+      notificationDetails: _detailsWithCover(
         channelId: 'new_event',
         channelName: 'Nové akce',
         coverPath: cover,
@@ -288,11 +291,11 @@ class NotificationService {
   }) async {
     final tz.TZDateTime scheduledAt = tz.TZDateTime.from(when, tz.local);
     await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      scheduledAt,
-      details,
+      id: id,
+      title: title,
+      body: body,
+      scheduledDate: scheduledAt,
+      notificationDetails: details,
       // alarmClock, not exactAllowWhileIdle: the broadcast of a plain exact
       // alarm is marked deferrable-until-active, so when the app process is
       // cached+frozen (phone locked for a few minutes is enough) the
@@ -302,8 +305,6 @@ class NotificationService {
       // "wake the user up / time to leave" is exactly its intended
       // semantics. Needs USE_EXACT_ALARM (declared in the manifest).
       androidScheduleMode: AndroidScheduleMode.alarmClock,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
 

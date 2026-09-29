@@ -14,28 +14,37 @@ abstract class GoogleSignInGateway {
 }
 
 class _RealGoogleSignInGateway implements GoogleSignInGateway {
-  _RealGoogleSignInGateway()
-    : _signIn = GoogleSignIn(
+  // GoogleSignIn is a singleton that must be initialised exactly once
+  // before any other call.
+  Future<void>? _initialized;
+
+  Future<void> _ensureInitialized() =>
+      _initialized ??= GoogleSignIn.instance.initialize(
         serverClientId: AppConfig.googleOauthServerClientId.isEmpty
             ? null
             : AppConfig.googleOauthServerClientId,
-        scopes: const <String>['email', 'profile'],
       );
-
-  final GoogleSignIn _signIn;
 
   @override
   Future<String?> signIn() async {
-    final GoogleSignInAccount? account = await _signIn.signIn();
-    if (account == null) {
-      return null; // user cancelled
+    await _ensureInitialized();
+    try {
+      final GoogleSignInAccount account = await GoogleSignIn.instance
+          .authenticate(scopeHint: const <String>['email', 'profile']);
+      return account.authentication.idToken;
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        return null;
+      }
+      rethrow;
     }
-    final GoogleSignInAuthentication auth = await account.authentication;
-    return auth.idToken;
   }
 
   @override
-  Future<void> signOut() => _signIn.signOut();
+  Future<void> signOut() async {
+    await _ensureInitialized();
+    await GoogleSignIn.instance.signOut();
+  }
 }
 
 final Provider<GoogleSignInGateway> googleSignInGatewayProvider =

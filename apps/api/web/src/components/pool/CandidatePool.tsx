@@ -15,7 +15,7 @@ import { groupStatus, isProductionBooked } from "../../domain/productions";
 import type { ProgramLine } from "../../domain/program";
 import type { IsoMonth } from "../../domain/season";
 import { monthOf } from "../../domain/season";
-import { cs } from "../../i18n/cs";
+import { en } from "../../i18n/en";
 import { isNew } from "../../state/newSince";
 import { CandidateCard } from "./CandidateCard";
 import styles from "./CandidatePool.module.css";
@@ -158,10 +158,10 @@ export function CandidatePool({
     return (
       <div className={styles.pool}>
         <div className={styles.scrapeNotice}>
-          <h2 className={styles.scrapeTitle}>{cs.emptyPool.title}</h2>
-          <p className={styles.scrapeBody}>{cs.emptyPool.body}</p>
-          <code className={styles.scrapeCommand}>{cs.emptyPool.command}</code>
-          <p className={styles.scrapeHint}>{cs.emptyPool.hint}</p>
+          <h2 className={styles.scrapeTitle}>{en.emptyPool.title}</h2>
+          <p className={styles.scrapeBody}>{en.emptyPool.body}</p>
+          <code className={styles.scrapeCommand}>{en.emptyPool.command}</code>
+          <p className={styles.scrapeHint}>{en.emptyPool.hint}</p>
         </div>
       </div>
     );
@@ -171,7 +171,7 @@ export function CandidatePool({
     <div ref={setNodeRef} className={`${styles.pool} ${isOver ? styles.dropTarget : ""}`}>
       <PoolFilters filters={filters} months={months} facets={facets} onChange={setFilters} />
       <div className={styles.cards} ref={cardsRef}>
-        {visible.length === 0 && <p className={styles.empty}>{cs.poolEmpty}</p>}
+        {visible.length === 0 && <p className={styles.empty}>{en.poolEmpty}</p>}
         {visible.map((group) => (
           <CandidateCard
             key={group.key}

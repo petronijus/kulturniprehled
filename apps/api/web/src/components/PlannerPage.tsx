@@ -21,7 +21,7 @@ import type { ProgramLine } from "../domain/program";
 import type { IsoDate } from "../domain/season";
 import { monthsBetween } from "../domain/season";
 import { computeViolations } from "../domain/violations";
-import { cs } from "../i18n/cs";
+import { en } from "../i18n/en";
 import { useCalendarVisible } from "../state/calendarLayer";
 import { SeasonCalendar } from "./calendar/SeasonCalendar";
 import { PlannerDnd } from "./dnd/PlannerDnd";
@@ -82,10 +82,10 @@ export function PlannerPage() {
     [programLinksQuery.data],
   );
 
-  const onConflict = useCallback(() => setToast(cs.conflictToast), []);
+  const onConflict = useCallback(() => setToast(en.conflictToast), []);
   const onRefreshCalendar = useCallback(() => {
     refreshCalendar.mutate(undefined, {
-      onError: () => setToast(cs.calendar.refreshFailed),
+      onError: () => setToast(en.calendar.refreshFailed),
     });
   }, [refreshCalendar]);
   const patchMutation = usePatchCandidate(season?.id ?? "none", onConflict);
@@ -209,7 +209,7 @@ export function PlannerPage() {
   );
 
   if (seasonQuery.isPending || (season !== undefined && poolQuery.isPending)) {
-    return <div className={styles.centered}>{cs.loading}</div>;
+    return <div className={styles.centered}>{en.loading}</div>;
   }
   if (seasonQuery.isError) {
     const status =
@@ -219,16 +219,16 @@ export function PlannerPage() {
     return (
       <div className={styles.centered}>
         {status === 401 ? (
-          <p>{cs.notHome}</p>
+          <p>{en.notHome}</p>
         ) : (
           <>
-            <p>{cs.loadFailed}</p>
+            <p>{en.loadFailed}</p>
             <button
               type="button"
               className={styles.retry}
               onClick={() => void seasonQuery.refetch()}
             >
-              {cs.retry}
+              {en.retry}
             </button>
           </>
         )}
@@ -236,7 +236,7 @@ export function PlannerPage() {
     );
   }
   if (season === undefined) {
-    return <div className={styles.centered}>{cs.loading}</div>;
+    return <div className={styles.centered}>{en.loading}</div>;
   }
 
   return (

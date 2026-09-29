@@ -1,5 +1,5 @@
 import type { Lane } from "../../api/types";
-import { cs } from "../../i18n/cs";
+import { en } from "../../i18n/en";
 import styles from "./LaneBadge.module.css";
 
 export function LaneBadge({ lane }: { lane: Lane }) {
@@ -8,7 +8,7 @@ export function LaneBadge({ lane }: { lane: Lane }) {
       className={styles.badge}
       style={{ color: `var(--lane-${lane})`, background: `var(--lane-${lane}-bg)` }}
     >
-      {cs.lanes[lane]}
+      {en.lanes[lane]}
     </span>
   );
 }

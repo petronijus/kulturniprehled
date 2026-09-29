@@ -15,7 +15,7 @@ const PRAGUE_DATE = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
-const PRAGUE_TIME = new Intl.DateTimeFormat("cs-CZ", {
+const PRAGUE_TIME = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Europe/Prague",
   hour: "2-digit",
   minute: "2-digit",

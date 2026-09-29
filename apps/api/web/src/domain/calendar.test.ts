@@ -109,7 +109,7 @@ describe("entryLabel", () => {
         span_index: 1,
       }),
     );
-    expect(label).toBe("do 01:00 Party");
+    expect(label).toBe("until 01:00 Party");
   });
 });
 

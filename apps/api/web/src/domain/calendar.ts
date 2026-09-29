@@ -6,7 +6,7 @@
  */
 
 import type { CalendarEntry, CalendarView, HolidayView } from "../api/types";
-import { cs } from "../i18n/cs";
+import { en } from "../i18n/en";
 import type { IsoDate } from "./season";
 import { isoToLocalTime } from "./season";
 
@@ -37,7 +37,7 @@ export function entryLabel(entry: CalendarEntry): string {
     return `${entry.title}${counter}`;
   }
   if (entry.span_index > 0 && entry.ends_at !== null) {
-    return `${cs.calendar.until} ${isoToLocalTime(entry.ends_at)} ${entry.title}`;
+    return `${en.calendar.until} ${isoToLocalTime(entry.ends_at)} ${entry.title}`;
   }
   return entry.starts_at === null
     ? entry.title

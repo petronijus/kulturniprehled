@@ -1,5 +1,5 @@
 import type { IsoMonth } from "../../domain/season";
-import { cs } from "../../i18n/cs";
+import { en } from "../../i18n/en";
 import styles from "./MonthJumpRail.module.css";
 
 interface MonthJumpRailProps {
@@ -10,7 +10,7 @@ interface MonthJumpRailProps {
 
 export function MonthJumpRail({ months, activeMonth, onJump }: MonthJumpRailProps) {
   return (
-    <nav className={styles.rail} aria-label="Měsíce">
+    <nav className={styles.rail} aria-label={en.monthsLabel}>
       {months.map((month) => {
         const index = Number(month.slice(5)) - 1;
         return (
@@ -20,7 +20,7 @@ export function MonthJumpRail({ months, activeMonth, onJump }: MonthJumpRailProp
             className={`${styles.stop} ${month === activeMonth ? styles.active : ""}`}
             onClick={() => onJump(month)}
           >
-            {cs.monthsShort[index] ?? month}
+            {en.monthsShort[index] ?? month}
           </button>
         );
       })}

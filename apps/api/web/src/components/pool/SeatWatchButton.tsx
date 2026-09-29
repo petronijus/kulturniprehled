@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { useCreateSeatWatch, useDeleteSeatWatch, useUpdateSeatWatch } from "../../api/mutations";
 import type { Candidate, SeatWatch } from "../../api/types";
-import { cs } from "../../i18n/cs";
+import { en } from "../../i18n/en";
 import styles from "./SeatWatchButton.module.css";
 
 interface SeatWatchButtonProps {
@@ -25,16 +25,16 @@ const NOT_SEATS = ["7328", "7327"];
 
 function when(iso: string | null): string {
   if (iso === null) {
-    return cs.watch.neverChecked;
+    return en.watch.neverChecked;
   }
   const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
   if (minutes < 1) {
-    return cs.watch.checked("teď");
+    return en.watch.checked(en.watch.justNow);
   }
   if (minutes < 60) {
-    return cs.watch.checked(`před ${minutes} min`);
+    return en.watch.checked(en.watch.minutesAgo(minutes));
   }
-  return cs.watch.checked(`před ${Math.round(minutes / 60)} h`);
+  return en.watch.checked(en.watch.hoursAgo(Math.round(minutes / 60)));
 }
 
 export function SeatWatchButton({ candidate, watch, disabled }: SeatWatchButtonProps) {
@@ -70,9 +70,9 @@ export function SeatWatchButton({ candidate, watch, disabled }: SeatWatchButtonP
     const found = watch.found_seats ?? [];
     return (
       <div className={styles.found}>
-        <span className={styles.foundText}>🎟 {cs.watch.found(found.length)}</span>
+        <span className={styles.foundText}>🎟 {en.watch.found(found.length)}</span>
         <a className={styles.foundLink} href={watch.hall_url} target="_blank" rel="noreferrer">
-          {cs.watch.openHall}
+          {en.watch.openHall}
         </a>
         <button type="button" className={styles.plain} onClick={() => remove.mutate(watch)}>
           ✕
@@ -86,12 +86,12 @@ export function SeatWatchButton({ candidate, watch, disabled }: SeatWatchButtonP
     return (
       <div className={styles.active}>
         <span className={styles.status} title={watch.last_error ?? undefined}>
-          👁 {cs.watch.active}
+          👁 {en.watch.active}
           <span className={styles.detail}>
             {expired
-              ? cs.watch.expiredLink
+              ? en.watch.expiredLink
               : watch.last_free_seats !== null && watch.last_free_seats > 0
-                ? cs.watch.freeSeats(watch.last_free_seats)
+                ? en.watch.freeSeats(watch.last_free_seats)
                 : when(watch.last_checked_at)}
           </span>
         </span>
@@ -104,7 +104,7 @@ export function SeatWatchButton({ candidate, watch, disabled }: SeatWatchButtonP
           type="button"
           className={styles.plain}
           onClick={() => update.mutate({ watch, patch: { state: "stopped" } })}
-          title={cs.watch.stop}
+          title={en.watch.stop}
         >
           ✕
         </button>
@@ -131,7 +131,7 @@ export function SeatWatchButton({ candidate, watch, disabled }: SeatWatchButtonP
         onClick={() => setOpen(true)}
         disabled={disabled}
       >
-        👁 {watch === undefined ? cs.watch.start : cs.watch.again}
+        👁 {watch === undefined ? en.watch.start : en.watch.again}
       </button>
       {open && (
         <Prompt
@@ -162,7 +162,7 @@ function Prompt({ url, seats, onUrl, onSeats, onCancel, onSubmit, pending }: Pro
   return (
     <div className={styles.prompt}>
       <label className={styles.label} htmlFor="watch-url">
-        {cs.watch.prompt}
+        {en.watch.prompt}
       </label>
       <input
         id="watch-url"
@@ -180,10 +180,10 @@ function Prompt({ url, seats, onUrl, onSeats, onCancel, onSubmit, pending }: Pro
           }
         }}
       />
-      <p className={styles.hint}>{cs.watch.promptHint}</p>
+      <p className={styles.hint}>{en.watch.promptHint}</p>
       <div className={styles.row}>
         <label className={styles.label} htmlFor="watch-seats">
-          {cs.watch.seatsWanted}
+          {en.watch.seatsWanted}
         </label>
         <input
           id="watch-seats"
@@ -195,7 +195,7 @@ function Prompt({ url, seats, onUrl, onSeats, onCancel, onSubmit, pending }: Pro
           onChange={(event) => onSeats(Math.max(1, Math.min(6, Number(event.target.value))))}
         />
         <button type="button" className={styles.confirm} onClick={onSubmit} disabled={pending}>
-          👁 {cs.watch.start}
+          👁 {en.watch.start}
         </button>
         <button type="button" className={styles.plain} onClick={onCancel}>
           ✕

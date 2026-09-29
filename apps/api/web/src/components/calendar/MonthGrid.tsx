@@ -1,7 +1,7 @@
 import type { BookedEvent, CalendarEntry, Candidate, ReservedSlot } from "../../api/types";
 import type { IsoDate, IsoMonth } from "../../domain/season";
 import { monthGrid } from "../../domain/season";
-import { cs } from "../../i18n/cs";
+import { en } from "../../i18n/en";
 import { ReservedChip } from "./EventChip";
 import styles from "./MonthGrid.module.css";
 import { WeekRow } from "./WeekRow";
@@ -44,7 +44,7 @@ export function MonthGrid({
   onOpenCandidate,
 }: MonthGridProps) {
   const [yearStr, monthStr] = month.split("-") as [string, string];
-  const monthName = cs.months[Number(monthStr) - 1] ?? month;
+  const monthName = en.months[Number(monthStr) - 1] ?? month;
 
   return (
     <section className={styles.month} data-month={month}>
@@ -66,7 +66,7 @@ export function MonthGrid({
       </header>
       <div className={styles.weekdays}>
         <span className={styles.gutterSpacer} />
-        {cs.weekdaysShort.map((day) => (
+        {en.weekdaysShort.map((day) => (
           <span key={day} className={styles.weekday}>
             {day}
           </span>

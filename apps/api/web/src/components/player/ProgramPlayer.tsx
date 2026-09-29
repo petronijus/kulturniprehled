@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { QueueItem } from "../../domain/playQueue";
 import { buildSegments } from "../../domain/playQueue";
-import { cs } from "../../i18n/cs";
+import { en } from "../../i18n/en";
 import type { PlayerCommand } from "../../player/protocol";
 import { asPlayerEvent } from "../../player/protocol";
 import styles from "./ProgramPlayer.module.css";
@@ -196,10 +196,10 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
   const movements = current.uris.length;
 
   return (
-    <aside className={styles.panel} aria-label={cs.player.title}>
+    <aside className={styles.panel} aria-label={en.player.title}>
       <header className={styles.header}>
-        <h2 className={styles.heading}>{cs.player.title}</h2>
-        <button type="button" className={styles.close} onClick={onClose} title={cs.player.close}>
+        <h2 className={styles.heading}>{en.player.title}</h2>
+        <button type="button" className={styles.close} onClick={onClose} title={en.player.close}>
           ✕
         </button>
       </header>
@@ -211,8 +211,8 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
       </p>
       <p className={styles.context}>
         {current.title}
-        {movements > 1 && ` · ${cs.player.movement(movement + 1, movements)}`}
-        {current.kind === "album" && ` · ${cs.player.wholeAlbum}`}
+        {movements > 1 && ` · ${en.player.movement(movement + 1, movements)}`}
+        {current.kind === "album" && ` · ${en.player.wholeAlbum}`}
       </p>
 
       {track !== null && (
@@ -230,7 +230,7 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
               max={Math.max(track.duration, 1)}
               step={1000}
               value={elapsed}
-              aria-label={cs.player.seek}
+              aria-label={en.player.seek}
               aria-valuetext={`${clock(elapsed)} / ${clock(track.duration)}`}
               onChange={(event) => setScrub(Number(event.target.value))}
               onPointerUp={commitScrub}
@@ -248,12 +248,12 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
         ref={frameRef}
         className={styles.embed}
         src={FRAME_SRC}
-        title={cs.player.title}
+        title={en.player.title}
         allow="autoplay 'src' https://sdk.scdn.co; encrypted-media 'src' https://sdk.scdn.co"
       />
       {failure !== null && (
         <p className={styles.failed} title={failure}>
-          {cs.player.failed}
+          {en.player.failed}
         </p>
       )}
 
@@ -262,7 +262,7 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
           type="button"
           className={styles.control}
           onClick={() => send({ kind: paused ? "play" : "pause" })}
-          title={paused ? cs.player.play : cs.player.pause}
+          title={paused ? en.player.play : en.player.pause}
         >
           {paused ? "▶" : "⏸"}
         </button>
@@ -270,7 +270,7 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
           type="button"
           className={styles.control}
           onClick={() => step(-1)}
-          title={cs.player.previous}
+          title={en.player.previous}
         >
           ⏮
         </button>
@@ -278,13 +278,13 @@ export function ProgramPlayer({ queue, onClose }: ProgramPlayerProps) {
           type="button"
           className={styles.control}
           onClick={() => step(1)}
-          title={cs.player.next}
+          title={en.player.next}
         >
           ⏭
         </button>
         {current.spotifyUrl !== null && (
           <a className={styles.openLink} href={current.spotifyUrl} target="_blank" rel="noreferrer">
-            {cs.player.openInSpotify}
+            {en.player.openInSpotify}
           </a>
         )}
       </div>

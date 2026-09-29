@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:kp_mobile/core/replay_counter.dart';
 import 'package:kp_mobile/core/widgets/blur_in_text.dart';
 import 'package:kp_mobile/core/widgets/date_row.dart';
 import 'package:kp_mobile/core/widgets/local_first_image.dart';
@@ -27,7 +28,7 @@ class EventDetailScreen extends ConsumerStatefulWidget {
 class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   // Captured in initState so dispose() can increment without calling ref.read
   // after the element is unmounted (Riverpod forbids ref access post-unmount).
-  late final StateController<int> _replayNotifier;
+  late final ReplayCounter _replayNotifier;
 
   @override
   void initState() {
@@ -38,7 +39,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   @override
   void dispose() {
     // Tell the agenda to replay its blur-in titles when we go back.
-    _replayNotifier.state++;
+    _replayNotifier.replay();
     super.dispose();
   }
 

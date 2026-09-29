@@ -68,6 +68,17 @@
   font-weight: 700;
 }
 
+/* Public holiday — a mark, not a rule: the day stays fully plannable. It wins
+   over a planned or a booked day, and loses to one that is both. */
+.holiday .dayNumber {
+  color: var(--holiday);
+  font-weight: 700;
+}
+
+.holiday:not(.outside) {
+  background: var(--holiday-bg);
+}
+
 /* Bought wins the cell when an evening is both: the ticket is the fact, the
    pick is only an intention. The lane still shows on the chip's own border. */
 .plannedDay.bookedDay:not(.outside) {
@@ -115,16 +126,6 @@
   color: var(--text-faint);
   padding-inline-start: var(--space-1);
   cursor: default;
-}
-
-/* Public holiday — a mark, not a rule: the day stays fully plannable. */
-.holiday .dayNumber {
-  color: var(--holiday);
-  font-weight: 700;
-}
-
-.holiday:not(.outside) {
-  background: var(--holiday-bg);
 }
 
 .holidayName {

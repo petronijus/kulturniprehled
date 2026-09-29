@@ -19,7 +19,7 @@ void main() {
   );
 
   String? androidAttr(XmlElement element, String name) =>
-      element.getAttribute(name, namespace: _android);
+      element.getAttribute(name, namespaceUri: _android);
 
   XmlElement? receiver(String name) {
     for (final XmlElement r in manifest.findAllElements('receiver')) {

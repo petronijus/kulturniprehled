@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -7,16 +5,12 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Release signing pulls from `android/key.properties` when present (the
-// release workflow writes one before invoking gradle, and a developer can
-// drop one in locally). When the file is missing we silently fall back to
-// the debug key so `flutter run` and contributors without the release
-// keystore aren't blocked.
-val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("key.properties")
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(keystorePropertiesFile.inputStream())
-}
+// Release signing uses the Google Play upload key. `just build-aab` reads it
+// from 1Password (`Kulturni Prehled Android upload key`) into a temporary
+// directory for the duration of one build and passes it in through the
+// environment; it never lives in the repo or in a properties file. Play App
+// Signing re-signs the bundle with the app signing key Google holds.
+val uploadKeystore: String? = System.getenv("KP_UPLOAD_KEYSTORE")
 
 android {
     namespace = "com.kulturniprehled.kp_mobile"
@@ -40,25 +34,21 @@ android {
     }
 
     signingConfigs {
-        if (keystorePropertiesFile.exists()) {
-            create("release") {
-                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
+        if (uploadKeystore != null) {
+            create("upload") {
+                storeFile = file(uploadKeystore)
+                storePassword = System.getenv("KP_UPLOAD_STORE_PASSWORD")
+                keyAlias = System.getenv("KP_UPLOAD_KEY_ALIAS")
+                keyPassword = System.getenv("KP_UPLOAD_KEY_PASSWORD")
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                // Debug signing fallback keeps `flutter run --release` working
-                // for devs without the release keystore on disk.
-                signingConfigs.getByName("debug")
-            }
+            // Without the upload key, local release builds (`flutter run
+            // --release`) fall back to the debug key; bundleRelease refuses.
+            signingConfig = signingConfigs.getByName(if (uploadKeystore != null) "upload" else "debug")
             // Disable R8 minification / resource shrinking. The
             // flutter_local_notifications plugin's Gson TypeToken stops
             // working when generic signatures are stripped, and even with
@@ -68,6 +58,15 @@ android {
             // need to squeeze the size for Play Store / TestFlight.
             isMinifyEnabled = false
             isShrinkResources = false
+        }
+    }
+}
+
+// A bundle for Play must be signed with the upload key, never the debug key.
+tasks.configureEach {
+    if (name == "bundleRelease" && uploadKeystore == null) {
+        doFirst {
+            throw GradleException("bundleRelease needs the Play upload key: run `just build-aab`.")
         }
     }
 }

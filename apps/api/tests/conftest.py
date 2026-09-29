@@ -26,8 +26,8 @@ from alembic.config import Config as AlembicConfig
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
-from testcontainers.minio import MinioContainer
-from testcontainers.postgres import PostgresContainer
+from testcontainers.community.minio import MinioContainer
+from testcontainers.community.postgres import PostgresContainer
 
 from kp_api.adapters.db import set_engine_override
 from kp_api.adapters.oauth import GoogleIdentity

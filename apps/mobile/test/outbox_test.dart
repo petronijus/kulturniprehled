@@ -4,6 +4,7 @@ import 'package:dio/dio.dart'
     show Dio, DioException, DioExceptionType, RequestOptions;
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kp_mobile/data/api_client/kp_client.dart';

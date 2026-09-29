@@ -51,8 +51,8 @@ tickets and creates events automatically.
 - **Auth** — Google OAuth2 (PKCE on mobile) + JWT (15 min) + refresh-token
   rotation with reuse detection. Personal access tokens for headless
   clients (the Claude skill).
-- **Mobile release** — signed APK from GitHub Releases for Android (Pixel
-  + Běla's phone sideload), TestFlight Internal Testing (group `Družina`)
+- **Mobile release** — Google Play internal testing for Android, TestFlight
+  Internal Testing (group `Družina`)
   for iOS.
 
 ## Docs
@@ -60,7 +60,7 @@ tickets and creates events automatically.
 | Doc | For |
 |---|---|
 | [`docs/development.md`](docs/development.md) | toolchain, setup per OS, checks, git hooks, troubleshooting |
-| [`docs/release.md`](docs/release.md) | Android APK, backend deploy, TestFlight, iOS sideload |
+| [`docs/release.md`](docs/release.md) | Play internal testing, backend deploy, TestFlight, iOS sideload |
 | [`docs/architecture.md`](docs/architecture.md) | system architecture, notifications without push |
 | [`docs/sync.md`](docs/sync.md) | sync protocol, outbox, invariants |
 | [`docs/api.md`](docs/api.md) | REST API (also `/openapi.json`) |
@@ -160,10 +160,9 @@ For routine releases: `ssh deploy@kp-vm /opt/kp/infra/deploy/upgrade.sh`.
 
 ## Mobile release
 
-- **Android** — local signed APK build, published to GitHub Releases. Petr
-  + Běla install via browser from
-  `https://github.com/petronijus/kulturniprehled/releases`. Procedure in
-  [`docs/release.md`](docs/release.md).
+- **Android** — a bundle signed with the Play upload key (`just build-aab`),
+  shipped through the Google Play internal testing track; testers update
+  from the Play Store. Procedure in [`docs/release.md`](docs/release.md).
 - **iOS** — TestFlight Internal Testing (group `Družina`,
   auto-distribute on). Two release paths:
   - Local Mac with Xcode + app-specific password — recipe in

@@ -1,95 +1,85 @@
 # Release
 
-How a mobile release ships: the signed Android APK on GitHub Releases, the
-backend image when the API changed, the iOS build on TestFlight, and the
-free-Apple-ID sideload for a physical iPhone. Real hostnames, IDs and
-credentials live in the private overlay (`private/`); this public file uses
-placeholders. Every step runs locally — there is no hosted CI.
+How a mobile release ships: the Android bundle to Google Play's internal
+testing track, the backend image when the API changed, the iOS build on
+TestFlight, and the free-Apple-ID sideload for a physical iPhone. Real
+hostnames, IDs and credentials live in the private overlay (`private/`); this
+public file uses placeholders. Every step runs locally — there is no hosted CI.
 
-## Android release (signed APK + API redeploy)
+## Android (Google Play internal testing)
 
-There is no hosted CI; everything below runs locally.
+Android ships through the Play Console **internal testing** track, as Pinkni
+does: no review, Play delivers updates, and the path to production is the
+same upload. Until 1.2.0 it was a sideloaded APK on GitHub Releases.
 
-### 1. Bump version
+### One-time setup (2026-09-29)
 
-`apps/mobile/pubspec.yaml` → `version: 1.0.X+Y` (semver + Android version code).
-Commit the bump on its own line: `chore(mobile): bump to v1.0.X`.
+- **Play Console** (developer account `Bastla`, the one Pinkni uses): app
+  `Kulturní Přehled`, package `com.kulturniprehled.kp_mobile`, **Play App
+  Signing with a Google-generated app signing key**, internal testing track
+  with the developer-account tester list `Internal testers`.
+- **Upload key**: 1Password `Kulturni Prehled Android upload key` (vault
+  Personal: the `.jks` as the file `keystore file`, plus `store password`,
+  `key password`, `key alias`). PKCS12, RSA 4096, alias `upload`,
+  `CN=Kulturni Prehled upload, O=Bastla, C=CZ`. If it is lost or leaked,
+  request an upload key reset in Play Console; the app signing key stays
+  with Google.
+- **Google Sign-In**: the Android OAuth client in Google Cloud must carry the
+  SHA-1 of the **app signing key** (Play Console → Test and release → App
+  integrity → App signing), not of the upload key. A wrong SHA-1 shows up as
+  a sign-in that fails right after the account is picked.
+- **Moving a phone from the old APK**: the sideloaded APK was signed with the
+  retired `kp-release.keystore`, so Play cannot update it in place. Uninstall
+  it once, then install from the testers' opt-in link. Everything that
+  matters is on the server; the phone re-syncs after sign-in.
 
-### 2. Run the full gate
+### Per release
 
-`just ci` on the Linux desktop or the MacBook must be green (see
-[development.md](./development.md#checks)).
+1. **Version**: `apps/mobile/pubspec.yaml` → `version: X.Y.Z+N`. `N` is the
+   Android version code; Play refuses a code it has seen, so it only goes up.
+   The `/repo-release` skill bumps it together with the CHANGELOG and the tag.
+2. **Gate**: `just ci` green on the Linux desktop or the MacBook
+   ([development.md](./development.md#checks)).
+3. **Bundle**: `just build-aab`. It reads the upload key and the OAuth client
+   ID from 1Password into a temporary directory for this one build, takes
+   `KP_API_BASE` from the environment or `private/config/mobile-release.conf`,
+   builds `apps/mobile/build/app/outputs/bundle/release/app-release.aab` and
+   checks that the upload key signed it. A plain `flutter build appbundle`
+   without the key fails on purpose, so a debug-signed bundle never reaches
+   Play.
+4. **Upload**: Play Console → Kulturní Přehled → Test and release → Testing →
+   Internal testing → Create new release → upload the `.aab` → release notes
+   → Save → Review release → Start rollout. Testers get the update from the
+   Play Store within minutes.
+5. **GitHub Release**: the tag's release carries the notes only; the bundle
+   goes to Play, not to GitHub.
 
-### 3. Tag the release
-
-```bash
-git tag -a v1.0.X -m "Short one-line summary of what's in this release"
-git push origin v1.0.X
-```
-
-### 4. Build the signed APK locally
-
-The release keystore lives at `~/.android/kp-release.keystore`. Local key
-properties are at `apps/mobile/android/key.properties` (gitignored). The
-`Kulturni Prehled Android Release Keystore` 1Password item currently holds
-**only the store/key passwords — NOT the `.jks` file or the key alias** (the
-keystore exists only on the Linux PC; backing it up is an open TODO). See
-`private/docs/release-credentials.md` (private overlay) for the full
-build-credential inventory and per-machine provisioning steps.
-
-```bash
-cd apps/mobile
-GOOG_CLIENT_ID=$(op-cache "Kulturni prehled google Web OAuth client" "client ID")
-flutter build apk --release \
-  --dart-define=KP_API_BASE=https://kulturniprehled.example.com \
-  --dart-define=KP_GOOGLE_OAUTH_SERVER_CLIENT_ID="$GOOG_CLIENT_ID"
-unset GOOG_CLIENT_ID
-mv build/app/outputs/flutter-apk/app-release.apk \
-   build/app/outputs/flutter-apk/kp-mobile-v1.0.X.apk
-```
-
-Sanity-check the signature SHA-1 (must match the one registered in the
-Android OAuth client for `com.kulturniprehled.kp_mobile` — release-key entry
-in Google Cloud is `DC:B7:D3:89:9A:A7:79:DF:53:EF:AF:40:3B:DC:7B:BB:9A:44:29:64`):
-
-```bash
-$ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs \
-  build/app/outputs/flutter-apk/kp-mobile-v1.0.X.apk \
-  | grep "SHA-1 digest"
-```
-
-### 5. Create the GitHub Release with the APK attached
-
-```bash
-gh release create v1.0.X build/app/outputs/flutter-apk/kp-mobile-v1.0.X.apk \
-  --title "v1.0.X" \
-  --generate-notes
-```
-
-Běla + Petr download the APK from
-<https://github.com/petronijus/kulturniprehled/releases> on their phones.
-First install needs "Install unknown apps" toggled on for the browser.
-
-### 6. Backend deploy (only when API changed)
+### Backend deploy (only when the API or the planner changed)
 
 The image is built **locally** and pushed to GHCR; the VM only pulls
 (`scripts/build-push.sh`, then `upgrade.sh` — never `--build` on the VM;
 see ai-config `docs/DEPLOY-STANDARD.md`).
 
 ```bash
-./scripts/build-push.sh
-ssh petronijus@192.0.2.101 '/opt/kp/infra/deploy/upgrade.sh'
+KP_API_TAG=$(git rev-parse --short HEAD) ./scripts/build-push.sh
+ssh petronijus@192.0.2.101 'cd /opt/kp \
+  && sed -i "s/^KP_API_TAG=.*/KP_API_TAG=<tag>/" .env \
+  && KP_API_TAG=<tag> ./infra/deploy/upgrade.sh'
 ```
 
-The script re-reads its own contents at start. If your release also changes
+`KP_API_TAG` stays pinned in `/opt/kp/.env` (infra/deploy/README.md): any
+later `docker compose up` re-creates the API from that tag, so the pin moves
+with every deploy. The VM checkout pulls over HTTPS (the repo is public) so
+the compose files follow `main`. If a release changes
 `infra/deploy/upgrade.sh`, run it twice — the first run pulls the new
 script, the second uses it.
 
-### 7. Smoke test
+### Smoke test
 
 - `curl https://kulturniprehled.example.com/healthz` → `200 {"status":"ok",…}`
-- Install the new APK on the Pixel, sign in, agenda + detail + month view
-  + watchlist + stats all render the way the release notes describe.
+- On the Pixel, update from Play, sign in; agenda, detail, month view,
+  watchlist and stats render the way the release notes describe; a
+  reminder fires on a locked phone.
 
 ## iOS dev sideload (physical device, free Apple ID)
 

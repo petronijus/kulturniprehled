@@ -36,6 +36,11 @@ class _MemorySecureStorage implements FlutterSecureStorage {
       values.remove(invocation.namedArguments[#key] as String);
       return Future<void>.value();
     }
+    if (invocation.memberName == #checkUpgradeStatus) {
+      return Future<SecureStorageUpgradeStatus>.value(
+        SecureStorageUpgradeStatus.unsupported,
+      );
+    }
     return super.noSuchMethod(invocation);
   }
 }

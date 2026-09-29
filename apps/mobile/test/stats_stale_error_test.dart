@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -22,6 +23,11 @@ class _NoopSecureStorage implements FlutterSecureStorage {
   dynamic noSuchMethod(Invocation invocation) {
     if (invocation.memberName == #readAll) {
       return Future<Map<String, String>>.value(<String, String>{});
+    }
+    if (invocation.memberName == #checkUpgradeStatus) {
+      return Future<SecureStorageUpgradeStatus>.value(
+        SecureStorageUpgradeStatus.unsupported,
+      );
     }
     return Future<void>.value();
   }
@@ -85,7 +91,7 @@ void main() {
     final ProviderContainer container = ProviderScope.containerOf(
       tester.element(find.byType(StatsScreen)),
     );
-    container.read(statsReplayProvider.notifier).state++;
+    container.read(statsReplayProvider.notifier).replay();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump(const Duration(milliseconds: 100));

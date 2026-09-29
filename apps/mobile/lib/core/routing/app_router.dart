@@ -208,11 +208,11 @@ class _HomeShellState extends ConsumerState<_HomeShell>
     // (StatefulShellRoute keeps branch state), so initState won't fire
     // on its own.
     if (index == 0) {
-      ref.read(agendaReplayProvider.notifier).state++;
+      ref.read(agendaReplayProvider.notifier).replay();
     } else if (index == 2) {
-      ref.read(watchlistReplayProvider.notifier).state++;
+      ref.read(watchlistReplayProvider.notifier).replay();
     } else if (index == 3) {
-      ref.read(statsReplayProvider.notifier).state++;
+      ref.read(statsReplayProvider.notifier).replay();
     }
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kp_mobile/core/replay_counter.dart';
 
 /// Monotonic counter bumped whenever something wants the agenda screen to
 /// replay its entrance animations (BlurInText titles, etc).
@@ -10,4 +11,5 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// The agenda screen listens to this provider and forwards the change
 /// through an InheritedWidget to every BlurInText in the list.
-final StateProvider<int> agendaReplayProvider = StateProvider<int>((_) => 0);
+final NotifierProvider<ReplayCounter, int> agendaReplayProvider =
+    NotifierProvider<ReplayCounter, int>(ReplayCounter.new);

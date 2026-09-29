@@ -1,0 +1,13 @@
+# Python outside apps/api (skill scripts, dev tools, hooks, claudebox tools).
+# apps/api keeps its own, stricter config in apps/api/pyproject.toml; ruff uses
+# the closest one. These scripts run on each machine's own `python3`, which is
+# 3.9 on a macOS without Homebrew, so they stay 3.9-compatible.
+target-version = "py39"
+line-length = 100
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+# The scrapers parse and print real Czech typography: en dashes in date and
+# price ranges, curly quotes and primes in titles, the multiplication sign in
+# seat coordinates, and no-break spaces inside prices ("1 290 Kč").
+allowed-confusables = ["–", "‘", "’", "´", "ʹ", "′", "×", " "]

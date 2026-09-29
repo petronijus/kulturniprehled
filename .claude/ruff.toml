@@ -1,0 +1,4 @@
+# The hook scripts come from the project-setup harness templates, written for
+# 120 columns; keeping them byte-identical keeps `/project-setup upgrade` a copy.
+extend = "../ruff.toml"
+line-length = 120

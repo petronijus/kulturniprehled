@@ -10,10 +10,32 @@ indent_style = space
 [*.{py,toml}]
 indent_size = 4
 
-[*.{dart,yaml,yml,json,md,html,css,js,ts}]
+[*.py]
+max_line_length = 100
+
+[*.{dart,yaml,yml,json,md,html,css,js,ts,tsx}]
 indent_size = 2
 
+[*.{kt,kts}]
+indent_size = 4
+max_line_length = 120
+# intellij_idea and android_studio report the same on this code; ktlint_official more.
+ktlint_code_style = intellij_idea
+ktlint_function_naming_ignore_when_annotated_with = Test
+# The Kotlin package is the app's namespace, com.kulturniprehled.kp_mobile, which
+# Flutter derived from the project name and the installed app is tied to.
+ktlint_standard_package-name = disabled
+
+[*.swift]
+indent_size = 2
+
+[justfile]
+indent_size = 4
+
 [Makefile]
+indent_style = tab
+
+[*.pbxproj]
 indent_style = tab
 
 [*.md]

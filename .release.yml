@@ -13,4 +13,4 @@ artifacts:
 registry:
   images: []
 preflight_extra:
-  - cd apps/api && python -m pytest -q
+  - just ci                             # the full gate; there is no hosted CI

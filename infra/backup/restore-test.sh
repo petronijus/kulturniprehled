@@ -18,6 +18,7 @@ SCRATCH="kp-restore-test"
 
 if [ -f "$ENV_FILE" ]; then
     set -a
+    # shellcheck source=/dev/null # the env file lives on the VM, not in the repo
     . "$ENV_FILE"
     set +a
 fi
@@ -54,7 +55,7 @@ docker run -d --rm --name "$SCRATCH" \
     postgres:16-alpine >/dev/null
 
 # Wait for readiness.
-for i in $(seq 1 30); do
+for _ in $(seq 1 30); do
     if docker exec "$SCRATCH" pg_isready -U "$POSTGRES_USER" >/dev/null 2>&1; then
         break
     fi

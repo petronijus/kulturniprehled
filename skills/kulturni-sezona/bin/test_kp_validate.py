@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import unittest
+from typing import Any, ClassVar
 
 from kp_validate import as_prague, timed_conflict
 
@@ -16,7 +17,7 @@ class TimedConflictTz(unittest.TestCase):
     emits naive local stamps while scrapers emit `+02:00` offsets.
     """
 
-    BLOCKED = {
+    BLOCKED: ClassVar[dict[str, Any]] = {
         "blocked_days": [],
         "conflicts": [
             {
@@ -28,9 +29,7 @@ class TimedConflictTz(unittest.TestCase):
     }
 
     def test_aware_event_vs_naive_conflict(self) -> None:
-        conflict = timed_conflict(
-            "2026-11-02", "2026-11-02T20:00:00+01:00", self.BLOCKED
-        )
+        conflict = timed_conflict("2026-11-02", "2026-11-02T20:00:00+01:00", self.BLOCKED)
         self.assertEqual(conflict, "UX Monday")
 
     def test_naive_event_vs_naive_conflict(self) -> None:
@@ -38,9 +37,7 @@ class TimedConflictTz(unittest.TestCase):
         self.assertEqual(conflict, "UX Monday")
 
     def test_event_clear_of_conflict(self) -> None:
-        conflict = timed_conflict(
-            "2026-11-03", "2026-11-03T20:00:00+01:00", self.BLOCKED
-        )
+        conflict = timed_conflict("2026-11-03", "2026-11-03T20:00:00+01:00", self.BLOCKED)
         self.assertIsNone(conflict)
 
     def test_utc_z_suffix_event(self) -> None:

@@ -35,7 +35,10 @@ from collections import defaultdict
 from email.message import EmailMessage
 from typing import Any
 
-UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36"
+UA = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/140.0 Safari/537.36"
+)
 KP_UA = "kp-seat-watch/1.0"
 # Seats are absolutely positioned; neighbours share a row and sit one pitch
 # apart. Real halls measure 18–19px at the default zoom, so the window is
@@ -97,7 +100,7 @@ def _get(
             return response.read().decode("utf-8", "replace"), response.geturl()
     except urllib.error.HTTPError as error:
         raise HallUnavailable(f"http_{error.code}") from error
-    except Exception as error:  # noqa: BLE001 - any transport failure is one outcome
+    except Exception as error:
         raise HallUnavailable(f"fetch_failed: {type(error).__name__}") from error
 
 
@@ -186,7 +189,7 @@ def find_adjacent(
     for _, row in sorted(rows.items()):
         row.sort(key=lambda s: s["left"])
         run = [row[0]]
-        for previous, seat in zip(row, row[1:], strict=False):
+        for previous, seat in zip(row, row[1:]):
             if PITCH_MIN <= seat["left"] - previous["left"] <= PITCH_MAX:
                 run.append(seat)
             else:
@@ -207,9 +210,7 @@ def notify(watch: dict[str, Any], found: list[dict[str, Any]]) -> bool:
     to = os.environ.get("SEAT_WATCH_MAIL_TO") or os.environ.get("DIGEST_MAIL_TO")
     if not (host and to):
         return False
-    where = ", ".join(
-        f"{s['category'] or '?'} @ {s['left']}×{s['top']}" for s in found
-    )
+    where = ", ".join(f"{s['category'] or '?'} @ {s['left']}×{s['top']}" for s in found)
     message = EmailMessage()
     message["Subject"] = f"🎟 Uvolnila se místa: {watch['label']}"
     message["From"] = os.environ.get("DIGEST_MAIL_FROM", to)
@@ -281,7 +282,7 @@ def main() -> int:
             return 2
     try:
         run_once(args.verbose)
-    except Exception as error:  # noqa: BLE001 - a timer wants a clean exit code
+    except Exception as error:
         print(f"seat-watch failed: {error}", file=sys.stderr)
         return 1
     return 0

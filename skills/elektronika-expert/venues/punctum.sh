@@ -10,7 +10,8 @@
 set -u
 
 # Shared Prague-time helper (see ../../klasika-expert/ensembles/lib).
-export PYTHONPATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../klasika-expert/ensembles/lib${PYTHONPATH:+:$PYTHONPATH}"
+lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../klasika-expert/ensembles/lib"
+export PYTHONPATH="$lib_dir${PYTHONPATH:+:$PYTHONPATH}"
 
 URL="https://punctum.cz/rss"
 UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'

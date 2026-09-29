@@ -218,7 +218,8 @@ async def list_items(
 ) -> WatchlistListResponse:
     workspace = await _user_workspace(session, user)
     rows = await session.scalars(
-        select(WatchlistItem).where(
+        select(WatchlistItem)
+        .where(
             WatchlistItem.workspace_id == workspace.id,
             WatchlistItem.deleted_at.is_(None),
         )

@@ -25,6 +25,7 @@ NOW="$(date -u +%Y%m%dT%H%M%SZ)"
 
 if [ -f "$ENV_FILE" ]; then
     set -a
+    # shellcheck source=/dev/null # the env file lives on the VM, not in the repo
     . "$ENV_FILE"
     set +a
 fi

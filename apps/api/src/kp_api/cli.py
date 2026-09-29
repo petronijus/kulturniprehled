@@ -67,7 +67,7 @@ async def _cmd_mint_pat(
 
     if not quiet:
         print(
-            "Personal access token (copy now — it is not stored on the server " "in plaintext):",
+            "Personal access token (copy now — it is not stored on the server in plaintext):",
             file=sys.stderr,
         )
     sys.stdout.write(token + "\n")

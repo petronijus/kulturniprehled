@@ -130,7 +130,8 @@ async def engine(settings: Settings) -> AsyncIterator[AsyncEngine]:
 @pytest_asyncio.fixture(autouse=True)
 async def _clean_db(engine: AsyncEngine) -> AsyncIterator[None]:
     async with engine.begin() as conn:
-        await conn.execute(text("""
+        await conn.execute(
+            text("""
                 TRUNCATE TABLE
                   applied_ops,
                   refresh_tokens,
@@ -149,7 +150,8 @@ async def _clean_db(engine: AsyncEngine) -> AsyncIterator[None]:
                   venues,
                   users
                 RESTART IDENTITY CASCADE
-                """))
+                """)
+        )
     yield
 
 

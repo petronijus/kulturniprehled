@@ -1,0 +1,33 @@
+# Git hooks — https://lefthook.dev. Installed per clone by `just setup`.
+# Personal overrides go to lefthook-local.yml (gitignored).
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: format
+      glob:
+        - "*.dart"
+        - "*.swift"
+        - "*.kt"
+        - "*.kts"
+        - "*.py"
+        - "*.sh"
+        - "apps/api/web/*.{ts,tsx,js,mjs,json,css}"
+        - "apps/api/web/**/*.{ts,tsx,js,mjs,json,css}"
+      run: tools/dev/format.sh {staged_files}
+      stage_fixed: true
+    - name: secrets
+      run: gitleaks git --pre-commit --staged --no-banner --redact
+    # The repo is public: no private hosts, addresses or personal data.
+    - name: pii
+      run: python3 tools/dev/pii-scan.py
+
+commit-msg:
+  jobs:
+    - name: conventional commit
+      run: tools/dev/commit-msg.sh {1}
+
+pre-push:
+  jobs:
+    - name: fast lane
+      run: just check

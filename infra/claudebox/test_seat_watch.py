@@ -18,7 +18,9 @@ import pathlib
 import re
 import sys
 
-spec = importlib.util.spec_from_file_location("seat_watch", pathlib.Path(__file__).with_name("seat-watch.py"))
+spec = importlib.util.spec_from_file_location(
+    "seat_watch", pathlib.Path(__file__).with_name("seat-watch.py")
+)
 assert spec is not None and spec.loader is not None
 seat_watch = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(seat_watch)
@@ -48,7 +50,10 @@ def hall(rows: list[list[bool]], category: str = SEATED) -> list[dict[str, objec
 
 def check(name: str, got: object, want: object) -> bool:
     ok = got == want
-    print(f"{'ok  ' if ok else 'FAIL'} {name}" + ("" if ok else f"\n       got {got!r}\n      want {want!r}"))
+    print(
+        f"{'ok  ' if ok else 'FAIL'} {name}"
+        + ("" if ok else f"\n       got {got!r}\n      want {want!r}")
+    )
     return ok
 
 
@@ -85,12 +90,18 @@ def main() -> int:
     # the flat seat list gets wrong.
     seats = hall([[False, False, False, True], [True, False, False, False]])
     results.append(
-        check("last of one row and first of the next is not a pair", seat_watch.find_adjacent(seats, 2, None), [])
+        check(
+            "last of one row and first of the next is not a pair",
+            seat_watch.find_adjacent(seats, 2, None),
+            [],
+        )
     )
 
     # --- how many -----------------------------------------------------------
     seats = hall([[True, True, True, False]])
-    results.append(check("three in a row, three wanted", len(seat_watch.find_adjacent(seats, 3, None)), 3))
+    results.append(
+        check("three in a row, three wanted", len(seat_watch.find_adjacent(seats, 3, None)), 3)
+    )
     results.append(
         check("three in a row, four wanted", seat_watch.find_adjacent(seats, 4, None), [])
     )
@@ -101,7 +112,11 @@ def main() -> int:
     # --- categories ---------------------------------------------------------
     seats = hall([[True, True, False]], category=STANDING)
     results.append(
-        check("standing places are not seats together", seat_watch.find_adjacent(seats, 2, [STANDING]), [])
+        check(
+            "standing places are not seats together",
+            seat_watch.find_adjacent(seats, 2, [STANDING]),
+            [],
+        )
     )
     results.append(
         check("…unless nothing is excluded", len(seat_watch.find_adjacent(seats, 2, None)), 2)
@@ -113,7 +128,9 @@ def main() -> int:
     seats = hall([[True, True]])
     seats[1]["top"] = 202
     results.append(
-        check("a two-pixel wobble is still one row", len(seat_watch.find_adjacent(seats, 2, None)), 2)
+        check(
+            "a two-pixel wobble is still one row", len(seat_watch.find_adjacent(seats, 2, None)), 2
+        )
     )
     # A different block entirely is not.
     seats = hall([[True, True]])
@@ -126,13 +143,16 @@ def main() -> int:
     payload = (
         "<div class='descr'>7.</div><!-- seats start -->"
         "<div style='left:248px;top:1196px;width:14px;height:14px;cursor:pointer;' "
-        "class='position-absolute is_seat ckt_7328  occupied' data-ckt='7328' id='s_0' onclick='P(0);'></div>"
+        "class='position-absolute is_seat ckt_7328  occupied' data-ckt='7328' id='s_0' "
+        "onclick='P(0);'></div>"
         "<div style='left:266px;top:1196px;width:14px;height:14px;cursor:pointer;' "
-        "class='position-absolute is_seat ckt_7323 ' data-ckt='7323' id='s_1' onclick='P(1);'></div>"
+        "class='position-absolute is_seat ckt_7323 ' data-ckt='7323' id='s_1' "
+        "onclick='P(1);'></div>"
     )
     parsed = []
     for match in re.finditer(
-        r"<div style='left:(\d+)px;top:(\d+)px;[^']*'\s+class='([^']*is_seat[^']*)'([^>]*)>", payload
+        r"<div style='left:(\d+)px;top:(\d+)px;[^']*'\s+class='([^']*is_seat[^']*)'([^>]*)>",
+        payload,
     ):
         left, top, classes, _ = match.groups()
         category = re.search(r"ckt_(\d+)", classes)
@@ -146,7 +166,9 @@ def main() -> int:
         )
     results.append(check("parses both seats", len(parsed), 2))
     results.append(check("reads the occupied flag", [s["occupied"] for s in parsed], [True, False]))
-    results.append(check("reads the price category", [s["category"] for s in parsed], ["7328", "7323"]))
+    results.append(
+        check("reads the price category", [s["category"] for s in parsed], ["7328", "7323"])
+    )
 
     print()
     failed = results.count(False)

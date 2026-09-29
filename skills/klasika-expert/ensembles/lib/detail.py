@@ -89,9 +89,7 @@ def _strong(fragment: str) -> list[str]:
 def _section(page: str, heading: str) -> str:
     """The slice between an <h2>/<h3> with this text and the next one."""
 
-    start = re.search(
-        rf"<h[23]\b[^>]*>\s*{heading}\s*</h[23]>", html_mod.unescape(page), re.I
-    )
+    start = re.search(rf"<h[23]\b[^>]*>\s*{heading}\s*</h[23]>", html_mod.unescape(page), re.I)
     if start is None:
         return ""
     rest = html_mod.unescape(page)[start.end() :]
@@ -196,9 +194,11 @@ def parse_cf(page: str) -> dict[str, Any]:
         names = _strong(block)
         if not names:
             continue
-        role = _text(re.search(r"<em\b[^>]*>(.*?)</em>", block, re.S | re.I).group(1)) if re.search(
-            r"<em\b[^>]*>(.*?)</em>", block, re.S | re.I
-        ) else ""
+        role = (
+            _text(re.search(r"<em\b[^>]*>(.*?)</em>", block, re.S | re.I).group(1))
+            if re.search(r"<em\b[^>]*>(.*?)</em>", block, re.S | re.I)
+            else ""
+        )
         if "dirigent" in role.lower():
             conductor = names[0]
         elif role:
@@ -354,7 +354,9 @@ def _pkf_field(page: str, name: str) -> str:
     found = re.search(
         # The class token has to end here: without the lookahead, asking for
         # "program" also matches "program-alternativa" and the two fields swap.
-        rf'<div class="field field--name-field-{name}(?=[\s"])[^"]*"[^>]*>', page, re.I
+        rf'<div class="field field--name-field-{name}(?=[\s"])[^"]*"[^>]*>',
+        page,
+        re.I,
     )
     return _div_block(page, found.start()) if found else ""
 
@@ -368,8 +370,8 @@ def parse_pkf(page: str) -> dict[str, Any]:
     program: list[dict[str, str]] = [
         _entry(composer, work)
         for composer, work in re.findall(
-            r'field--name-field-skladatel[^>]*>(.*?)</div>.*?'
-            r'field--name-field-skladba[^>]*>(.*?)</div>',
+            r"field--name-field-skladatel[^>]*>(.*?)</div>.*?"
+            r"field--name-field-skladba[^>]*>(.*?)</div>",
             _pkf_field(page, "program"),
             re.S | re.I,
         )

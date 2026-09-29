@@ -16,6 +16,9 @@
 # Usage:
 #   infra/ios/bootstrap-signing.sh
 
+# Variables expand locally on purpose; the commands run on the macOS VM.
+# shellcheck disable=SC2029
+
 set -euo pipefail
 
 MAC_HOST="petronijus@192.0.2.154"

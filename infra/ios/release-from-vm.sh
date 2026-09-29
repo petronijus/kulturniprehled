@@ -13,6 +13,10 @@
 #   infra/ios/release-from-vm.sh            # interactive — prompts before VM swap
 #   infra/ios/release-from-vm.sh --no-swap  # skip VM power management (VM already up)
 
+# Variables expand locally on purpose and the commands run on the remote
+# hosts, where ~ in REPO_DIR expands to the remote home.
+# shellcheck disable=SC2029,SC2088
+
 set -euo pipefail
 
 ### Configuration ############################################################
@@ -22,7 +26,6 @@ WIN_VM_ID=106
 MAC_HOST="petronijus@192.0.2.154"
 REPO_DIR="~/Documents/Dev/kulturniprehled"
 APPLE_ID="petronijus@example.com"
-BUNDLE_ID="com.kulturniprehled.kpMobile"
 API_BASE="https://kulturniprehled.example.com"
 NO_SWAP="${1:-}"
 ##############################################################################

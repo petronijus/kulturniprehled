@@ -35,6 +35,7 @@ if ! command -v docker >/dev/null 2>&1; then
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
         | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     sudo chmod a+r /etc/apt/keyrings/docker.gpg
+    # shellcheck source=/dev/null # a system file of the VM being set up
     UBUNTU_CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $UBUNTU_CODENAME stable" \
         | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null

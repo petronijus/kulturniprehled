@@ -7,35 +7,71 @@ international title, catalogue number dropped) and each hit is scored before
 anything is accepted. Everything the scorer is not sure about is written out
 for a human to look at rather than guessed.
 """
+
 from __future__ import annotations
-import json, os, re, sys, time, unicodedata, urllib.parse, urllib.request
+
+import json
+import os
+import re
+import sys
+import time
+import unicodedata
+import urllib.parse
+import urllib.request
 
 SD = os.environ.get("KP_SEASON_DIR") or sys.exit("set KP_SEASON_DIR to the season scratch dir")
 NON = re.compile(r"[^a-z0-9]+")
+
+
+def load(name: str):
+    with open(f"{SD}/{name}", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def dump(obj, name: str) -> None:
+    with open(f"{SD}/{name}", "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False)
+
 
 def fold(t: str | None) -> str:
     d = unicodedata.normalize("NFKD", (t or "").lower())
     s = "".join(c for c in d if not unicodedata.combining(c))
     return NON.sub(" ", s).strip()
 
+
 # Spotify has never heard of "Dmitrij Šostakovič"; the recordings sit under
 # the English transliteration. This cost a whole earlier pass.
 COMPOSER = {
-    "dmitrij sostakovic": "Shostakovich", "sostakovic": "Shostakovich",
-    "petr iljic cajkovskij": "Tchaikovsky", "cajkovskij": "Tchaikovsky",
-    "modest musorgskij": "Mussorgsky", "musorgskij": "Mussorgsky",
-    "sergej prokofjev": "Prokofiev", "prokofjev": "Prokofiev",
-    "sergej rachmaninov": "Rachmaninoff", "rachmaninov": "Rachmaninoff",
-    "frantisek kramar": "Krommer", "kramar": "Krommer",
-    "igor stravinskij": "Stravinsky", "stravinskij": "Stravinsky",
-    "nikolaj rimskij korsakov": "Rimsky-Korsakov", "rimskij korsakov": "Rimsky-Korsakov",
-    "fryderyk chopin": "Chopin", "gioachino rossini": "Rossini",
-    "felix mendelssohn bartholdy": "Mendelssohn", "antonin dvorak": "Dvořák",
-    "leos janacek": "Janáček", "bedrich smetana": "Smetana",
-    "bohuslav martinu": "Martinů", "josef suk": "Josef Suk",
-    "jevgenij svetlanov": "Svetlanov", "alexandr borodin": "Borodin",
-    "aram chacaturjan": "Khachaturian", "michail glinka": "Glinka",
-    "arvo part": "Arvo Pärt", "gyorgy ligeti": "Ligeti",
+    "dmitrij sostakovic": "Shostakovich",
+    "sostakovic": "Shostakovich",
+    "petr iljic cajkovskij": "Tchaikovsky",
+    "cajkovskij": "Tchaikovsky",
+    "modest musorgskij": "Mussorgsky",
+    "musorgskij": "Mussorgsky",
+    "sergej prokofjev": "Prokofiev",
+    "prokofjev": "Prokofiev",
+    "sergej rachmaninov": "Rachmaninoff",
+    "rachmaninov": "Rachmaninoff",
+    "frantisek kramar": "Krommer",
+    "kramar": "Krommer",
+    "igor stravinskij": "Stravinsky",
+    "stravinskij": "Stravinsky",
+    "nikolaj rimskij korsakov": "Rimsky-Korsakov",
+    "rimskij korsakov": "Rimsky-Korsakov",
+    "fryderyk chopin": "Chopin",
+    "gioachino rossini": "Rossini",
+    "felix mendelssohn bartholdy": "Mendelssohn",
+    "antonin dvorak": "Dvořák",
+    "leos janacek": "Janáček",
+    "bedrich smetana": "Smetana",
+    "bohuslav martinu": "Martinů",
+    "josef suk": "Josef Suk",
+    "jevgenij svetlanov": "Svetlanov",
+    "alexandr borodin": "Borodin",
+    "aram chacaturjan": "Khachaturian",
+    "michail glinka": "Glinka",
+    "arvo part": "Arvo Pärt",
+    "gyorgy ligeti": "Ligeti",
 }
 # Czech concert-programme titles → the spelling the catalogue uses.
 TITLE = [
@@ -86,11 +122,25 @@ TITLE = [
 ]
 # Noise the concert programme adds and the catalogue never carries.
 STRIP = [
-    r"\bvyber\b", r"\bvybrane casti\b", r"\bkoncertni provedeni\b", r"\bscenicka verze[^,]*",
-    r"\bkomorni provedeni\b", r"\bupravа[^,]*", r"\buprava[^,]*", r"\barr[ .][^,]*",
-    r"\bpro housle a klavir\b", r"\bpro klavir a orchestr\b", r"\bpro smycce a basso continuo\b",
-    r"\bsvetova premiera[^,]*", r"\bceska premiera[^,]*", r"\bna objednavku[^,]*",
-    r"\bz opery\b", r"\bz baletu\b", r"\bvyber z dila\b", r"\bpisne\b", r"\bzive\b", r"\blive set\b",
+    r"\bvyber\b",
+    r"\bvybrane casti\b",
+    r"\bkoncertni provedeni\b",
+    r"\bscenicka verze[^,]*",
+    r"\bkomorni provedeni\b",
+    r"\buprava[^,]*",
+    r"\barr[ .][^,]*",
+    r"\bpro housle a klavir\b",
+    r"\bpro klavir a orchestr\b",
+    r"\bpro smycce a basso continuo\b",
+    r"\bsvetova premiera[^,]*",
+    r"\bceska premiera[^,]*",
+    r"\bna objednavku[^,]*",
+    r"\bz opery\b",
+    r"\bz baletu\b",
+    r"\bvyber z dila\b",
+    r"\bpisne\b",
+    r"\bzive\b",
+    r"\blive set\b",
 ]
 CATNUM = re.compile(r"\b(kv|k|op|bwv|hob|wq|fk|rv|d|h|b|wc|hwv|fp)[ .]*\d+[a-z]*\b", re.I)
 
@@ -99,7 +149,8 @@ CATNUM = re.compile(r"\b(kv|k|op|bwv|hob|wq|fk|rv|d|h|b|wc|hwv|fp)[ .]*\d+[a-z]*
 PLACEHOLDER = re.compile(
     r"^(vyber|vyber z dila|vybrane casti|pisne|arie|various works|program[^|]*upresn|"
     r"live|live set|autorsky program|spolecny set|spolecny program|dj set|koncert|"
-    r"vystoupeni|recital|krest[^|]*|not specified.*|)$")
+    r"vystoupeni|recital|krest[^|]*|not specified.*|)$"
+)
 
 # What KIND of piece it is. A number surviving is not enough — "Klavírní koncert
 # č. 5" matched "Symphony No. 5" on the digit alone until this gate existed.
@@ -117,15 +168,15 @@ PLACEHOLDER = re.compile(
 KIND = [
     ("concerto", r"\bkoncert(y|u|em)?\b|\bconcertos?\b|\bkonzert(e|en)?\b"),
     ("symphony", r"\bsymfoni|\bsymphon|\bsinfoni"),
-    ("quartet",  r"\bkvartet(y|u|em)?\b|\bquartets?\b|\bquatuors?\b"),
-    ("quintet",  r"\bkvintet(y|u|em)?\b|\bquintets?\b"),
-    ("trio",     r"\btrios?\b"),
-    ("sextet",   r"\bsextets?\b"),
-    ("sonata",   r"\bsonat"),
+    ("quartet", r"\bkvartet(y|u|em)?\b|\bquartets?\b|\bquatuors?\b"),
+    ("quintet", r"\bkvintet(y|u|em)?\b|\bquintets?\b"),
+    ("trio", r"\btrios?\b"),
+    ("sextet", r"\bsextets?\b"),
+    ("sonata", r"\bsonat"),
     ("overture", r"\bpredehr|\bouvertur|\bovertures?\b"),
-    ("mass",     r"\bmse\b|\bmasses?\b|\bmass\b|\brequiems?\b"),
-    ("cantata",  r"\bkantat|\bcantatas?\b|\boratori"),
-    ("suite",    r"\bsuit[ay]\b|\bsuites?\b"),
+    ("mass", r"\bmse\b|\bmasses?\b|\bmass\b|\brequiems?\b"),
+    ("cantata", r"\bkantat|\bcantatas?\b|\boratori"),
+    ("suite", r"\bsuit[ay]\b|\bsuites?\b"),
     ("serenade", r"\bserenad"),
     ("fantasia", r"\bfantazie\b|\bfantas"),
     ("variations", r"\bvariace\b|\bvariation"),
@@ -136,17 +187,17 @@ KIND = [
 # kind, right number, wrong instrument entirely.
 INSTRUMENT = [
     ("violin", r"\bhousl|\bviolin"),
-    ("piano",  r"\bklavir|\bpiano\b|\bklavier"),
-    ("cello",  r"\bvioloncell|\bcello\b"),
-    ("viola",  r"\bviola\b"),
-    ("flute",  r"\bfletn|\bflute\b|\bflote\b"),
-    ("oboe",   r"\bhoboj|\boboe\b"),
+    ("piano", r"\bklavir|\bpiano\b|\bklavier"),
+    ("cello", r"\bvioloncell|\bcello\b"),
+    ("viola", r"\bviola\b"),
+    ("flute", r"\bfletn|\bflute\b|\bflote\b"),
+    ("oboe", r"\bhoboj|\boboe\b"),
     ("clarinet", r"\bklarinet|\bclarinet"),
     ("bassoon", r"\bfagot|\bbassoon"),
-    ("horn",   r"\blesni roh\b|\bhorn\b|\bcorno\b"),
+    ("horn", r"\blesni roh\b|\bhorn\b|\bcorno\b"),
     ("trumpet", r"\btrubk|\btrumpet"),
-    ("organ",  r"\bvarhan|\borgan\b"),
-    ("harp",   r"\bharf|\bharp\b"),
+    ("organ", r"\bvarhan|\borgan\b"),
+    ("harp", r"\bharf|\bharp\b"),
     ("guitar", r"\bkytar|\bguitar"),
 ]
 
@@ -159,6 +210,8 @@ def instruments_of(text):
 def kind_of(text):
     t = fold(text)
     return {name for name, pat in KIND if re.search(pat, t)}
+
+
 NUMBER = re.compile(r"\bno\s*(\d+)\b|\bc\s*(\d+)\b")
 # The work names one number ("č. 5"); the record that carries it often lists
 # several, and rarely with a marker in front of each — "Symphonies 5 & 7-9",
@@ -177,7 +230,8 @@ OPUS = re.compile(r"\bop\s*(\d{1,3})\b")
 COLLECTION = re.compile(
     r"\bcomplete\b|\bworks\b|\bintegrale\b|\bsamtliche\b|"
     r"\b(sonatas|quartets|quintets|trios|concertos|symphonies|sextets|"
-    r"scherzos|sonaty|kvartety|koncerty)\b")
+    r"scherzos|sonaty|kvartety|koncerty)\b"
+)
 
 
 def album_numbers(raw_name: str) -> set[str]:
@@ -193,6 +247,8 @@ def album_numbers(raw_name: str) -> set[str]:
         if 1 <= lo < hi <= 120 and hi - lo <= 40:
             found |= {str(n) for n in range(lo, hi + 1)}
     return found
+
+
 BAD_ALBUM = re.compile(
     r"\b(relaxation|relaxing|chill|sleep|study|best of classical|100 best|greatest hits|"
     r"famous|favourite|favorite|classical music for|essential classics|wedding|"
@@ -200,7 +256,9 @@ BAD_ALBUM = re.compile(
     # A "most popular pieces" record is one movement lifted out of the work —
     # four of these were sitting in the pool as if they were the symphony.
     r"\d+ most popular|most popular pieces|essentials?|anthology|antologija|"
-    r"masterpieces|the very best|this is )\b", re.I)
+    r"masterpieces|the very best|this is )\b",
+    re.I,
+)
 
 # socr.rozhlas.cz prints the playing time after each title ("Římské pinie
 # (23‘)"). It has to go before fold(), because fold() drops the brackets and
@@ -228,44 +286,56 @@ def variants(author: str, work: str) -> list[str]:
     for q in (f"{author} {work}", f"{a_en} {w_en}", f"{a_en} {w_nocat}", f"{a_en} {w_clean}"):
         q = re.sub(r"\s+", " ", q).strip()
         if q and q.lower() not in seen:
-            seen.add(q.lower()); out.append(q)
+            seen.add(q.lower())
+            out.append(q)
     return out
+
 
 def api(url: str, token: str) -> dict:
     req = urllib.request.Request(url, headers={"Authorization": "Bearer " + token})
-    for attempt in range(4):
+    for _attempt in range(4):
         try:
             return json.loads(urllib.request.urlopen(req, timeout=30).read())
         except urllib.error.HTTPError as e:
             if e.code == 429:
-                time.sleep(int(e.headers.get("Retry-After", "2")) + 1); continue
+                time.sleep(int(e.headers.get("Retry-After", "2")) + 1)
+                continue
             if e.code >= 500:
-                time.sleep(2); continue
+                time.sleep(2)
+                continue
             return {}
         except Exception:
             time.sleep(2)
     return {}
 
+
 def score(album: dict, author: str, work: str, hint: str = "") -> int:
     name = fold(album.get("name"))
     artists = fold(" ".join(a["name"] for a in album.get("artists", [])))
     hay = name + " " + artists
-    a_f = fold(author); sur = a_f.split()[-1] if a_f else ""
+    a_f = fold(author)
+    sur = a_f.split()[-1] if a_f else ""
     a_en = fold(COMPOSER.get(a_f) or COMPOSER.get(sur) or author)
     en_sur = a_en.split()[-1] if a_en else ""
     s = 0
-    if BAD_ALBUM.search(album.get("name") or ""): return -100
-    if sur and (sur in hay): s += 3
-    elif en_sur and (en_sur in hay): s += 3
-    else: return -100                      # not about this composer at all
+    if BAD_ALBUM.search(album.get("name") or ""):
+        return -100
+    if (sur and (sur in hay)) or (en_sur and (en_sur in hay)):
+        s += 3
+    else:
+        return -100  # not about this composer at all
     # The kind of piece has to agree. A concerto is not a symphony, however
     # well the opus number lines up.
     want, got = kind_of(work), kind_of(album.get("name"))
-    if want and got and not (want & got): return -100
-    if want and want & got: s += 2
+    if want and got and not (want & got):
+        return -100
+    if want and want & got:
+        s += 2
     w_instr, a_instr = instruments_of(work), instruments_of(album.get("name") or "")
-    if w_instr and a_instr and not (w_instr & a_instr): return -100
-    if w_instr and w_instr & a_instr: s += 2
+    if w_instr and a_instr and not (w_instr & a_instr):
+        return -100
+    if w_instr and w_instr & a_instr:
+        s += 2
     # A number in the piece must survive into the recording, or it is another work.
     # A number in the piece must survive into the recording, or it is another
     # work — but the record is allowed to say it a different way: by opus, by
@@ -279,11 +349,16 @@ def score(album: dict, author: str, work: str, hint: str = "") -> int:
         # No. 14 … Op. 27 No. 2" shares its opus with sonata 13 and IS NOT IT.
         stated = {m.group(1) or m.group(2) for m in NUMBER.finditer(name)}
         opus = set(OPUS.findall(w_f))
-        if nums & on_album: s += 3
-        elif stated: return -100
-        elif opus & on_album: s += 2
-        elif not on_album and COLLECTION.search(name): s += 1
-        else: return -100
+        if nums & on_album:
+            s += 3
+        elif stated:
+            return -100
+        elif opus & on_album:
+            s += 2
+        elif not on_album and COLLECTION.search(name):
+            s += 1
+        else:
+            return -100
     w_tokens = [t for t in fold(work).split() if len(t) > 3][:6]
     s += sum(1 for t in w_tokens if t in name)
     # A retry carries the catalogue title someone supplied by hand. Its words
@@ -293,10 +368,15 @@ def score(album: dict, author: str, work: str, hint: str = "") -> int:
     if hint:
         s += min(sum(1 for t in [t for t in fold(hint).split() if len(t) > 3][:6] if t in name), 4)
     for pat, rep in TITLE:
-        if re.search(pat, fold(work)) and fold(rep).split()[0] in name: s += 2; break
-    if album.get("album_type") == "album": s += 1
-    if (album.get("total_tracks") or 0) > 40: s -= 1     # box sets drown the work
+        if re.search(pat, fold(work)) and fold(rep).split()[0] in name:
+            s += 2
+            break
+    if album.get("album_type") == "album":
+        s += 1
+    if (album.get("total_tracks") or 0) > 40:
+        s -= 1  # box sets drown the work
     return s
+
 
 def retry() -> int:
     """Second pass: search again with catalogue titles supplied by hand.
@@ -314,14 +394,16 @@ def retry() -> int:
     """
 
     token = os.environ["SP_TOKEN"]
-    unsure = json.load(open(f"{SD}/unsure.json"))
-    supplied = json.load(open(f"{SD}/retry_titles.json"))
+    unsure = load("unsure.json")
+    supplied = load("retry_titles.json")
     if isinstance(supplied, dict):
-        supplied = [{"author": k.split("|")[0], "work": k.split("|")[-1], "title": v}
-                    for k, v in supplied.items()]
+        supplied = [
+            {"author": k.split("|")[0], "work": k.split("|")[-1], "title": v}
+            for k, v in supplied.items()
+        ]
     by_key = {(fold(t["author"]), fold(t["work"])): t["title"] for t in supplied}
 
-    resolved = json.load(open(f"{SD}/resolved.json"))
+    resolved = load("resolved.json")
     still, added = [], 0
     for p in unsure:
         title = by_key.get((fold(p["author"]), fold(p["work"])))
@@ -332,8 +414,9 @@ def retry() -> int:
         a_en = COMPOSER.get(a_f) or COMPOSER.get(a_f.split()[-1] if a_f else "") or p["author"]
         best = None
         for q in (f"{a_en} {title}", title):
-            url = ("https://api.spotify.com/v1/search?"
-                   + urllib.parse.urlencode({"q": q, "type": "album", "limit": 5, "market": "CZ"}))
+            url = "https://api.spotify.com/v1/search?" + urllib.parse.urlencode(
+                {"q": q, "type": "album", "limit": 5, "market": "CZ"}
+            )
             for alb in api(url, token).get("albums", {}).get("items", []):
                 sc = score(alb, p["author"], p["work"], hint=title)
                 if best is None or sc > best[0]:
@@ -345,21 +428,29 @@ def retry() -> int:
             still.append({**p, "why": f"retry with '{title}' still found nothing"})
             continue
         sc, alb, q = best
-        resolved.append({"author": p["author"], "work": p["work"],
-                         "spotify_url": alb["external_urls"]["spotify"],
-                         "match_label": f"{alb['artists'][0]['name']} — {alb['name']}",
-                         "_score": sc, "_query": q, "_album_id": alb["id"],
-                         "_total_tracks": alb.get("total_tracks"), "_retry_title": title})
+        resolved.append(
+            {
+                "author": p["author"],
+                "work": p["work"],
+                "spotify_url": alb["external_urls"]["spotify"],
+                "match_label": f"{alb['artists'][0]['name']} — {alb['name']}",
+                "_score": sc,
+                "_query": q,
+                "_album_id": alb["id"],
+                "_total_tracks": alb.get("total_tracks"),
+                "_retry_title": title,
+            }
+        )
         added += 1
-    json.dump(resolved, open(f"{SD}/resolved.json", "w"), ensure_ascii=False)
-    json.dump(still, open(f"{SD}/unsure.json", "w"), ensure_ascii=False)
+    dump(resolved, "resolved.json")
+    dump(still, "unsure.json")
     print(f"retry resolved: {added}   still unresolved: {len(still)}")
     return 0
 
 
 def main() -> int:
     token = os.environ["SP_TOKEN"]
-    pieces = json.load(open(f"{SD}/pieces.json"))
+    pieces = load("pieces.json")
     resolved, unsure = [], []
     for n, p in enumerate(pieces, 1):
         if "klasika" not in p["lanes"] and "elektronika" not in p["lanes"]:
@@ -372,8 +463,9 @@ def main() -> int:
             continue
         best = None
         for q in variants(p["author"], p["work"]):
-            url = ("https://api.spotify.com/v1/search?"
-                   + urllib.parse.urlencode({"q": q, "type": "album", "limit": 5, "market": "CZ"}))
+            url = "https://api.spotify.com/v1/search?" + urllib.parse.urlencode(
+                {"q": q, "type": "album", "limit": 5, "market": "CZ"}
+            )
             for alb in api(url, token).get("albums", {}).get("items", []):
                 sc = score(alb, p["author"], p["work"])
                 if best is None or sc > best[0]:
@@ -382,21 +474,29 @@ def main() -> int:
                 break
             time.sleep(0.08)
         if best is None or best[0] < 4:
-            unsure.append({**p, "why": "no plausible album", "best": (best[1]["name"] if best else None)})
+            unsure.append(
+                {**p, "why": "no plausible album", "best": (best[1]["name"] if best else None)}
+            )
             continue
         sc, alb, q = best
-        entry = {"author": p["author"], "work": p["work"],
-                 "spotify_url": alb["external_urls"]["spotify"],
-                 "match_label": f"{alb['artists'][0]['name']} — {alb['name']}",
-                 "_score": sc, "_query": q, "_album_id": alb["id"],
-                 "_total_tracks": alb.get("total_tracks")}
+        entry = {
+            "author": p["author"],
+            "work": p["work"],
+            "spotify_url": alb["external_urls"]["spotify"],
+            "match_label": f"{alb['artists'][0]['name']} — {alb['name']}",
+            "_score": sc,
+            "_query": q,
+            "_album_id": alb["id"],
+            "_total_tracks": alb.get("total_tracks"),
+        }
         resolved.append(entry)
         if n % 25 == 0:
             print(f"  … {n}/{len(pieces)}", file=sys.stderr)
-    json.dump(resolved, open(f"{SD}/resolved.json", "w"), ensure_ascii=False)
-    json.dump(unsure, open(f"{SD}/unsure.json", "w"), ensure_ascii=False)
+    dump(resolved, "resolved.json")
+    dump(unsure, "unsure.json")
     print(f"albums picked: {len(resolved)}   left unresolved: {len(unsure)}")
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(retry() if "--retry" in sys.argv else main())

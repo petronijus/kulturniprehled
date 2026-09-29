@@ -94,7 +94,9 @@ def work_keys(candidate: dict[str, Any]) -> list[str]:
 def parse_price(price_czk: str | None) -> tuple[int, int] | None:
     if not price_czk:
         return None
-    numbers = [int(n.replace(" ", "").replace(" ", "")) for n in re.findall(r"\d[\d  ]*", price_czk)]
+    numbers = [
+        int(n.replace(" ", "").replace(" ", "")) for n in re.findall(r"\d[\d  ]*", price_czk)
+    ]
     if not numbers:
         return None
     return (min(numbers), max(numbers))
@@ -187,9 +189,7 @@ def check_schedule(
 
     for (date_a, event_a, _), (date_b, event_b, _) in zip(dated, dated[1:]):
         gap = day_diff(date_a, date_b)
-        if gap < MIN_GAP_DAYS and not (
-            event_a.get("season_event") or event_b.get("season_event")
-        ):
+        if gap < MIN_GAP_DAYS and not (event_a.get("season_event") or event_b.get("season_event")):
             report.violation(
                 "gap",
                 f"'{event_a.get('title')}' ({date_a}) a '{event_b.get('title')}' ({date_b}) "
@@ -213,8 +213,12 @@ def check_works(
     events: list[dict[str, Any]],
     context: dict[str, Any] | None,
 ) -> None:
-    this_year = {normalize(w.replace("|", " ")) for w in (context or {}).get("history_works_this_year", [])}
-    last_year = {normalize(w.replace("|", " ")) for w in (context or {}).get("history_works_last_year", [])}
+    this_year = {
+        normalize(w.replace("|", " ")) for w in (context or {}).get("history_works_this_year", [])
+    }
+    last_year = {
+        normalize(w.replace("|", " ")) for w in (context or {}).get("history_works_last_year", [])
+    }
 
     seen: dict[str, str] = {}
     for event in events:
@@ -259,7 +263,8 @@ def check_prices(report: Report, events: list[dict[str, Any]]) -> None:
         elif midpoint > PRICE_WARN_CZK:
             report.warning(
                 "price_high",
-                f"'{title}': efektivní střed ceny {midpoint} Kč (pásmo {PRICE_WARN_CZK}–{PRICE_EXCLUDE_CZK})",
+                f"'{title}': efektivní střed ceny {midpoint} Kč "
+                f"(pásmo {PRICE_WARN_CZK}–{PRICE_EXCLUDE_CZK})",
             )
 
 
@@ -279,7 +284,9 @@ def check_month_variety(report: Report, events: list[dict[str, Any]]) -> None:
             )
 
 
-def check_lane_balance(report: Report, events: list[dict[str, Any]], pool: list[dict[str, Any]]) -> None:
+def check_lane_balance(
+    report: Report, events: list[dict[str, Any]], pool: list[dict[str, Any]]
+) -> None:
     pool_lanes = {str(candidate.get("lane")) for candidate in pool}
     scenario_lanes = {str(event.get("lane")) for event in events}
     for lane in sorted(pool_lanes - scenario_lanes):
@@ -379,9 +386,7 @@ def cmd_fit(args: argparse.Namespace) -> int:
     for slot in plan.get("reserved_slots", []):
         if slot.get("lane") == candidate.get("lane") and slot.get("month") == date_iso[:7]:
             fills_slot = slot
-            reasons.append(
-                f"zaplní rezervované místo: {slot.get('lane')}, {slot.get('month')}"
-            )
+            reasons.append(f"zaplní rezervované místo: {slot.get('lane')}, {slot.get('month')}")
             break
 
     json.dump(

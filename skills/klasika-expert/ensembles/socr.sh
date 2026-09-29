@@ -8,7 +8,8 @@
 set -u
 
 # Shared Prague-time helper (see lib/prague_time.py).
-export PYTHONPATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib${PYTHONPATH:+:$PYTHONPATH}"
+lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib"
+export PYTHONPATH="$lib_dir${PYTHONPATH:+:$PYTHONPATH}"
 
 URL="https://socr.rozhlas.cz/koncerty-a-vstupenky"
 UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'

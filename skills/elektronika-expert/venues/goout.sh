@@ -17,7 +17,8 @@
 
 set -u
 
-export PYTHONPATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../klasika-expert/ensembles/lib${PYTHONPATH:+:$PYTHONPATH}"
+lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../klasika-expert/ensembles/lib"
+export PYTHONPATH="$lib_dir${PYTHONPATH:+:$PYTHONPATH}"
 
 URL="${1:?usage: goout.sh <goout-url>}"
 UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'

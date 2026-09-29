@@ -72,6 +72,7 @@ Read `docs/sync.md` before touching sync, the outbox or any synced entity,
 | `just fmt` | format everything (`tools/dev/format.sh`) |
 | `just test-api` / `test-dart` / `test-web` / `test-scripts` | one test layer |
 | `just lint-py` / `lint-dart` / `lint-web` / `lint-shell` | one analyzer |
+| `just build-aab` | signed bundle for Play internal testing (upload key from 1Password) |
 | `just dev-up` / `dev-down` | the dev stack (Postgres, MinIO, API) |
 | `just secrets-decrypt` | materialise `.env` from the private overlay |
 | `just run` | the app on a connected device or simulator |
@@ -97,7 +98,8 @@ There is no hosted CI. `just ci` is the CI, run on the Linux desktop
   commit message carries what a PR description would: summary, why, test
   plan, and for UI changes what was verified by looking at it.
 - After every fix: commit and push. After every milestone: tag
-  (`vX.Y.Z`), push the tag, publish the signed APK (`docs/release.md`).
+  (`vX.Y.Z`), push the tag, ship the bundle to Play internal testing and
+  the build to TestFlight (`docs/release.md`).
 - Never `--no-verify`, never force-push `main`.
 
 ## Layout

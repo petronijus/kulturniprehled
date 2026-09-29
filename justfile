@@ -106,6 +106,39 @@ build-ios: _macos
 build-web: _web-deps
     cd {{web}} && npm run --silent build
 
+# Signed release bundle for Google Play (upload key and OAuth client ID from 1Password)
+build-aab:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # The real API host stays out of this public repo: the environment or the
+    # private overlay supplies it.
+    if [[ -z "${KP_API_BASE:-}" ]]; then
+      conf=private/config/mobile-release.conf
+      [[ -f "$conf" ]] || { echo "build-aab: set KP_API_BASE or clone the private overlay ($conf is missing)" >&2; exit 1; }
+      # shellcheck source=/dev/null
+      source "$conf"
+    fi
+    account="${OP_ACCOUNT:-my}"
+    key="op://Personal/Kulturni Prehled Android upload key"
+    dir="$(mktemp -d "${TMPDIR:-/tmp}/kp-upload.XXXXXX")"
+    trap 'rm -rf "$dir"' EXIT
+    op read --account "$account" --out-file "$dir/upload.jks" "$key/keystore file" >/dev/null
+    export KP_UPLOAD_KEYSTORE="$dir/upload.jks"
+    KP_UPLOAD_STORE_PASSWORD="$(op read --account "$account" "$key/store password")"
+    KP_UPLOAD_KEY_PASSWORD="$(op read --account "$account" "$key/key password")"
+    KP_UPLOAD_KEY_ALIAS="$(op read --account "$account" "$key/key alias")"
+    export KP_UPLOAD_STORE_PASSWORD KP_UPLOAD_KEY_PASSWORD KP_UPLOAD_KEY_ALIAS
+    client_id="$(op read --account "$account" "op://API/Kulturni prehled google Web OAuth client/client ID")"
+    cd {{mobile}}
+    flutter build appbundle --release \
+      --dart-define=KP_API_BASE="$KP_API_BASE" \
+      --dart-define=KP_GOOGLE_OAUTH_SERVER_CLIENT_ID="$client_id"
+    aab=build/app/outputs/bundle/release/app-release.aab
+    signer="$(keytool -printcert -jarfile "$aab" | sed -n 's/^Owner: //p' | head -1)"
+    [[ "$signer" == "CN=Kulturni Prehled upload, O=Bastla, C=CZ" ]] || { echo "build-aab: unexpected signer: $signer" >&2; exit 1; }
+    echo "signed by: $signer"
+    echo "upload:    {{mobile}}/$aab"
+
 # The API image exactly as scripts/build-push.sh builds it, tagged locally only
 build-api: _docker
     docker build --quiet -t kulturniprehled-api:ci -f {{api}}/Dockerfile {{api}}

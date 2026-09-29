@@ -55,16 +55,28 @@ tickets and creates events automatically.
   + Běla's phone sideload), TestFlight Internal Testing (group `Družina`)
   for iOS.
 
-See [`CLAUDE.md`](./CLAUDE.md) for the development guide, including the
-local pre-merge checklist, release procedure and iOS dev-sideload flow.
+## Docs
+
+| Doc | For |
+|---|---|
+| [`docs/development.md`](docs/development.md) | toolchain, setup per OS, checks, git hooks, troubleshooting |
+| [`docs/release.md`](docs/release.md) | Android APK, backend deploy, TestFlight, iOS sideload |
+| [`docs/architecture.md`](docs/architecture.md) | system architecture, notifications without push |
+| [`docs/sync.md`](docs/sync.md) | sync protocol, outbox, invariants |
+| [`docs/api.md`](docs/api.md) | REST API (also `/openapi.json`) |
+| [`docs/deployment.md`](docs/deployment.md) | Proxmox VM, Cloudflare Tunnel, backups |
+| [`docs/SELF-HOSTING.md`](docs/SELF-HOSTING.md) | running your own instance |
+| [`AGENTS.md`](AGENTS.md) | rules for coding agents (Claude Code, Cursor, Codex) |
 
 ## Repository layout
 
 ```
 apps/api/            FastAPI service
 apps/mobile/         Flutter app
+apps/api/web/        season-planner SPA (React + Vite), served at /app
 packages/            OpenAPI snapshot
-skills/ticket-parser Claude Code skill source
+skills/              Claude Code skills: ticket ingest, domain experts, season planner
+tools/dev/           formatter, toolchain doctor, commit-msg check, PII scan
 assets-source/       master design assets — user-authored, repo of truth
   brand/             logo + launcher + notification icon masters; the
                      downstream PNG/AppIcon variants are regenerated from
@@ -76,15 +88,21 @@ infra/
   cloudflared/          tunnel config example
   deploy/               setup-vm.sh + upgrade.sh + README
   backup/               pg_dump, mc_mirror, restore-test, cron.example
-docs/                Architecture, API, sync, deployment, handover notes
+docs/                architecture, sync, API, release, deployment, development
 ```
 
 ## Quick start (development)
 
-Prerequisites:
-- Docker and Docker Compose v2
-- Python 3.12+ (only needed for running backend tests outside Docker)
-- Flutter 3.47.5 (only needed for the mobile app)
+Prerequisites: the pinned toolchain in
+[`docs/development.md`](docs/development.md) — `just doctor` checks it.
+
+```bash
+just setup     # checks the toolchain, installs git hooks, fetches dependencies
+just check     # fast lane: formatting, analyzers, every unit test (~1 min)
+just ci        # full gate: + the APK, the SPA bundle, the API image, iOS on macOS
+```
+
+Then the dev stack:
 
 ```bash
 cp .env.example .env
@@ -117,20 +135,12 @@ ln -sfn $(pwd)/skills/ticket-parser ~/.claude/skills/kulturni-prehled-ingest
 
 ## Testing
 
-```bash
-# Backend (testcontainers spins up Postgres + MinIO)
-cd apps/api
-uv sync --dev
-uv run pytest
-
-# Mobile
-cd apps/mobile
-flutter pub get
-flutter test
-```
-
-See [`CLAUDE.md`](./CLAUDE.md) for the full pre-merge checklist (ruff,
-black, mypy, dart format, flutter analyze).
+`just check` runs every analyzer and unit test; `just test-api`,
+`just test-dart`, `just test-web` and `just test-scripts` run one layer
+(the API tests start Postgres and MinIO with testcontainers, so Docker must
+be running). There is no hosted CI: `just ci` is the gate, and the pre-push
+hook runs `just check`. Details in
+[`docs/development.md`](docs/development.md#checks).
 
 ## Production deployment
 
@@ -153,14 +163,13 @@ For routine releases: `ssh deploy@kp-vm /opt/kp/infra/deploy/upgrade.sh`.
 - **Android** — local signed APK build, published to GitHub Releases. Petr
   + Běla install via browser from
   `https://github.com/petronijus/kulturniprehled/releases`. Procedure in
-  [`CLAUDE.md`](./CLAUDE.md) under *Release procedure*.
+  [`docs/release.md`](docs/release.md).
 - **iOS** — TestFlight Internal Testing (group `Družina`,
   auto-distribute on). Two release paths:
-  - Local Mac with Xcode + app-specific password — original recipe in
-    [`CLAUDE.md`](./CLAUDE.md) under *iOS release procedure (TestFlight)*.
+  - Local Mac with Xcode + app-specific password — recipe in
+    [`docs/release.md`](docs/release.md).
   - Headless from any SSH-capable workstation via the Proxmox MacOS VM
-    + App Store Connect API key. End-to-end recipe lives in
-    [`docs/handover.md`](./docs/handover.md) under the 2026-05-22 session.
+    + App Store Connect API key — the `ios-release-vm` skill.
 
 ## Milestones
 

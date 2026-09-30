@@ -67,11 +67,12 @@ Read `docs/sync.md` before touching sync, the outbox or any synced entity,
 | Command | What it does |
 |---|---|
 | `just setup` | check the toolchain, install git hooks, `flutter pub get`, `uv sync`, `npm ci` |
-| `just check` | fast lane (~1 min): formatting, all analyzers, Dart, API (testcontainers), web and script tests |
+| `just check` | fast lane (~1 min): formatting, all analyzers, docs check, Dart, API (testcontainers), web and script tests |
 | `just ci` | full gate: fast lane + debug APK, SPA bundle, API image, and the iOS build on macOS |
 | `just fmt` | format everything (`tools/dev/format.sh`) |
 | `just test-api` / `test-dart` / `test-web` / `test-scripts` | one test layer |
 | `just lint-py` / `lint-dart` / `lint-web` / `lint-shell` | one analyzer |
+| `just lint-docs` | the docs name only recipes, files, headings and imports that exist (also a pre-commit job) |
 | `just build-aab` | signed bundle for Play internal testing (upload key from 1Password) |
 | `just dev-up` / `dev-down` | the dev stack (Postgres, MinIO, API) |
 | `just secrets-decrypt` | materialise `.env` from the private overlay |
@@ -113,7 +114,7 @@ infra/             compose files, deploy, backup, claudebox timers, iOS release 
 scripts/           image build + push, secrets, PAT minting, iOS private-value injection
 assets-source/     brand masters (Petr's; read-only)
 packages/          OpenAPI notes (no snapshot: the API serves /openapi.json)
-tools/dev/         formatter, doctor, commit-msg check, PII scan
+tools/dev/         formatter, doctor, commit-msg check, PII scan, docs check
 docs/              architecture, sync, API, release, deployment, development
 private/           private overlay (gitignored; its own repo)
 ```

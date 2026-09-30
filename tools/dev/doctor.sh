@@ -68,7 +68,7 @@ else
 fi
 
 echo "Dev tools"
-for t in just lefthook gitleaks uv ktlint shellcheck; do
+for t in just lefthook gitleaks python3 uv ktlint shellcheck; do
   has "$t" && ok "$t" || bad "$t missing" "brew install $t   (Linux: see docs/development.md)"
 done
 

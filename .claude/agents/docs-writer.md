@@ -31,7 +31,10 @@ disagrees with the code is a bug.
 1. Start from `git diff HEAD` (or the given range); list the facts that
    changed; update only their homes.
 2. Verify before writing: every command exists (`just --list`, scripts),
-   every path exists, every version matches the build files.
+   every path exists, every version matches the build files. Then run
+   `just lint-docs`: it proves the recipes, links, anchors, repo paths and
+   `@imports` the docs name; it must pass. It cannot judge whether the
+   prose is true; that part is yours.
 3. Keep `AGENTS.md` and `CLAUDE.md` under 200 lines each; detail goes to
    `docs/` and `.claude/rules/`, linked.
 4. When the sync protocol, the API or the season-plan contracts change,
@@ -56,5 +59,5 @@ paths and commands in backticks.
 
 ## Report
 
-The files you changed, one line each on what and why, and any claim you
-could not verify.
+The files you changed, one line each on what and why, whether
+`just lint-docs` passes, and any claim you could not verify.

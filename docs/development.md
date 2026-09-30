@@ -29,6 +29,7 @@ pre-push hook runs the fast lane on every push.
 | Docker | running daemon | pytest starts Postgres and MinIO with testcontainers; `just build-api` |
 | ruff | locked in `apps/api/uv.lock` | one version for the API and every script (`uv run --project apps/api ruff`) |
 | just, lefthook, gitleaks, ktlint, shellcheck, uv | current | task runner, git hooks, secret scan, Kotlin and shell lint, Python toolchain |
+| python3 | ≥ 3.9 | the Claude Code hooks, the PII scan, the script tests and the docs check (standard library only) |
 | sops, age, op | current | secrets from the private overlay and 1Password |
 
 `just doctor` checks all of it and prints the fix for anything missing.
@@ -66,7 +67,8 @@ just secrets-decrypt   # .env for the dev stack (needs the overlay and 1Password
 
 | Recipe | Runs | When |
 |---|---|---|
-| `just check` | format check, `flutter analyze`, ruff + mypy, Biome + tsc, shellcheck, and every test below except builds (~1 min) | pre-push hook; Claude Code Stop hook |
+| `just check` | format check, `flutter analyze`, ruff + mypy, Biome + tsc, shellcheck, `just lint-docs`, and every test below except builds (~1 min) | pre-push hook; Claude Code Stop hook |
+| `just lint-docs` | `tools/dev/docs-check.py`: every `just` recipe, relative link, heading anchor, repo path in inline code and `@import` the docs name exists; AGENTS.md and CLAUDE.md within 200 lines | pre-commit hook, `just check` |
 | `just test-api` | pytest against Postgres 16 and MinIO in testcontainers | API changes |
 | `just test-dart` | `flutter test` | app changes |
 | `just test-web` | vitest | SPA changes |
@@ -95,7 +97,7 @@ What the tests cover:
 
 | Hook | Does |
 |---|---|
-| pre-commit | formats staged files and re-stages them; gitleaks scans the staged diff; the PII scan checks the added lines |
+| pre-commit | formats staged files and re-stages them; gitleaks scans the staged diff; the PII scan checks the added lines; the docs check |
 | commit-msg | Conventional Commits, subject ≤ 72 characters |
 | pre-push | `just check` |
 
@@ -150,3 +152,4 @@ and lets the commit through. Lines already in the repo are the monthly
 | `Unresolved reference` in a plugin's Kotlin after a dependency upgrade (seen with `sentry_flutter`) | stale incremental build from the old plugin version: `cd apps/mobile/android && ./gradlew --stop`, then `flutter clean` in `apps/mobile` |
 | a scraper run (`fok.sh`) takes minutes | expected: it fetches every detail page |
 | the commit is refused with `pii-scan` | replace the value with a placeholder and put the real one in `private/` |
+| `docs-check` names a path or recipe that is right in context (another repo's file, a future file in a plan) | write the reference so it cannot be misread, or put `<!-- docs-check: ignore -->` on that line (above a code fence: the whole block); docs that record history go to `EXCLUDE` in `tools/dev/docs-check.py` |

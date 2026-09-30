@@ -32,8 +32,8 @@ doctor:
 
 # ── fast lane (~1 min, no device, no app build) ──────────────────────────
 
-# Formatting, static analysis and every unit test that needs no build
-check: fmt-check lint test-dart test-api test-web test-scripts
+# Formatting, static analysis, the docs check and every unit test that needs no build
+check: fmt-check lint lint-docs test-dart test-api test-web test-scripts
 
 # Format every source file in place
 fmt: _web-deps
@@ -62,6 +62,10 @@ lint-web: _web-deps
 # shellcheck on every tracked shell script
 lint-shell:
     git ls-files -z '*.sh' | xargs -0 shellcheck
+
+# Docs name only recipes, files, headings and imports that exist
+lint-docs:
+    tools/dev/docs-check.py
 
 # Dart widget and unit tests
 test-dart:

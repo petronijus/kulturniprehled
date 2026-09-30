@@ -76,7 +76,7 @@ apps/mobile/         Flutter app
 apps/api/web/        season-planner SPA (React + Vite), served at /app
 packages/            OpenAPI notes (no snapshot: the API serves /openapi.json)
 skills/              Claude Code skills: ticket ingest, domain experts, season planner
-tools/dev/           formatter, toolchain doctor, commit-msg check, PII scan
+tools/dev/           formatter, toolchain doctor, commit-msg check, PII scan, docs check
 assets-source/       master design assets — user-authored, repo of truth
   brand/             logo + launcher + notification icon masters; the
                      downstream PNG/AppIcon variants are regenerated from
@@ -98,7 +98,7 @@ Prerequisites: the pinned toolchain in
 
 ```bash
 just setup     # checks the toolchain, installs git hooks, fetches dependencies
-just check     # fast lane: formatting, analyzers, every unit test (~1 min)
+just check     # fast lane: formatting, analyzers, docs, every unit test (~1 min)
 just ci        # full gate: + the APK, the SPA bundle, the API image, iOS on macOS
 ```
 
@@ -135,11 +135,11 @@ ln -sfn $(pwd)/skills/ticket-parser ~/.claude/skills/kulturni-prehled-ingest
 
 ## Testing
 
-`just check` runs every analyzer and unit test; `just test-api`,
-`just test-dart`, `just test-web` and `just test-scripts` run one layer
-(the API tests start Postgres and MinIO with testcontainers, so Docker must
-be running). There is no hosted CI: `just ci` is the gate, and the pre-push
-hook runs `just check`. Details in
+`just check` runs every analyzer, the docs check and every unit test;
+`just test-api`, `just test-dart`, `just test-web` and `just test-scripts`
+run one layer (the API tests start Postgres and MinIO with testcontainers,
+so Docker must be running). There is no hosted CI: `just ci` is the gate,
+and the pre-push hook runs `just check`. Details in
 [`docs/development.md`](docs/development.md#checks).
 
 ## Production deployment

@@ -18,8 +18,10 @@ publicly without opening ports on the home network.
    - `MINIO_PUBLIC_USE_SSL=true`
    - `MINIO_SERVER_URL=https://tickets.kp.example.com` (env var on the
      MinIO container itself, so MinIO advertises the public hostname).
-3. Create the Cloudflare Tunnel, mount the credentials JSON into the
-   `cloudflared` container per `infra/cloudflared/config.example.yml`.
+3. Create the Cloudflare Tunnel with the two public hostnames listed in
+   `infra/cloudflared/config.example.yml` and put its token in `.env` as
+   `CLOUDFLARE_TUNNEL_TOKEN`; the `cloudflared` container in
+   `infra/compose.prod.yml` runs with it.
 4. `docker compose -f infra/docker-compose.yml -f infra/compose.prod.yml up -d`
 5. Migrations run on every API start (see `apps/api/docker-entrypoint.sh`).
 6. Set up cron jobs for `infra/backup/pg_dump.sh` and `mc_mirror.sh`.

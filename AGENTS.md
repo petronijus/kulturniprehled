@@ -112,7 +112,7 @@ skills/            Claude Code skills: ticket ingest, domain experts, season pla
 infra/             compose files, deploy, backup, claudebox timers, iOS release scripts
 scripts/           image build + push, secrets, PAT minting, iOS private-value injection
 assets-source/     brand masters (Petr's; read-only)
-packages/          OpenAPI snapshot
+packages/          OpenAPI notes (no snapshot: the API serves /openapi.json)
 tools/dev/         formatter, doctor, commit-msg check, PII scan
 docs/              architecture, sync, API, release, deployment, development
 private/           private overlay (gitignored; its own repo)

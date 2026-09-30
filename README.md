@@ -74,7 +74,7 @@ tickets and creates events automatically.
 apps/api/            FastAPI service
 apps/mobile/         Flutter app
 apps/api/web/        season-planner SPA (React + Vite), served at /app
-packages/            OpenAPI snapshot
+packages/            OpenAPI notes (no snapshot: the API serves /openapi.json)
 skills/              Claude Code skills: ticket ingest, domain experts, season planner
 tools/dev/           formatter, toolchain doctor, commit-msg check, PII scan
 assets-source/       master design assets — user-authored, repo of truth
@@ -148,7 +148,7 @@ See [`infra/deploy/README.md`](./infra/deploy/README.md). TL;DR:
 
 ```bash
 sh infra/deploy/setup-vm.sh        # one-shot bootstrap
-# fill /opt/kp/.env, drop Cloudflare Tunnel creds in /etc/cloudflared
+# fill /opt/kp/.env, including CLOUDFLARE_TUNNEL_TOKEN for the cloudflared container
 docker compose --env-file /opt/kp/.env \
                -f /opt/kp/infra/docker-compose.yml \
                -f /opt/kp/infra/compose.prod.yml \

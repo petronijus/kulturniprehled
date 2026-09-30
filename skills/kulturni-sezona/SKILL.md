@@ -209,8 +209,9 @@ unresolved one keeps the search fallback), and plan-neutral.
 **A season run is not finished until this step has run.** Leaving it for
 later ships a planner whose ▶ buttons mostly do nothing, and the pool only
 grows — 259 unlinked pieces after the 2026-09-13 scrape, which is nobody's
-idea of a follow-up. `bin/resolve.py` and `bin/tracks.py` in that skill do
-the mechanical pass, so the cost is one run, not one call per piece.
+idea of a follow-up. `skills/program-links/bin/resolve.py` and
+`skills/program-links/bin/tracks.py` do the mechanical pass, so the cost is
+one run, not one call per piece.
 
 ### 4. Generate scenarios (LLM step — you are the LLM)
 

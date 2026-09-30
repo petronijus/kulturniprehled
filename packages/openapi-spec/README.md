@@ -1,18 +1,16 @@
-# OpenAPI spec snapshot
+# OpenAPI spec
 
-The backend's `/openapi.json` is committed here as a versioned snapshot so the
-Flutter Dart client (generated in `apps/mobile/lib/data/api_client/generated/`)
-stays in sync. Regeneration script lands in milestone M5.
+No snapshot of the schema is committed here. The bootstrap planned one, plus
+a Dart client generated from it with `openapi-generator`; milestone M5 wrote
+the client by hand instead, and neither was ever added.
 
-Planned workflow:
-
-```bash
-# Backend running locally or in CI
-curl -s http://localhost:8000/openapi.json | jq . > openapi.json
-
-# Generate Dart client (run from this directory)
-openapi-generator generate -i openapi.json -g dart-dio \
-  -o ../../apps/mobile/lib/data/api_client/generated
-```
-
-CI fails the PR if `openapi.json` is stale relative to the running API.
+- **The schema** is served live by the API: `GET /openapi.json` (Swagger UI
+  at `GET /docs`). [`docs/api.md`](../../docs/api.md) is the prose reference
+  and names the URLs for prod and the dev stack.
+- **The Dart client** is hand-written:
+  `apps/mobile/lib/data/api_client/kp_client.dart` (Dio, with the
+  bearer-token interceptor and the refresh-token rotation).
+- **Contract safety** comes from the tests, not from a generated client: the
+  API tests exercise every endpoint through the ASGI client, and the mobile
+  tests cover the client's auth and sync paths (`just test-api`,
+  `just test-dart`).

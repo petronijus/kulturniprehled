@@ -11,7 +11,7 @@ Two flows feed *Kulturní Přehled* the app:
    `https://kulturniprehled-plan.bastla.com/app` (internal split-horizon
    name — see One-time setup below).
 2. **Novelty watching** (`/kulturni-prehled`, weekly, Saturday 11:00
-   via `/schedule`) — re-scrapes, diffs against the pool, pushes
+   on the claudebox timer) — re-scrapes, diffs against the pool, pushes
    updates, and emails **only newly announced events** with a
    fit-suggestion against the standing plan. It is the only skill in
    the suite that sends email.
@@ -30,13 +30,13 @@ ONCE PER SEASON (local)
                      ▼
         Petr finalizes in the SPA (/app) — plan_status on candidates
 
-WEEKLY (cloud /schedule, Sat 11:00 — cloud-routine.md)
+WEEKLY (claudebox timer, Sat 11:00 — claudebox-routine.md)
 /kulturni-prehled (novelty watcher)
    ├─ experts in weekly mode (pool-aware enrichment = cheap)
    ├─ diff by dedup_key → novelties; ticket watchdog on plan events
    ├─ PUT pool (grows elektronika/film coverage all season)
    ├─ bin/kp_validate.py fit → „kam by to sedlo"
-   ├─ email novelties (HMAC 👍/👎, /v1/digest/send in cloud)
+   ├─ email novelties (HMAC 👍/👎, /v1/digest/send on the claudebox)
    └─ POST …/novelties/ack   (only after a successful send)
 ```
 
@@ -86,12 +86,11 @@ divadlo template + symlink + uncomment. No aggregator changes.
    done
    ```
 
-2. **Cloud PAT** for the /schedule routine — scopes
-   `digest:read feedback:sign digest:send season:read season:write`:
-
-   ```bash
-   ./scripts/mint-pat.sh   # then update the routine's stored KP_DIGEST_TOKEN
-   ```
+2. **Weekly-run PAT** on the claudebox — scopes
+   `digest:read feedback:sign digest:send events:read season:read season:write`;
+   mint it and place it as
+   [`infra/claudebox/README.md`](../../infra/claudebox/README.md#one-time-setup)
+   describes.
 
 3. **SPA access** — the planner is home-only and **login-less**: set
    `WEB_TRUSTED_LAN=true` in `/opt/kp/.env` (direct requests from the
@@ -111,9 +110,12 @@ divadlo template + symlink + uncomment. No aggregator changes.
 
    No Google OAuth involvement anywhere — the network is the auth.
 
-4. The `/schedule` routine (Sat 11:00 Europe/Prague) runs
-   [`cloud-routine.md`](./cloud-routine.md) — it survives this rework
-   unchanged as an entry, only the playbook content changed.
+4. The claudebox timer `kulturni-prehled-weekly.timer` (Sat 11:00
+   Europe/Prague) runs `infra/claudebox/run-weekly.sh`, which follows
+   [`claudebox-routine.md`](./claudebox-routine.md). It replaced the
+   Anthropic-cloud `/schedule` routine and its `cloud-routine.md` playbook
+   in 2026-08; setup in
+   [`infra/claudebox/README.md`](../../infra/claudebox/README.md).
 
 ## Operator calendar
 

@@ -1,6 +1,6 @@
 ---
 name: kulturni-prehled
-description: Weekly novelty watcher for Petr's season plan. Runs every active domain-expert skill in weekly mode, diffs the scrape against the backend season pool, pushes pool updates, and emails ONLY newly announced events with a fit-suggestion against the standing plan (kp_validate.py fit). Also watches ticket availability on planned events. **This is the only skill in the suite that sends email.** Designed to be invoked weekly by the /schedule skill; season planning itself lives in /kulturni-sezona.
+description: Weekly novelty watcher for Petr's season plan. Runs every active domain-expert skill in weekly mode, diffs the scrape against the backend season pool, pushes pool updates, and emails ONLY newly announced events with a fit-suggestion against the standing plan (kp_validate.py fit). Also watches ticket availability on planned events. **This is the only skill in the suite that sends email.** Runs weekly on the claudebox timer (infra/claudebox, claudebox-routine.md); season planning itself lives in /kulturni-sezona.
 ---
 
 ## Task
@@ -294,7 +294,8 @@ echo "Watchdog: <w> uvolněných lístků. Balance: $BALANCE_HINT"
 
 ## When to use
 
-- **Primary**: weekly via `/schedule` (Saturday 11:00).
+- **Primary**: weekly on the claudebox (`kulturni-prehled-weekly.timer`,
+  Saturday 11:00 Europe/Prague; playbook `claudebox-routine.md`).
 - **Manual**: `/kulturni-prehled` for an immediate novelty check.
 
 ## When NOT to use

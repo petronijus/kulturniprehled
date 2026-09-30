@@ -64,7 +64,8 @@ same upload. Until 1.2.0 it was a sideloaded APK on GitHub Releases.
 
 The image is built **locally** and pushed to GHCR; the VM only pulls
 (`scripts/build-push.sh`, then `upgrade.sh` — never `--build` on the VM;
-see ai-config `docs/DEPLOY-STANDARD.md`).
+see Petr's deploy standard, `ai-config/docs/DEPLOY-STANDARD.md` in the
+ai-config repo).
 
 ```bash
 KP_API_TAG=$(git rev-parse --short HEAD) ./scripts/build-push.sh

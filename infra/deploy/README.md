@@ -22,8 +22,11 @@ The script:
 Then **manually**:
 
 1. Edit `/opt/kp/.env` with secrets (1Password is the source of truth).
-2. Place the Cloudflare Tunnel credentials JSON into `/etc/cloudflared/`
-   and point `infra/cloudflared/config.yml` at the matching UUID.
+2. Set `CLOUDFLARE_TUNNEL_TOKEN` in `/opt/kp/.env`: `infra/compose.prod.yml`
+   runs `cloudflared` with that token (a tunnel managed in the Cloudflare
+   dashboard), so no credentials file or `config.yml` is mounted. Give the
+   tunnel the two public hostnames listed in
+   `infra/cloudflared/config.example.yml`.
 3. Bring the stack up:
 
    ```bash

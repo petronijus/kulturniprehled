@@ -52,10 +52,17 @@ approval. Today (UTC): $STAMP."
 
 echo "[$(date -u +%FT%TZ)] launching kulturni-sezona; log=$LOG"
 RUN_STAGE="claude"
+# --permission-mode dontAsk: only allowed-tools-weekly.txt is approved. The
+# box's synced settings default to `auto`, where a classifier would approve
+# anything else and the list would be advice, not a boundary (2026-09-30).
+# `< /dev/null`: claude -p reads stdin and blocks on an inherited pipe or TTY
+# (the Ústředna supervisor hung 5+ h on one on 2026-08-10).
 claude -p "$PROMPT" \
+  --permission-mode dontAsk \
   --allowedTools "$ALLOWED" \
   --add-dir "$REPO" \
   --output-format text \
+  < /dev/null \
   2>&1 | tee "$LOG"
 
 RUN_STAGE="done"

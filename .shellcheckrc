@@ -1,0 +1,5 @@
+# Follow `# shellcheck source=` directives (paths are relative to the repo
+# root) without passing -x: the lefthook format hook and `just` run plain
+# `shellcheck <files>`, and a script that sources lib.sh otherwise reports
+# the variables lib.sh reads as unused (SC2034).
+external-sources=true

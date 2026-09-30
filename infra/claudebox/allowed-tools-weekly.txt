@@ -4,6 +4,12 @@
 # own data — but such edits do not survive the run (lib.sh parks them as a
 # patch + stash and alerts). Deliberately absent: git push, gh, any email
 # connector — the only send path is the KP API itself.
+# Enforced with --permission-mode dontAsk since 2026-09-30: nothing unlisted
+# runs. Note that `Bash` is listed whole, so git push / gh are absent only as
+# tools of their own — the shell itself can still reach them.
+# ToolSearch: loads deferred tools (WebFetch and friends); dontAsk denies it
+# unless listed, and the runs use it every week.
+ToolSearch
 Bash
 Read
 Write

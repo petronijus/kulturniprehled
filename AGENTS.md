@@ -8,7 +8,7 @@ Codex, …); humans start at `README.md`.
 
 | Layer | Choice |
 |---|---|
-| Backend | Python 3.12, FastAPI, SQLAlchemy 2.0 async, PostgreSQL 16, Alembic, MinIO |
+| Backend | Python 3.12, FastAPI, SQLAlchemy 2.1 async, PostgreSQL 16, Alembic, MinIO |
 | Mobile | Flutter 3.47.5, drift (SQLite), Riverpod, go_router, Material 3 |
 | Planner | React + Vite SPA served by the API at `/app` (home network only) |
 | Auth | Google OAuth2 (PKCE) → JWT + refresh-token rotation; scoped PATs for the skills |

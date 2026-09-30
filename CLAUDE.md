@@ -11,8 +11,10 @@ Project configuration lives in `.claude/` (committed). What it does for you:
     are left alone mid-edit; `just check` catches the ones that stay;
   - writing key material, SOPS files, the brand masters, drift's
     `*.g.dart`, lockfiles and build output is refused, from the shell too,
-    and so is a shell command that prints key material; `project.pbxproj`
-    asks first;
+    and so is a shell command that prints key material — also when wrapped
+    (`sudo -u x cat …`) or reached by a recursive search (`grep -r`; use `rg` or
+    `git grep`, which skip gitignored files); a call the guard cannot parse
+    is denied; `project.pbxproj` asks first;
   - when you finish a turn with code changes, `just check` runs; if it
     fails, you get the output and must fix it before stopping.
 - **Rules** (`.claude/rules/`) load when you read files under

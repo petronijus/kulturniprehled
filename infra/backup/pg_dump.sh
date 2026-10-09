@@ -44,16 +44,18 @@ SIZE_BYTES="$(stat -c '%s' "$TMP")"
 KEY="${PREFIX}/${NOW}.sql.gz"
 
 echo "[pg_dump] uploading ${SIZE_BYTES} B → s3://${BUCKET}/${KEY}"
+# minio-init is the stack's `mc` shell; its credentials are in its compose
+# environment and expand inside the container (hence the single quotes),
+# bucket and key arrive as $1 and $2. The dump streams in on stdin: the
+# image runs as nonroot 65532, which cannot read this 0600 temp file through
+# a bind mount.
+# shellcheck disable=SC2016 # the script expands its variables in the container
 docker compose --env-file "$ENV_FILE" \
     -f "$COMPOSE_FILE" -f "$COMPOSE_PROD" \
-    run --rm -T \
-    -v "$TMP:/dump.sql.gz:ro" \
-    minio-init \
-    /bin/sh -c "
-        mc alias set kp http://minio:9000 \
-            \${MINIO_ACCESS_KEY} \${MINIO_SECRET_KEY} >/dev/null &&
-        mc mb --ignore-existing kp/${BUCKET} >/dev/null &&
-        mc cp /dump.sql.gz kp/${KEY}
-    "
+    run --rm -T --entrypoint /bin/sh minio-init -c '
+        mc alias set kp http://minio:9000 "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" >/dev/null &&
+        mc mb --ignore-existing "kp/$1" >/dev/null &&
+        mc pipe "kp/$1/$2"
+    ' sh "$BUCKET" "$KEY" < "$TMP"
 
 echo "[pg_dump] done."

@@ -26,26 +26,31 @@ fi
 BUCKET="${MINIO_BACKUP_BUCKET:-backups}"
 TMP="$(mktemp -d -t kp-restore.XXXXXX)"
 
+# `rm -v`: removing the scratch container here pre-empts its --rm, which
+# would otherwise have taken the anonymous Postgres data volume along.
 trap '
     rm -rf "$TMP"
     if [ "$KEEP" != "1" ]; then
-        docker rm -f "$SCRATCH" >/dev/null 2>&1 || true
+        docker rm -f -v "$SCRATCH" >/dev/null 2>&1 || true
     fi
 ' EXIT
 
 echo "[restore-test] fetching latest dump from MinIO..."
+# minio-init is the stack's `mc` shell; its credentials are in its compose
+# environment and expand inside the container (hence the single quotes),
+# the bucket arrives as $1. The dump streams out on stdout — the image runs
+# as nonroot 65532 and could not write into this 0700 temp directory through
+# a bind mount — so the progress line goes to stderr.
+# shellcheck disable=SC2016 # the script expands its variables in the container
 docker compose --env-file "$ENV_FILE" \
     -f "$COMPOSE_FILE" -f "$COMPOSE_PROD" \
-    run --rm -T \
-    -v "$TMP:/out" \
-    minio-init \
-    /bin/sh -c "
-        mc alias set kp http://minio:9000 \
-            \${MINIO_ACCESS_KEY} \${MINIO_SECRET_KEY} >/dev/null &&
-        LATEST=\$(mc ls kp/${BUCKET}/postgres/ | awk '{print \$NF}' | sort | tail -n 1) &&
-        echo \"[restore-test] latest: \$LATEST\" &&
-        mc cp kp/${BUCKET}/postgres/\$LATEST /out/dump.sql.gz
-    "
+    run --rm -T --entrypoint /bin/sh minio-init -c '
+        mc alias set kp http://minio:9000 "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" >/dev/null &&
+        LATEST=$(mc find "kp/$1/postgres/" --name "*.sql.gz" | sort | tail -n 1) &&
+        [ -n "$LATEST" ] &&
+        echo "[restore-test] latest: $LATEST" >&2 &&
+        mc cat "$LATEST"
+    ' sh "$BUCKET" > "$TMP/dump.sql.gz"
 
 echo "[restore-test] starting scratch postgres..."
 docker run -d --rm --name "$SCRATCH" \

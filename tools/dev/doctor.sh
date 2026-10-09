@@ -11,7 +11,7 @@ FLUTTER="$(tr -d "[:space:]" <"$root/.flutter-version")" # also enforced by pubs
 JAVA_MAJOR=25
 JAVA_MIN=17
 ANDROID_PLATFORM=android-36
-NODE_MAJOR=22
+NODE_MAJOR=24
 
 fail=0
 ok() { printf '  \033[32m✓\033[0m %s\n' "$1"; }

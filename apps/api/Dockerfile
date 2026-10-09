@@ -1,5 +1,5 @@
 # Stage 1 — season-planner SPA bundle
-FROM node:22-slim AS webbuild
+FROM node:24-slim AS webbuild
 
 WORKDIR /web
 

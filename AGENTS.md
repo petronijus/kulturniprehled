@@ -135,13 +135,18 @@ private/           private overlay (gitignored; its own repo)
   ticket and incident references belong in commit messages.
 - Toolchain pins: Flutter 3.47.5 (`.flutter-version`, Swift Package Manager
   disabled), JDK 25, AGP 9.2.1, Gradle 9.4.1, Kotlin 2.4.20, Python 3.12
-  (`apps/api/.python-version`, as in the image), Node 22
+  (`apps/api/.python-version`, as in the image), Node 24
   (`apps/api/web/.nvmrc`), Docker. `just doctor` checks them.
 - Formatting is automatic (pre-commit hook): `dart format`, ruff,
   Biome, ktlint (`.editorconfig`), swift-format
   (`apps/mobile/ios/.swift-format`, macOS only).
 - Deploy: the API image is built locally and pushed to GHCR; the VM only
   pulls (`scripts/build-push.sh`, `infra/deploy/upgrade.sh`).
+- MinIO runs one image for server and `mc`, Chainguard's build mirrored into
+  a private GHCR package; the reference lives only in the `x-minio-image`
+  anchor of `infra/docker-compose.yml`. `minio/minio` and `minio/mc` are
+  gone from Docker Hub; never reintroduce them (refresh:
+  [`docs/development.md`](docs/development.md#minio-image)).
 - Time zone for everything human-facing: Europe/Prague.
 
 Details, per-OS setup and troubleshooting: `docs/development.md`.

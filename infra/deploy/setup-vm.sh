@@ -85,7 +85,9 @@ Next steps:
 2. Drop the Cloudflare Tunnel credentials JSON into /etc/cloudflared/
    and point /opt/kp/infra/cloudflared/config.yml at it (copy from
    config.example.yml, replace placeholders).
-3. As 'deploy':
+3. As 'deploy', log in to GHCR once (the API and MinIO images are private
+   packages; a PAT with read:packages), then bring the stack up:
+       docker login ghcr.io -u petronijus
        cd /opt/kp
        docker compose --env-file .env -f infra/docker-compose.yml \
                                        -f infra/compose.prod.yml up -d

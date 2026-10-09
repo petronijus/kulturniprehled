@@ -142,6 +142,11 @@ private/           private overlay (gitignored; its own repo)
   (`apps/mobile/ios/.swift-format`, macOS only).
 - Deploy: the API image is built locally and pushed to GHCR; the VM only
   pulls (`scripts/build-push.sh`, `infra/deploy/upgrade.sh`).
+- MinIO runs one image for server and `mc`, Chainguard's build mirrored into
+  a private GHCR package; the reference lives only in the `x-minio-image`
+  anchor of `infra/docker-compose.yml`. `minio/minio` and `minio/mc` are
+  gone from Docker Hub; never reintroduce them (refresh:
+  [`docs/development.md`](docs/development.md#minio-image)).
 - Time zone for everything human-facing: Europe/Prague.
 
 Details, per-OS setup and troubleshooting: `docs/development.md`.

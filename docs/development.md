@@ -26,7 +26,7 @@ pre-push hook runs the fast lane on every push.
 | AGP / Gradle / Kotlin | 9.2.1 / 9.4.1 / 2.4.20 | shared with Pinkni; a bump is verified with `just build-android` |
 | Python | 3.12 (`apps/api/.python-version`) | the API image is `python:3.12-slim`; tests run on the same version. uv installs it |
 | Node | 24 (`apps/api/web/.nvmrc`) | the image builds the SPA on `node:24-slim` |
-| Docker | running daemon | pytest starts Postgres and MinIO with testcontainers; `just build-api` |
+| Docker | running daemon, `docker login ghcr.io` | pytest starts Postgres and MinIO with testcontainers; `just build-api`. The MinIO image is a private GHCR package ([MinIO image](#minio-image)) |
 | ruff | locked in `apps/api/uv.lock` | one version for the API and every script (`uv run --project apps/api ruff`) |
 | just, lefthook, gitleaks, ktlint, shellcheck, uv | current | task runner, git hooks, secret scan, Kotlin and shell lint, Python toolchain |
 | python3 | ≥ 3.9 | the Claude Code hooks, the PII scan, the script tests and the docs check (standard library only) |
@@ -124,6 +124,46 @@ and lets the commit through. Lines already in the repo are the monthly
 - Release credentials (keystore, App Store Connect key): `docs/release.md`
   and `private/docs/release-credentials.md`.
 
+## MinIO image
+
+MinIO deleted `minio/minio` and `minio/mc` from Docker Hub on 2026-09-11
+(Quay has no tags either). The stack now runs Chainguard's maintained build,
+`cgr.dev/chainguard/minio`, **mirrored byte-for-byte into our own GHCR
+package** so it cannot disappear again:
+
+```text
+ghcr.io/petronijus/minio:RELEASE.2026-09-22T19-25-18Z@sha256:25bc63a89475bc494bfbce9bbeddb0421aece3f3968d77c809db5104d07b4545
+```
+
+- The reference lives once, in the `x-minio-image` anchor of
+  `infra/docker-compose.yml`; `apps/api/tests/conftest.py` reads it from
+  there, so the testcontainers MinIO is the production build too.
+- The package is **private**: every machine that pulls it (this one for
+  `just test-api` and `just dev-up`, the VM) needs `docker login ghcr.io`
+  once.
+- One image serves server and client: entrypoint `/usr/bin/minio`, `mc` and
+  `sh` (bash) in `/usr/bin` with GNU coreutils, but no curl, wget or `find`
+  (the healthcheck is `mc ready local`).
+  Chainguard's separate `minio-client` image has no shell, so `minio-init`
+  and the backup scripts run this one with an `sh` entrypoint.
+- It runs as nonroot `65532`. Volumes written by the old root-running
+  official image are handed over by the one-shot `minio-perms` service
+  (`chown -R -c`) before every `minio` start; it logs how many entries it
+  changed, `0` on an already migrated volume.
+
+To move to a newer build, mirror it under its release tag and bump the
+reference:
+
+```sh
+crane digest cgr.dev/chainguard/minio:latest            # the new digest
+docker run --rm cgr.dev/chainguard/minio@sha256:<digest> --version   # its RELEASE tag
+crane copy cgr.dev/chainguard/minio@sha256:<digest> ghcr.io/petronijus/minio:<RELEASE tag>
+```
+
+`crane copy` keeps the digest, so the new `tag@sha256:<digest>` goes into the
+`x-minio-image` line as is. Then `just test-api`, `just dev-up`, and on the
+VM the manual MinIO step in `infra/deploy/README.md`.
+
 ## Coding agents
 
 - `AGENTS.md` holds the rules for every agent; Claude Code reads
@@ -146,6 +186,7 @@ and lets the commit through. Lines already in the repo are the monthly
 | Symptom | Cause / fix |
 |---|---|
 | `just test-api` says Docker is not running | start the daemon; testcontainers needs it |
+| `just test-api` or `just dev-up` cannot pull `ghcr.io/petronijus/minio` (`denied` / `unauthorized`) | the package is private: `docker login ghcr.io -u petronijus` with a PAT that has `read:packages` ([MinIO image](#minio-image)) |
 | `fmt-check` / `lint-web` say `node_modules` is missing | `just setup` (or `cd apps/api/web && npm ci`) |
 | a Swift file is "skipped" by `format.sh` | swift-format ships with Xcode; run `just fmt` on the MacBook |
 | `uv run` reinstalls packages or Python | `apps/api/.python-version` pins 3.12 like the image; the dev tools are the `dev` dependency group, installed by default |

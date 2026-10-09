@@ -13,6 +13,7 @@ breaks once endpoints start doing their own commits.
 from __future__ import annotations
 
 import os
+import re
 import sys
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
@@ -37,6 +38,24 @@ from kp_api.config import Settings, get_settings
 from kp_api.main import app
 
 API_DIR = Path(__file__).resolve().parents[1]
+COMPOSE_FILE = API_DIR.parents[1] / "infra" / "docker-compose.yml"
+
+
+def _minio_image() -> str:
+    """The MinIO image the dev and prod stacks run, read from the compose file.
+
+    testcontainers' default (`minio/minio:RELEASE.2022-12-02…`) no longer
+    exists upstream, and the tests should exercise the very build that runs
+    in production anyway — so the compose file's `x-minio-image` anchor is
+    the single place the reference is bumped."""
+    match = re.search(
+        r"^x-minio-image: &minio-image (\S+)$",
+        COMPOSE_FILE.read_text(encoding="utf-8"),
+        re.MULTILINE,
+    )
+    if match is None:
+        raise RuntimeError(f"no `x-minio-image: &minio-image <ref>` line in {COMPOSE_FILE}")
+    return match.group(1)
 
 
 class StubVerifier:
@@ -67,7 +86,12 @@ def postgres() -> Iterator[PostgresContainer]:
 
 @pytest.fixture(scope="session")
 def minio() -> Iterator[MinioContainer]:
-    with MinioContainer() as container:
+    container = MinioContainer(_minio_image())
+    # MinioContainer passes the credentials only as the long-deprecated
+    # MINIO_ACCESS_KEY / MINIO_SECRET_KEY; name them the current way too.
+    container.with_env("MINIO_ROOT_USER", container.access_key)
+    container.with_env("MINIO_ROOT_PASSWORD", container.secret_key)
+    with container:
         yield container
 
 

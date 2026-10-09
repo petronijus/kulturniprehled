@@ -30,16 +30,19 @@ BACKUPS="${MINIO_BACKUP_BUCKET:-backups}"
 TICKETS="${MINIO_BUCKET_TICKETS:-tickets}"
 
 echo "[mc_mirror] starting at $(date -u +%Y%m%dT%H%M%SZ)"
+# minio-init is the stack's `mc` shell. The MinIO credentials are in its
+# compose environment, the B2 ones are passed through from the sourced .env
+# (`-e NAME` without a value); all expand inside the container (hence the
+# single quotes). Region, buckets and the B2 bucket arrive as $1..$4.
+# shellcheck disable=SC2016 # the script expands its variables in the container
 docker compose --env-file "$ENV_FILE" \
     -f "$COMPOSE_FILE" -f "$COMPOSE_PROD" \
-    run --rm -T minio-init \
-    /bin/sh -c "
-        mc alias set kp http://minio:9000 \
-            \${MINIO_ACCESS_KEY} \${MINIO_SECRET_KEY} >/dev/null &&
-        mc alias set b2 https://s3.${B2_REGION:-eu-central-003}.backblazeb2.com \
-            \${B2_ACCOUNT_ID} \${B2_APPLICATION_KEY} >/dev/null &&
-        mc mirror --overwrite --remove kp/${BACKUPS} b2/${B2_BUCKET_NAME}/${BACKUPS} &&
-        mc mirror --overwrite kp/${TICKETS} b2/${B2_BUCKET_NAME}/${TICKETS}
-    "
+    run --rm -T -e B2_ACCOUNT_ID -e B2_APPLICATION_KEY \
+    --entrypoint /bin/sh minio-init -c '
+        mc alias set kp http://minio:9000 "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" >/dev/null &&
+        mc alias set b2 "https://s3.$1.backblazeb2.com" "$B2_ACCOUNT_ID" "$B2_APPLICATION_KEY" >/dev/null &&
+        mc mirror --overwrite --remove "kp/$2" "b2/$4/$2" &&
+        mc mirror --overwrite "kp/$3" "b2/$4/$3"
+    ' sh "${B2_REGION:-eu-central-003}" "$BACKUPS" "$TICKETS" "$B2_BUCKET_NAME"
 
 echo "[mc_mirror] done."

@@ -27,9 +27,11 @@ Then **manually**:
    dashboard), so no credentials file or `config.yml` is mounted. Give the
    tunnel the two public hostnames listed in
    `infra/cloudflared/config.example.yml`.
-3. Bring the stack up:
+3. Bring the stack up. The API and MinIO images are private GHCR
+   packages, so log in once first (a PAT with `read:packages`):
 
    ```bash
+   docker login ghcr.io -u petronijus
    cd /opt/kp
    docker compose --env-file .env \
                   -f infra/docker-compose.yml \
@@ -70,6 +72,64 @@ The script:
 
 Postgres and MinIO are **not** restarted by the script — bump them
 manually after reviewing release notes for each service.
+
+## MinIO: switching to the GHCR mirror (manual, once)
+
+MinIO deleted `minio/minio` and `minio/mc` from Docker Hub on 2026-09-11.
+The compose file now runs Chainguard's build mirrored into the private
+package `ghcr.io/petronijus/minio` (why and how to refresh it:
+[`docs/development.md`](../../docs/development.md#minio-image)). It runs as
+nonroot `65532`, while the volume on the VM was written by the old image
+as root, so the one-shot `minio-perms` service chowns it before `minio`
+starts. `upgrade.sh` never touches MinIO; on the VM:
+
+```bash
+cd /opt/kp
+C="docker compose --env-file .env -p kulturniprehled-dev -f infra/docker-compose.yml -f infra/compose.internal-web.yml"
+
+# 0. The checkout must carry the change (git pull --ff-only, or copy
+#    infra/docker-compose.yml over while the VM's GitHub access is broken).
+grep -n '^x-minio-image' infra/docker-compose.yml
+
+# 1. Rollback insurance. The old images can never be pulled again, so save
+#    the VM's cached copies, and snapshot the data volume (postgres:16-alpine
+#    is on the VM already and has tar).
+docker image save minio/minio:RELEASE.2025-01-20T14-49-07Z \
+    minio/mc:RELEASE.2025-01-17T23-25-50Z | gzip > ~/minio-old-images.tar.gz
+docker run --rm -v kulturniprehled-dev_minio-data:/data:ro postgres:16-alpine \
+    tar -C /data -czf - . > ~/minio-data-pre-switch.tar.gz
+
+# 2. Pull. Private package: `docker login ghcr.io -u petronijus` first
+#    (a PAT with read:packages).
+$C pull minio-perms minio minio-init
+
+# 3. Switch: minio-perms hands the data to 65532, then minio and minio-init
+#    are re-created. The API keeps running and reconnects by itself.
+$C up -d minio-perms minio minio-init
+
+# 4. Verify.
+$C ps -a minio-perms minio minio-init   # Exited (0) / Up (healthy) / Exited (0)
+$C logs minio-perms minio minio-init    # perms: "N entries handed to 65532:65532"; no FATAL
+$C exec minio mc ready local            # "The cluster is ready"
+```
+
+Then check the signed-URL path end to end from a client: open a ticket in
+the app (or `GET /v1/tickets/{id}/url` and fetch the URL it returns).
+
+**Rollback** works only from what step 1 saved — the old tags are gone
+upstream, and if `docker image save` reports no such image there is no
+rollback image at all. `docker load < ~/minio-old-images.tar.gz`, restore the
+previous `infra/docker-compose.yml` (`git checkout <previous commit> --
+infra/docker-compose.yml`) and `$C up -d minio minio-init`. The old image ran
+as root, so the chowned files do not stop it; whether it reads data the new
+build has written was not tested (only old → new was), so roll back early
+or restore `~/minio-data-pre-switch.tar.gz` into the volume first.
+
+The backup scripts in `infra/backup/` changed with the switch: before it,
+their `compose run minio-init /bin/sh -c ...` was swallowed by the old
+service's own `sh -c` entrypoint, so the bucket-init script ran instead and
+no dump was ever uploaded, mirrored or fetched. Run `pg_dump.sh` once after
+the switch and check that the dump lands in `backups/postgres/`.
 
 ## HTTPS front for the planner (deployed 2026-08-30)
 

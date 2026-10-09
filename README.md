@@ -119,6 +119,10 @@ The dev stack publishes Postgres on `15432`, MinIO API on `19000`
 (console `19001`) and the API on `18000` so it can co-exist with a system
 Postgres/MinIO.
 
+MinIO comes from a private GHCR mirror of Chainguard's build (upstream's
+Docker Hub images are gone), so run `docker login ghcr.io` once per
+machine; see [`docs/development.md`](docs/development.md#minio-image).
+
 ## Skill setup (desktop ingestion)
 
 ```bash

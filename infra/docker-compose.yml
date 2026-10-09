@@ -6,6 +6,15 @@
 
 name: kulturniprehled-dev
 
+# MinIO server and `mc` client, one image for minio-perms, minio and
+# minio-init. Upstream deleted minio/minio and minio/mc from Docker Hub
+# (2026-09-11), so this is Chainguard's build (cgr.dev/chainguard/minio)
+# mirrored byte-for-byte into our own GHCR package — it cannot vanish under
+# us again. Private package: the host needs `docker login ghcr.io`. Refresh:
+# docs/development.md#minio-image. Runs as nonroot 65532, ships `mc`, bash
+# as `sh` and GNU coreutils, but no curl, wget or find.
+x-minio-image: &minio-image ghcr.io/petronijus/minio:RELEASE.2026-09-22T19-25-18Z@sha256:25bc63a89475bc494bfbce9bbeddb0421aece3f3968d77c809db5104d07b4545
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -31,11 +40,36 @@ services:
       timeout: 3s
       retries: 10
 
+  # One-shot ownership fix, run before every minio start. Volumes created
+  # before 2026-10 hold data written by the official minio/minio image,
+  # which ran as root; this image runs minio as nonroot 65532 and refuses to
+  # start on root-owned data ("Unable to initialize backend: Unable to write
+  # to the backend"). Gives everything under /data to 65532:65532 and logs
+  # how many entries actually changed (`chown -c`), 0 once migrated. The image
+  # has GNU coreutils but no findutils, hence chown -R rather than find.
+  minio-perms:
+    image: *minio-image
+    restart: "no"
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        set -o pipefail;
+        changed=$$(chown -R -c 65532:65532 /data | wc -l);
+        echo "minio-perms: $$changed entries handed to 65532:65532"
+    volumes:
+      - minio-data:/data
+
   minio:
-    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+    image: *minio-image
     restart: unless-stopped
     labels:
       com.centurylinklabs.watchtower.enable: "false"
+    depends_on:
+      minio-perms:
+        condition: service_completed_successfully
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-kp-minio}
@@ -46,22 +80,30 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 3s
       retries: 10
 
+  # Creates the tickets bucket on `up`. The backup scripts in infra/backup
+  # reuse this service as their `mc` shell (`run --entrypoint /bin/sh
+  # minio-init -c ...`), which is why the credentials sit in its environment
+  # and the scripts expand them inside the container.
   minio-init:
-    image: minio/mc:RELEASE.2025-01-17T23-25-50Z
+    image: *minio-image
     depends_on:
       minio:
         condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set kp http://minio:9000 ${MINIO_ACCESS_KEY:-kp-minio} ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env} &&
-      mc mb --ignore-existing kp/${MINIO_BUCKET_TICKETS:-tickets} &&
-      mc anonymous set none kp/${MINIO_BUCKET_TICKETS:-tickets};
-      "
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-kp-minio}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env}
+      MINIO_BUCKET_TICKETS: ${MINIO_BUCKET_TICKETS:-tickets}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        mc alias set kp http://minio:9000 "$$MINIO_ACCESS_KEY" "$$MINIO_SECRET_KEY" &&
+        mc mb --ignore-existing "kp/$$MINIO_BUCKET_TICKETS" &&
+        mc anonymous set none "kp/$$MINIO_BUCKET_TICKETS"
 
   api:
     image: ghcr.io/petronijus/kulturniprehled-api:${KP_API_TAG:-latest}

@@ -135,7 +135,7 @@ private/           private overlay (gitignored; its own repo)
   ticket and incident references belong in commit messages.
 - Toolchain pins: Flutter 3.47.5 (`.flutter-version`, Swift Package Manager
   disabled), JDK 25, AGP 9.2.1, Gradle 9.4.1, Kotlin 2.4.20, Python 3.12
-  (`apps/api/.python-version`, as in the image), Node 22
+  (`apps/api/.python-version`, as in the image), Node 24
   (`apps/api/web/.nvmrc`), Docker. `just doctor` checks them.
 - Formatting is automatic (pre-commit hook): `dart format`, ruff,
   Biome, ktlint (`.editorconfig`), swift-format

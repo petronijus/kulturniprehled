@@ -25,7 +25,7 @@ pre-push hook runs the fast lane on every push.
 | Android SDK | platform `android-36` | Flutter 3.47.5's default `compileSdk` |
 | AGP / Gradle / Kotlin | 9.2.1 / 9.4.1 / 2.4.20 | shared with Pinkni; a bump is verified with `just build-android` |
 | Python | 3.12 (`apps/api/.python-version`) | the API image is `python:3.12-slim`; tests run on the same version. uv installs it |
-| Node | 22 (`apps/api/web/.nvmrc`) | the image builds the SPA on `node:22-slim` |
+| Node | 24 (`apps/api/web/.nvmrc`) | the image builds the SPA on `node:24-slim` |
 | Docker | running daemon | pytest starts Postgres and MinIO with testcontainers; `just build-api` |
 | ruff | locked in `apps/api/uv.lock` | one version for the API and every script (`uv run --project apps/api ruff`) |
 | just, lefthook, gitleaks, ktlint, shellcheck, uv | current | task runner, git hooks, secret scan, Kotlin and shell lint, Python toolchain |
@@ -44,7 +44,7 @@ flutter config --no-enable-swift-package-manager
 ### macOS
 
 ```sh
-brew install just lefthook gitleaks ktlint shellcheck uv node@22 sops age cocoapods
+brew install just lefthook gitleaks ktlint shellcheck uv node@24 sops age cocoapods
 ```
 
 Xcode from the App Store; Docker Desktop (or OrbStack) for the API tests.
@@ -52,7 +52,7 @@ Xcode from the App Store; Docker Desktop (or OrbStack) for the API tests.
 ### Linux
 
 `just`, `lefthook`, `gitleaks`, `ktlint` and `uv` from Homebrew on Linux or
-their release binaries; `shellcheck` and Docker from apt; Node 22 from
+their release binaries; `shellcheck` and Docker from apt; Node 24 from
 NodeSource or nvm.
 
 ### Then, in every clone

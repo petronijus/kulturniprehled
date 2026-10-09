@@ -68,6 +68,9 @@ def main() -> int:
             file=sys.stderr,
         )
         return 0
+    # The prefixes are pinned because added_lines() reads paths from the
+    # `+++ b/` headers: a user's diff.mnemonicprefix (`+++ i/`) or
+    # diff.noprefix (`+++ path`) would otherwise hide every file from the scan.
     diff = subprocess.run(
         [
             "git",
@@ -77,6 +80,8 @@ def main() -> int:
             "--cached",
             "--no-color",
             "--no-ext-diff",
+            "--src-prefix=a/",
+            "--dst-prefix=b/",
             "-U0",
         ],
         check=True,

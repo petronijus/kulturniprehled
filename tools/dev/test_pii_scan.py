@@ -46,8 +46,15 @@ class PiiScanTest(unittest.TestCase):
     def write(self, name: str, text: str) -> None:
         (self.repo / name).write_text(text, encoding="utf-8")
 
-    def scan(self, patterns: Path | None = None) -> subprocess.CompletedProcess[str]:
+    def scan(
+        self, patterns: Path | None = None, git_config: dict[str, str] | None = None
+    ) -> subprocess.CompletedProcess[str]:
         env = {**os.environ, "KP_PII_PATTERNS": str(patterns or self.patterns)}
+        for index, (key, value) in enumerate((git_config or {}).items()):
+            env[f"GIT_CONFIG_KEY_{index}"] = key
+            env[f"GIT_CONFIG_VALUE_{index}"] = value
+        if git_config:
+            env["GIT_CONFIG_COUNT"] = str(len(git_config))
         return subprocess.run(
             [sys.executable, str(SCAN)], cwd=self.repo, env=env, capture_output=True, text=True
         )
@@ -84,6 +91,15 @@ class PiiScanTest(unittest.TestCase):
         result = self.scan()
         self.assertEqual(result.returncode, 1)
         self.assertIn("poznámky.md:1:", result.stderr)
+
+    def test_diff_prefix_settings_do_not_hide_files(self) -> None:
+        self.write("new.txt", "host: secret-host.lan\n")
+        self.git("add", "new.txt")
+        for setting in ("diff.mnemonicPrefix", "diff.noPrefix"):
+            with self.subTest(setting=setting):
+                result = self.scan(git_config={setting: "true"})
+                self.assertEqual(result.returncode, 1)
+                self.assertIn("new.txt:1: secret-host.lan", result.stderr)
 
     def test_removing_private_data_passes(self) -> None:
         self.write("notes.md", "secret-host.lan\n")

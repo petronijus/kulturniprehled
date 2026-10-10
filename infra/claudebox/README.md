@@ -18,8 +18,33 @@ Two runs live here:
    `origin/main`. The run scripts sync it on every start and refuse to run
    on anything else — see [Checkout discipline](#checkout-discipline).
 2. KP skills symlinked into `~/.claude/skills` (loop in
-   `skills/kulturni-prehled/README.md`).
-3. **Scoped PAT** — mint on the prod VM and place on the claudebox
+   `skills/kulturni-prehled/README.md`) — for interactive sessions on the
+   box only. The headless runs are restricted and do not load
+   `~/.claude/skills`; they get the skills as a plugin (see
+   [The boundary](#the-boundary)).
+3. **Sandbox prerequisites** (the runs refuse to start without them):
+   `bubblewrap` and `socat`, and on Ubuntu 24.04 an AppArmor profile that
+   lets `bwrap` create user namespaces, because
+   `kernel.apparmor_restrict_unprivileged_userns=1` otherwise fails it with
+   `setting up uid map: Permission denied`:
+
+   ```bash
+   sudo apt install bubblewrap socat
+   sudo tee /etc/apparmor.d/bwrap >/dev/null <<'PROFILE'
+   abi <abi/4.0>,
+   include <tunables/global>
+
+   profile bwrap /usr/bin/bwrap flags=(unconfined) {
+     userns,
+     include if exists <local/bwrap>
+   }
+   PROFILE
+   sudo apparmor_parser -r /etc/apparmor.d/bwrap
+   bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all true && echo ok
+   ```
+
+   Installed on the claudebox on 2026-10-10.
+4. **Scoped PAT** — mint on the prod VM and place on the claudebox
    without it ever touching a terminal:
 
    ```bash
@@ -32,13 +57,13 @@ Two runs live here:
    #   ssh claudebox 'umask 077; mkdir -p ~/.config/kulturni-prehled; cat > ~/.config/kulturni-prehled/kp-token'
    ```
 
-4. Optional — blocked-day checks: nothing to do on this box. The shared
+5. Optional — blocked-day checks: nothing to do on this box. The shared
    calendar's **secret iCal address** (Google Calendar → Settings →
    Kocourek&Prdelčička → "Secret address in iCal format") belongs in the
    API's `.env` as `CALENDAR_ICS_URL` on the app VM; the routine reads
    the classification from `GET /v1/season/calendar`. Without it the
    weekly email just notes that calendar conflicts were not checked.
-5. Install units:
+6. Install units:
 
    ```bash
    ln -sf ~/Documents/Dev/kulturniprehled/infra/claudebox/kulturni-prehled-weekly.{service,timer} \
@@ -47,7 +72,7 @@ Two runs live here:
    systemctl --user enable --now kulturni-prehled-weekly.timer
    ```
 
-6. Notify hook: executable `~/.config/kulturni-prehled/notify`, called as
+7. Notify hook: executable `~/.config/kulturni-prehled/notify`, called as
    `notify "<subject>"` with a Markdown body on stdin, for anything that
    needs a human — a failed run, a missing login, changes parked out of the
    checkout. Non-zero exit = delivery failed. The box's hook forwards to
@@ -56,6 +81,60 @@ Two runs live here:
    hosts. Without a hook the alert only reaches the journal — which is how
    three stale weekly runs went unnoticed in 2026-09, so install one.
    Successful runs do not notify: the digest e-mail is the report.
+
+## The boundary
+
+Both runs start the same session (`lib.sh`: `prepare_session`,
+`run_session`): `claude -p --restricted --strict-mcp-config --settings
+<generated> --plugin-dir <kp plugin> --permission-mode dontAsk --add-dir /tmp`,
+started in the checkout.
+
+- **`--restricted`** keeps the box's user, project and local settings out.
+  Before 2026-10-10 the allow-list only added to them (the synced user
+  allow-list, the autosync hooks).
+- **The Bash sandbox** (bubblewrap). The runs need the shell whole —
+  multi-line python heredocs, jq pipelines, `$(…)` — and they read
+  untrusted web pages, so no command list could bound them. The sandbox
+  does: writes only to the checkout and `/tmp`; no reads of
+  `denied-tools.txt`'s places (the gh token, SSH keys, the other runners'
+  tokens, ai-config — whose scripts run on every machine after an
+  autosync); network only to the KP API (the host of `$KP_API_BASE`), the
+  public hosts in `sandbox-domains.txt` (the scrapers' sites) and the
+  box-local `~/.config/kulturni-prehled/sandbox-domains.local` (private
+  hosts such as the tickets host, kept out of this public repo); no
+  unsandboxed retry (`allowUnsandboxedCommands:
+  false`), and no run at all if the sandbox cannot start
+  (`failIfUnavailable: true`). WebFetch runs outside the sandbox, read-only,
+  and is how the experts read every other site.
+- **`session_settings.py`** builds the `--settings` file from
+  `allowed-tools-weekly.txt`, `denied-tools.txt`, the domain lists and
+  `$KP_API_BASE`;
+  every `Read(…)` deny rule also lands in the sandbox's `denyRead`, so the
+  file tools and the shell share one list.
+- **Skills**: restricted mode does not load `~/.claude/skills`, so
+  `prepare_session` links `session-skills.txt` from the checkout into a
+  throwaway plugin `kp`; the session calls them as `kp:<name>`.
+- **`--strict-mcp-config`**: no MCP servers, the claude.ai connectors
+  included.
+
+A scraper on a new host needs its line in `sandbox-domains.txt` (a
+private host: in `sandbox-domains.local` on the box), or its curl fails
+with `CONNECT tunnel failed, response 403`.
+
+**Rehearse** after changing any of it — the same session and boundary, but
+without the KP token (the API answers 401, so nothing can be sent, acked or
+written) and with a probe checklist instead of the routine; the final
+message is a table of what worked and what was refused:
+
+```bash
+infra/claudebox/run-weekly.sh --rehearsal
+infra/claudebox/run-sezona.sh --rehearsal
+```
+
+Verified on 2026-10-10: skills load as `kp:*`, heredocs, `$(…)` and loops
+run, the scraper and the validator work, writes outside the checkout and
+`/tmp` fail read-only, `~/.config/gh` and ai-config are invisible, and
+example.com and github.com are refused by the proxy.
 
 ## Checkout discipline
 
@@ -77,7 +156,7 @@ scripts) holds three rules:
 - **Fail loudly.** A missing `claude` login is checked up front, and any
   non-zero exit sends an alert with the stage and the tail of the log.
 
-`test_lib.sh` covers these without network, box or claude:
+`test_lib.sh` covers these, and the session setup, without network, box or claude:
 
 ```bash
 infra/claudebox/test_lib.sh
@@ -86,8 +165,8 @@ infra/claudebox/test_lib.sh
 ## Environment differences (vs. the old Anthropic-cloud routine)
 
 The claudebox has the full repo, so `ensembles/*.sh` scrapers and
-`kp_validate.py` run natively and experts are invoked via the real
-Skill tool. What it does NOT have: interactive MCP connectors — no
+`kp_validate.py` run natively (inside the sandbox) and experts are
+invoked via the real Skill tool (as `kp:<name>`). What it does NOT have: interactive MCP connectors — no
 Spotify (skipped), no google-workspace (calendar comes from the ICS
 URL, e-mail goes through `POST /v1/digest/send`).
 

@@ -133,4 +133,42 @@ out="$(run_with_lib 'sync_checkout' 2>&1)" || fail_test "sync failed without a h
 case "$out" in *"no notify hook"*) ;; *) fail_test "missing hook not reported: $out" ;; esac
 ok "missing notify hook is reported, not fatal"
 
+# 9. prepare_session builds the sandboxed settings and the kp plugin from the
+#    real lists; the exit trap removes both
+setup
+while IFS= read -r skill; do
+  case "$skill" in '' | '#'*) continue ;; esac
+  mkdir -p "$T/case/repo/skills/$skill"
+  echo "# $skill" >"$T/case/repo/skills/$skill/SKILL.md"
+done <"$HERE/session-skills.txt"
+out="$(run_with_lib 'install_run_trap; KP_API_BASE=https://kp.example.com; prepare_session; echo "TMP=$SESSION_TMP";
+  python3 -c "import json,sys; s=json.load(open(sys.argv[1]))[\"sandbox\"]; assert s[\"enabled\"] and s[\"failIfUnavailable\"] and not s[\"allowUnsandboxedCommands\"]" "$SESSION_SETTINGS";
+  echo SANDBOX-OK;
+  python3 -c "import json,sys; print(\"DOMAINS=\" + \",\".join(json.load(open(sys.argv[1]))[\"sandbox\"][\"network\"][\"allowedDomains\"]))" "$SESSION_SETTINGS";
+  cat "$SESSION_PLUGIN/.claude-plugin/plugin.json";
+  readlink "$SESSION_PLUGIN/skills/klasika-expert"')" || fail_test "prepare_session failed: $out"
+case "$out" in *SANDBOX-OK*) ;; *) fail_test "settings lack the fail-closed sandbox: $out" ;; esac
+case "$out" in *DOMAINS=*kp.example.com*) ;; *) fail_test "KP_API_BASE host not allowed: $out" ;; esac
+case "$out" in *'"name": "kp"'*) ;; *) fail_test "plugin manifest missing: $out" ;; esac
+case "$out" in *"$T/case/repo/skills/klasika-expert"*) ;; *) fail_test "skill not linked from the checkout: $out" ;; esac
+session_tmp="$(printf '%s\n' "$out" | sed -n 's/^TMP=//p')"
+[ -n "$session_tmp" ] && [ ! -e "$session_tmp" ] || fail_test "session dir not removed on exit: $session_tmp"
+ok "prepare_session builds a fail-closed sandbox and the kp plugin; exit removes them"
+
+# 10. a skill named in session-skills.txt but missing in the checkout stops the run
+setup
+if run_with_lib 'install_run_trap; RUN_STAGE=session; KP_API_BASE=https://kp.example.com; prepare_session' >/dev/null 2>&1; then
+  fail_test "missing skill did not fail"
+fi
+alerts | grep -q 'Reason:.*session-skills.txt names' || fail_test "missing skill not alerted with its reason"
+ok "a missing skill fails the run with an alert"
+
+# 11. the rehearsal prompt never carries a token and names the refusals it checks
+out="$(run_with_lib 'rehearsal_prompt weekly')"
+case "$out" in *'kp:kulturni-prehled'*'~/.config/gh/hosts.yml'*'git ls-remote https://github.com/'*) ;;
+  *) fail_test "weekly rehearsal prompt incomplete" ;; esac
+case "$(run_with_lib 'rehearsal_prompt sezona')" in *'kp:kulturni-sezona'*) ;;
+  *) fail_test "sezona rehearsal prompt does not load its skill" ;; esac
+ok "rehearsal prompts probe the skills and the refusals"
+
 echo "all $pass passed"

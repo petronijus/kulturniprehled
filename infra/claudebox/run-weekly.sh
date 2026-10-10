@@ -9,7 +9,15 @@
 # provisioned per infra/claudebox/README.md. The shared calendar is NOT a
 # secret of this box any more: the API holds the iCal address
 # (CALENDAR_ICS_URL in its .env) and serves GET /v1/season/calendar.
+#
+#   run-weekly.sh               # the weekly run (what the timer starts)
+#   run-weekly.sh --rehearsal   # the same session and boundary, WITHOUT the KP
+#                               # token (so nothing can be sent, acked or
+#                               # written to the API) and with a short probe
+#                               # checklist instead of the routine
 set -euo pipefail
+REHEARSAL=""
+[ "${1:-}" = "--rehearsal" ] && REHEARSAL=1
 
 # Manual ssh runs come in with a bare non-login PATH — make claude et al.
 # resolvable regardless of how we were invoked.
@@ -19,7 +27,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 CFG_DIR="${CFG_DIR:-$HOME/.config/kulturni-prehled}"
 LOGDIR="$CFG_DIR/logs"; mkdir -p "$LOGDIR"
-RUN="weekly"
+RUN="weekly${REHEARSAL:+-rehearsal}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 LOG="$LOGDIR/$RUN-$STAMP.log"
 
@@ -33,31 +41,27 @@ RUN_STAGE="sync"
 sync_checkout
 require_claude_login
 
-TOKEN_FILE="$CFG_DIR/kp-token"
-[ -r "$TOKEN_FILE" ] || fail "$TOKEN_FILE missing (see infra/claudebox/README.md)"
-KP_DIGEST_TOKEN="$(cat "$TOKEN_FILE")"
-export KP_DIGEST_TOKEN
 export KP_API_BASE="${KP_API_BASE:-https://kulturniprehled.bastla.com}"
+if [ -z "$REHEARSAL" ]; then
+  TOKEN_FILE="$CFG_DIR/kp-token"
+  [ -r "$TOKEN_FILE" ] || fail "$TOKEN_FILE missing (see infra/claudebox/README.md)"
+  KP_DIGEST_TOKEN="$(cat "$TOKEN_FILE")"
+  export KP_DIGEST_TOKEN
+  PROMPT="$(cat "$REPO/skills/kulturni-prehled/claudebox-routine.md")
+Repo checkout: $REPO. Today (UTC): $STAMP.
+The KP skills are the plugin \`kp\`: call the Skill tool with kp:<name>
+(kp:klasika-expert, …)."
+else
+  unset KP_DIGEST_TOKEN KP_TOKEN
+  PROMPT="$(rehearsal_prompt weekly)"
+fi
 
-ALLOWED="$(grep -vE '^\s*(#|$)' "$HERE/allowed-tools-weekly.txt" | paste -sd, -)"
+RUN_STAGE="session"
+prepare_session
 
-PROMPT="$(cat "$REPO/skills/kulturni-prehled/claudebox-routine.md")
-Repo checkout: $REPO. Today (UTC): $STAMP."
-
-echo "[$(date -u +%FT%TZ)] launching kulturni-prehled weekly; log=$LOG"
+echo "[$(date -u +%FT%TZ)] launching kulturni-prehled $RUN; log=$LOG"
 RUN_STAGE="claude"
-# --permission-mode dontAsk: only allowed-tools-weekly.txt is approved. The
-# box's synced settings default to `auto`, where a classifier would approve
-# anything else and the list would be advice, not a boundary (2026-09-30).
-# `< /dev/null`: claude -p reads stdin and blocks on an inherited pipe or TTY
-# (the Ústředna supervisor hung 5+ h on one on 2026-08-10).
-claude -p "$PROMPT" \
-  --permission-mode dontAsk \
-  --allowedTools "$ALLOWED" \
-  --add-dir "$REPO" \
-  --output-format text \
-  < /dev/null \
-  2>&1 | tee "$LOG"
+run_session "$PROMPT" 2>&1 | tee "$LOG"
 
 RUN_STAGE="done"
 echo "[$(date -u +%FT%TZ)] weekly run finished; report in $LOG"

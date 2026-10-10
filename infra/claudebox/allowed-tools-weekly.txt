@@ -1,22 +1,32 @@
 # Tool allow-list for the headless kulturni-prehled runs (weekly + sezona).
-# Comma-joined by the run scripts. Edit/Write are allowed: scratch lives under
-# /tmp, and a run may patch the checkout when a bug would otherwise poison its
-# own data — but such edits do not survive the run (lib.sh parks them as a
-# patch + stash and alerts). Deliberately absent: git push, gh, any email
-# connector — the only send path is the KP API itself.
-# Enforced with --permission-mode dontAsk since 2026-09-30: nothing unlisted
-# runs. Note that `Bash` is listed whole, so git push / gh are absent only as
-# tools of their own — the shell itself can still reach them.
+# session_settings.py puts it into the session's --settings file
+# (permissions.allow), {REPO} filled in. Deliberately absent: git push, gh,
+# any email connector — the only send path is the KP API itself.
+#
+# Enforced with --permission-mode dontAsk since 2026-09-30, and since
+# 2026-10-10 the session is --restricted (the box's user settings are not
+# loaded; this list no longer only adds to them) and its Bash runs in the
+# Claude Code sandbox (bubblewrap): writes only to the checkout and /tmp, no
+# reads of denied-tools.txt's places, network only to sandbox-domains.txt,
+# no unsandboxed retry. That is why `Bash` can stay whole: the runs are built
+# on multi-line python heredocs, jq pipelines and $(...), which no command
+# list can express, and the sandbox — not this list — bounds what they reach.
 # ToolSearch: loads deferred tools (WebFetch and friends); dontAsk denies it
 # unless listed, and the runs use it every week.
 ToolSearch
 Bash
 Read
-Write
-Edit
 Glob
 Grep
+# File writes: the checkout (a run may patch it when a bug would poison its
+# own data — lib.sh parks such edits as a patch + stash and alerts) and the
+# work dirs under /tmp. Edit rules govern the Write tool too.
+Edit(/{REPO}/**)
+Edit(//tmp/**)
+# Outside the sandbox by design (the CLI fetches): the experts read theatre
+# and concert pages. Read-only, and the shell cannot reach those hosts.
 WebFetch
 WebSearch
+# The KP skills, loaded as the `kp` plugin (kp:<skill>, see lib.sh)
 Skill
 TodoWrite

@@ -7,7 +7,14 @@
 #
 #   ssh -t petronijus@server-linux.home.arpa \
 #     '~/Documents/Dev/kulturniprehled/infra/claudebox/run-sezona.sh'
+#
+#   run-sezona.sh --rehearsal   # the same session and boundary, WITHOUT the
+#                               # KP token (nothing can be written to the API,
+#                               # no 1Password prompt) and with a short probe
+#                               # checklist instead of the season run
 set -euo pipefail
+REHEARSAL=""
+[ "${1:-}" = "--rehearsal" ] && REHEARSAL=1
 
 # Manual ssh runs come in with a bare non-login PATH — make claude et al.
 # resolvable regardless of how we were invoked.
@@ -17,7 +24,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 CFG_DIR="${CFG_DIR:-$HOME/.config/kulturni-prehled}"
 LOGDIR="$CFG_DIR/logs"; mkdir -p "$LOGDIR"
-RUN="sezona"
+RUN="sezona${REHEARSAL:+-rehearsal}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 LOG="$LOGDIR/$RUN-$STAMP.log"
 
@@ -29,41 +36,37 @@ RUN_STAGE="sync"
 sync_checkout
 require_claude_login
 
-RUN_STAGE="token"
-KP_TOKEN="$(op item get 'Kulturni Prehled API Token' --account my --fields label=credential --reveal)"
-[ -n "$KP_TOKEN" ] || fail "could not fetch the KP PAT from 1Password"
-export KP_TOKEN
 export KP_API_BASE="${KP_API_BASE:-https://kulturniprehled.bastla.com}"
+if [ -z "$REHEARSAL" ]; then
+  RUN_STAGE="token"
+  KP_TOKEN="$(op item get 'Kulturni Prehled API Token' --account my --fields label=credential --reveal)"
+  [ -n "$KP_TOKEN" ] || fail "could not fetch the KP PAT from 1Password"
+  export KP_TOKEN
 
-ALLOWED="$(grep -vE '^\s*(#|$)' "$HERE/allowed-tools-weekly.txt" | paste -sd, -)"
-
-PROMPT="$(cat "$REPO/skills/kulturni-sezona/SKILL.md")
+  PROMPT="$(cat "$REPO/skills/kulturni-sezona/SKILL.md")
 
 Claudebox substitutions for this run: the KP token is already in
 \$KP_TOKEN (do not use op yourself, never print it). No Spotify and no
 google-workspace MCP here — skip Spotify (missing_sources); blocked.json
 comes from GET /v1/season/calendar exactly as SKILL.md step 1 says
 (available:false → empty blocked set, note it in the report). Experts run via the Skill
-tool in season mode; scrapers and kp_validate.py run natively from the
+tool in season mode — the KP skills are the plugin \`kp\`, so call them as
+kp:<name> (kp:klasika-expert, …); scrapers and kp_validate.py run natively from the
 checkout at $REPO. Edits to that checkout do not outlive this run (the
 runner saves them as a patch and stashes them), so report every one — file,
 what was wrong, how it was verified — and never leave work there for
 approval. Today (UTC): $STAMP."
+else
+  unset KP_TOKEN KP_DIGEST_TOKEN
+  PROMPT="$(rehearsal_prompt sezona)"
+fi
 
-echo "[$(date -u +%FT%TZ)] launching kulturni-sezona; log=$LOG"
+RUN_STAGE="session"
+prepare_session
+
+echo "[$(date -u +%FT%TZ)] launching kulturni-sezona $RUN; log=$LOG"
 RUN_STAGE="claude"
-# --permission-mode dontAsk: only allowed-tools-weekly.txt is approved. The
-# box's synced settings default to `auto`, where a classifier would approve
-# anything else and the list would be advice, not a boundary (2026-09-30).
-# `< /dev/null`: claude -p reads stdin and blocks on an inherited pipe or TTY
-# (the Ústředna supervisor hung 5+ h on one on 2026-08-10).
-claude -p "$PROMPT" \
-  --permission-mode dontAsk \
-  --allowedTools "$ALLOWED" \
-  --add-dir "$REPO" \
-  --output-format text \
-  < /dev/null \
-  2>&1 | tee "$LOG"
+run_session "$PROMPT" 2>&1 | tee "$LOG"
 
 RUN_STAGE="done"
 echo "[$(date -u +%FT%TZ)] season run finished; report in $LOG"

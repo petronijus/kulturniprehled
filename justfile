@@ -84,6 +84,7 @@ test-scripts:
     cd skills/kulturni-sezona/bin && python3 test_kp_validate.py
     python3 tools/dev/test_pii_scan.py
     python3 infra/claudebox/test_seat_watch.py
+    python3 infra/claudebox/test_session_settings.py
     bash infra/claudebox/test_lib.sh
 
 # ── full gate ────────────────────────────────────────────────────────────

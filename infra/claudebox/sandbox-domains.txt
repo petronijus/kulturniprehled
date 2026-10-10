@@ -1,0 +1,24 @@
+# Hosts the sandboxed shell of a kulturni-prehled run may connect to (one per
+# line; `*.example.com` matches subdomains, not the apex). Everything else is
+# refused by the sandbox proxy. WebFetch is not affected: it runs outside the
+# sandbox and is how the experts read every other site.
+#
+# The list is what the runs' shell actually reached (box transcripts,
+# 2026-08..10) plus the ensembles/*.sh scrapers. A scraper on a new host
+# needs its line here, or it fails with "CONNECT tunnel failed, response 403".
+#
+# Public hosts only — this repo is public. The KP API host comes from
+# $KP_API_BASE at run time, and further private hosts (the tickets host) from
+# the box-local ~/.config/kulturni-prehled/sandbox-domains.local (same
+# format), both added by lib.sh.
+#
+# skills/klasika-expert/ensembles/*.sh
+www.fok.cz
+www.ceskafilharmonie.cz
+www.berg.cz
+www.prgphil.cz
+socr.rozhlas.cz
+# fetched from the shell by the experts
+punctum.cz
+goout.net
+www.narodni-divadlo.cz

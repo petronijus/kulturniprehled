@@ -1,0 +1,27 @@
+# Denied explicitly for the headless kulturni-prehled runs (one rule per line).
+# session_settings.py puts them into permissions.deny ({HOME} filled in) and
+# every Read(...) rule also into the sandbox's denyRead, so neither the file
+# tools nor anything the shell starts can read these places. The runs need
+# none of them: the KP token arrives in the environment, the skills come from
+# the checkout.
+#
+# ~/.claude is a symlink to ~/Documents/Dev/ai-config/.claude and rules are
+# resolved through it, so ai-config is denied as a whole: it holds Claude's
+# credentials and transcripts, and its scripts run on every machine of
+# Petr's after the next autosync — the place a hijacked run must not reach.
+Read(/{HOME}/.ssh/**)
+Read(/{HOME}/.config/gh/**)
+Read(/{HOME}/.config/op/**)
+Read(/{HOME}/.config/colony/**)
+Read(/{HOME}/.config/oh-so/**)
+Read(/{HOME}/.config/moco-timesheet/**)
+Read(/{HOME}/.config/ustredna-supervisor/**)
+Read(/{HOME}/.config/pixoo-weekly/**)
+Read(/{HOME}/.config/repo-maintenance/**)
+Read(/{HOME}/.config/kulturni-prehled/kp-token)
+Read(/{HOME}/.config/kulturni-prehled/seat-watch.env)
+Read(/{HOME}/.claude.json)
+Read(/{HOME}/.mcp.json)
+Read(/{HOME}/.claude/**)
+Read(/{HOME}/Documents/Dev/ai-config/**)
+Read(/{HOME}/.local/share/keyrings/**)

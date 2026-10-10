@@ -1,0 +1,10 @@
+# The skills of a headless run, from skills/<name> in the checkout. lib.sh
+# links them into a throwaway `kp` plugin (--plugin-dir), because restricted
+# mode does not load ~/.claude/skills; in the session they are kp:<name>.
+divadlo-expert
+elektronika-expert
+film-expert
+klasika-expert
+kulturni-prehled
+kulturni-sezona
+program-links

@@ -23,8 +23,13 @@ only the interactive MCP connectors are missing.
 
 Unchanged from the local flow (unlike the old cloud routine):
 
-- **Experts run via the Skill tool** (weekly mode, no args) — the KP
-  skills are symlinked into `~/.claude/skills` on the box.
+- **Experts run via the Skill tool** (weekly mode, no args) — the run
+  loads the KP skills as the plugin `kp`, so call them as `kp:<name>`
+  (`kp:klasika-expert`, …).
+- **The shell is sandboxed**: it writes only to the checkout and `/tmp`,
+  and reaches only the KP API and the scrapers' sites — fetch every other
+  page with WebFetch. A refused connection reads `CONNECT tunnel failed,
+  response 403`; say so in the report instead of working around it.
 - **`ensembles/*.sh` static scrapers run natively** from the checkout.
 - **`python3 skills/kulturni-sezona/bin/kp_validate.py`** runs natively
   (stdlib-only) for the `fit` checks.

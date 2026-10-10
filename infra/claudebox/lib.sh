@@ -92,6 +92,104 @@ require_claude_login() {
     || fail "claude is not logged in on this box — run \`claude auth login\` (or /login in the tmux session)"
 }
 
+# prepare_session  — build what the headless session runs inside, in a
+# throwaway directory under $CFG_DIR that the exit trap removes:
+#   * the --settings file (session_settings.py): permissions from
+#     allowed-tools-weekly.txt and denied-tools.txt, and the Bash sandbox
+#     (bubblewrap) bounded by them and sandbox-domains.txt;
+#   * the `kp` plugin carrying the skills of session-skills.txt, linked from
+#     the checkout — restricted mode does not load ~/.claude/skills, so the
+#     session finds them as kp:<name>.
+# Sets SESSION_SETTINGS and SESSION_PLUGIN. Run it in the main shell (not in a
+# pipeline), so a failure reaches the exit alert with its reason.
+SESSION_TMP=""
+SESSION_SETTINGS=""
+SESSION_PLUGIN=""
+prepare_session() {
+  local here skill
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  SESSION_TMP="$(mktemp -d "$CFG_DIR/session-$STAMP.XXXXXX")" \
+    || fail "could not create the session directory in $CFG_DIR" || return 1
+  SESSION_SETTINGS="$SESSION_TMP/settings.json"
+  SESSION_PLUGIN="$SESSION_TMP/plugin"
+  # The KP API host comes from $KP_API_BASE; private hosts beyond it live in
+  # the box-local sandbox-domains.local, never in this public repo.
+  local domains=(--domains "$here/sandbox-domains.txt")
+  [ ! -f "$CFG_DIR/sandbox-domains.local" ] || domains+=(--domains "$CFG_DIR/sandbox-domains.local")
+  python3 "$here/session_settings.py" \
+    --allowed "$here/allowed-tools-weekly.txt" --denied "$here/denied-tools.txt" \
+    "${domains[@]}" --url "${KP_API_BASE:?KP_API_BASE must be set before prepare_session}" \
+    --home "$HOME" --repo "$REPO" \
+    >"$SESSION_SETTINGS" || fail "session_settings.py could not build the session settings" || return 1
+  mkdir -p "$SESSION_PLUGIN/.claude-plugin" "$SESSION_PLUGIN/skills"
+  printf '%s\n' '{"name": "kp", "version": "1.0.0", "description": "Kulturni prehled skills for the headless claudebox runs"}' \
+    >"$SESSION_PLUGIN/.claude-plugin/plugin.json"
+  while IFS= read -r skill; do
+    case "$skill" in '' | '#'*) continue ;; esac
+    [ -f "$REPO/skills/$skill/SKILL.md" ] \
+      || fail "session-skills.txt names $skill, but $REPO/skills/$skill/SKILL.md is missing" || return 1
+    ln -s "$REPO/skills/$skill" "$SESSION_PLUGIN/skills/$skill"
+  done <"$here/session-skills.txt"
+}
+
+# run_session <prompt>  — the headless session, after prepare_session. Its
+# output goes to stdout (the caller tees it into $LOG).
+#   --restricted: the box's user, project and local settings are NOT loaded
+#     (before 2026-10-10 the allow-list only added to the synced user
+#     allow-list and hooks); file tools stay in the working directories.
+#   --settings: the only permissions, and the sandbox: Bash runs in
+#     bubblewrap — writes only to the checkout and /tmp, no reads of the
+#     denied places, network only to sandbox-domains.txt, no unsandboxed
+#     retry, and no run at all if the sandbox cannot start.
+#   --strict-mcp-config: no MCP servers, the claude.ai connectors included.
+#   --add-dir /tmp: the work dirs (/tmp/kp-digest-CW<n>, /tmp/kp-season-…).
+#   `< /dev/null`: claude -p reads stdin and blocks on an inherited pipe or
+#     TTY (the Ústředna supervisor hung 5+ h on one on 2026-08-10).
+run_session() {
+  (cd "$REPO" && claude -p "$1" \
+    --restricted --strict-mcp-config \
+    --tools "Bash,Read,Edit,Write,Glob,Grep,WebFetch,WebSearch,Skill,TodoWrite,ToolSearch" \
+    --settings "$SESSION_SETTINGS" \
+    --plugin-dir "$SESSION_PLUGIN" \
+    --permission-mode dontAsk \
+    --add-dir /tmp \
+    --output-format text \
+    </dev/null)
+}
+
+# rehearsal_prompt <weekly|sezona>  — the probe checklist a --rehearsal runs
+# instead of the routine: everything a real run leans on (skills, heredocs,
+# the API host, a scraper, the validator, WebFetch, file tools in /tmp) and
+# what the boundary must refuse. Without a KP token in the environment the
+# API answers 401, so a rehearsal can neither send, ack nor write.
+rehearsal_prompt() {
+  local mode_skill="kp:kulturni-prehled" work="/tmp/kp-rehearsal-$STAMP"
+  [ "$1" = sezona ] && mode_skill="kp:kulturni-sezona"
+  cat <<EOF
+REHEARSAL of the headless kulturni-prehled $1 session — NOT a run. Do not
+follow any skill's procedure. There is no KP token; never look for one. Do
+exactly this, each numbered item as its own tool call, and record whether it
+worked, failed (quote the error) or was denied (quote the denial):
+1. Skill tool: $mode_skill, then kp:klasika-expert — only confirm each loads.
+2. Bash: mkdir -p $work && cd $work && python3 - <<'PY'
+   (a heredoc printing "heredoc ok" and writing probe.json with json.dump)
+   followed by: echo "now \$(date -u +%H:%M)"; for i in 1 2; do echo loop\$i; done
+3. Write tool: $work/note.txt with one line; then Read it back.
+4. Bash: curl -sS -o /dev/null -w '%{http_code}' -A 'kp-skill/1.0' "\$KP_API_BASE/v1/season/plans/current"
+   (expected 401: the host is reachable, the request is unauthenticated)
+5. Bash: bash skills/klasika-expert/ensembles/fok.sh | head -c 300
+6. Bash: python3 skills/kulturni-sezona/bin/kp_validate.py --help | head -3
+7. WebFetch https://www.rudolfinum.cz/ — the page title only.
+Expected to be refused (report how each one failed):
+8. Bash: cat ~/.config/gh/hosts.yml
+9. Bash: ls ~/Documents/Dev/ai-config
+10. Bash: echo x > ~/kp-escape.txt
+11. Bash: curl -sS --max-time 10 -o /dev/null -w '%{http_code}' https://example.com/
+12. Bash: git ls-remote https://github.com/petronijus/kulturniprehled.git HEAD
+End with a table of the steps and their outcomes as your final message.
+EOF
+}
+
 # install_run_trap  — on exit, park whatever the run left behind and alert on
 # failure with the tail of the log. Set RUN_STAGE as the run progresses so the
 # alert says where it stopped; post-run parking only happens once the agent
@@ -99,6 +197,7 @@ require_claude_login() {
 RUN_STAGE="setup"
 _on_run_exit() {
   local rc=$?
+  [ -z "$SESSION_TMP" ] || rm -rf "$SESSION_TMP"
   if [ "$RUN_STAGE" = "claude" ] || [ "$RUN_STAGE" = "done" ]; then
     park_changes post-run || echo "[$(date -u +%FT%TZ)] could not park post-run changes in $REPO" >&2
   fi

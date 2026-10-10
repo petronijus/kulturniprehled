@@ -34,6 +34,13 @@ install_run_trap
 
 RUN_STAGE="sync"
 sync_checkout
+# The sync may have just replaced this very file. bash reads a script as it
+# runs, so carrying on would execute the new file's bytes from the old
+# file's offset, or finish as the old script (2026-10-10: `--rehearsal` was
+# pulled in mid-run, and the old script, which did not know the flag, went
+# on to start a real weekly session). Start over from the synced
+# copy; the second sync is a no-op. exec skips the exit trap on purpose.
+[ -n "${KP_SYNCED:-}" ] || KP_SYNCED=1 exec "$HERE/run-sezona.sh" "$@"
 require_claude_login
 
 export KP_API_BASE="${KP_API_BASE:-https://kulturniprehled.bastla.com}"

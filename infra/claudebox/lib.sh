@@ -112,6 +112,9 @@ prepare_session() {
     || fail "could not create the session directory in $CFG_DIR" || return 1
   SESSION_SETTINGS="$SESSION_TMP/settings.json"
   SESSION_PLUGIN="$SESSION_TMP/plugin"
+  # The scrapers' page cache (skills/lib/kp_fetch.py), writable in the
+  # sandbox; it has to exist before the sandbox can mount it.
+  mkdir -p "$HOME/.cache/kulturni-prehled"
   # The KP API host comes from $KP_API_BASE; private hosts beyond it live in
   # the box-local sandbox-domains.local, never in this public repo.
   local domains=(--domains "$here/sandbox-domains.txt")
@@ -159,7 +162,7 @@ run_session() {
 
 # rehearsal_prompt <weekly|sezona>  — the probe checklist a --rehearsal runs
 # instead of the routine: everything a real run leans on (skills, heredocs,
-# the API host, a scraper, the validator, WebFetch, file tools in /tmp) and
+# the API host, a scraper host, the validator, WebFetch, file tools in /tmp) and
 # what the boundary must refuse. Without a KP token in the environment the
 # API answers 401, so a rehearsal can neither send, ack nor write.
 rehearsal_prompt() {
@@ -177,7 +180,12 @@ worked, failed (quote the error) or was denied (quote the denial):
 3. Write tool: $work/note.txt with one line; then Read it back.
 4. Bash: curl -sS -o /dev/null -w '%{http_code}' -A 'kp-skill/1.0' "\$KP_API_BASE/v1/season/plans/current"
    (expected 401: the host is reachable, the request is unauthenticated)
-5. Bash: bash skills/klasika-expert/ensembles/fok.sh | head -c 300
+5. Bash: python3 skills/lib/kp_fetch.py get --kind listing https://www.ceskafilharmonie.cz/program | wc -c
+   then the same command again, and python3 skills/lib/kp_fetch.py status
+   (the scrapers' page cache: the first call may fetch or revalidate, the
+   second must say "KP_FETCH cached" — the cache is writable in the sandbox.
+   Never run a whole scraper in a rehearsal: fok.cz bans this network after
+   a burst, see skills/lib/kp_fetch.py)
 6. Bash: python3 skills/kulturni-sezona/bin/kp_validate.py --help | head -3
 7. WebFetch https://www.rudolfinum.cz/ — the page title only.
 Expected to be refused (report how each one failed):

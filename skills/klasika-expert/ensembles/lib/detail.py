@@ -22,9 +22,10 @@ A parser that comes back empty says so on stderr (`MISSING_PROGRAM=<url>`)
 rather than quietly emitting `program: []` — that line is the signal for
 step 5d to spend a WebFetch on the page after all.
 
-Stdlib only, and fetching shells out to the same `curl` the scrapers use:
-these hosts already answer it, and a second HTTP client would be a second
-set of TLS and redirect quirks to keep working.
+Stdlib only. Every page comes through `skills/lib/kp_fetch.py` — the cache
+with a monthly cadence, the per-host budget and cooldown that keep fok.cz
+from banning this network (it did, 2026-09 and 2026-10, for every device at
+home) — which shells out to the same `curl` the scrapers always used.
 """
 
 from __future__ import annotations
@@ -32,12 +33,15 @@ from __future__ import annotations
 import html as html_mod
 import json
 import re
-import subprocess
 import sys
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
-UA = "Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)"
+# skills/lib holds the page cache shared with the elektronika venues;
+# resolve() so it is found through the `kp` plugin's symlinks too.
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "lib"))
+import kp_fetch
 
 # Separates the works from the performers on a fok.cz card, and shows up as
 # an en dash, an em dash or a plain hyphen depending on who typed it.
@@ -434,69 +438,35 @@ PARSERS: dict[str, Callable[[str], dict[str, Any]]] = {
 }
 
 
-# Seconds between detail fetches, per host. fok.cz stopped answering this
-# machine entirely after a ~60-page pass at one request per second (2026-09-20)
-# and stayed dark for minutes; the others took the same pass without complaint.
-# Slower there is not politeness theatre, it is the difference between a full
-# lane and an empty one.
-DELAYS = {"fok": 3.0, "cf": 1.0, "socr": 1.0, "pkf": 1.0}
-
-# A host that has started refusing will not change its mind inside one run, so
-# the pass gives up rather than spending the rest of the season's goodwill.
-_GIVE_UP_AFTER = 3
+def fetch(url: str) -> str | None:
+    """A detail page through the shared cache; None when neither the cache nor
+    the host (budget, cooldown) can supply it."""
+    return kp_fetch.get(url, "detail")
 
 
-def fetch(url: str, *, timeout: int = 30) -> str | None:
-    try:
-        done = subprocess.run(
-            ["curl", "-sS", "-L", "-A", UA, "--max-time", str(timeout), url],
-            capture_output=True,
-            timeout=timeout + 10,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    if done.returncode != 0 or not done.stdout:
-        return None
-    return done.stdout.decode("utf-8", errors="replace")
-
-
-def enrich(items: list[dict[str, Any]], site: str, *, delay: float | None = None) -> None:
+def enrich(items: list[dict[str, Any]], site: str) -> None:
     """Fill `program` / `soloists` / `conductor` / `price_czk` in place.
 
     One fetch per distinct detail URL, shared by every evening of the run —
-    that dedup is the whole point, so never make this per item.
+    that dedup is the whole point, so never make this per item. Pacing, the
+    retry policy and giving up on a refusing host are kp_fetch's: a page it
+    cannot supply (host cooling down, budget spent, never cached) is skipped
+    and the production keeps the listing only, until a later run fills it.
     """
 
     parser = PARSERS[site]
-    delay = DELAYS[site] if delay is None else delay
-    consecutive_failures = 0
     by_url: dict[str, list[dict[str, Any]]] = {}
     for item in items:
         url = item.get("url")
         if isinstance(url, str) and url:
             by_url.setdefault(url, []).append(item)
 
-    for index, (url, group) in enumerate(by_url.items()):
-        if index and delay:
-            _sleep(delay)
+    unavailable = 0
+    for url, group in by_url.items():
         page = fetch(url)
         if page is None:
-            # One slow answer is noise; give it a breath and ask again.
-            _sleep(delay * 5)
-            page = fetch(url)
-        if page is None:
-            consecutive_failures += 1
-            print(f"WARN: detail fetch failed {url}", file=sys.stderr)
-            if consecutive_failures >= _GIVE_UP_AFTER:
-                print(
-                    f"WARN: {site} stopped answering after {index} of {len(by_url)} "
-                    "productions — detail pass abandoned, the rest keep the listing "
-                    "only (step 5d will see them as MISSING_PROGRAM)",
-                    file=sys.stderr,
-                )
-                return
+            unavailable += 1
             continue
-        consecutive_failures = 0
         try:
             detail = parser(page)
         except Exception as exc:  # a layout change must not kill the lane
@@ -519,18 +489,21 @@ def enrich(items: list[dict[str, Any]], site: str, *, delay: float | None = None
                 if value not in (None, [], "") and not item.get(key):
                     item[key] = value
 
-
-def _sleep(seconds: float) -> None:
-    import time
-
-    time.sleep(seconds)
+    if unavailable:
+        print(
+            f"WARN: {site} detail pages unavailable for {unavailable} of {len(by_url)} "
+            "productions (host cooling down or its daily budget spent, see the "
+            "KP_FETCH lines) — they keep the listing only until a later run",
+            file=sys.stderr,
+        )
 
 
 def main() -> int:
     """`python3 -m detail <site> <url>` — parse one page, print the JSON.
 
     The scrapers do not use this; it is how you check a parser after one of
-    these four sites has been redesigned.
+    these four sites has been redesigned. The page comes from the cache when
+    it has it; `KP_FETCH_REFRESH=detail` asks the site again (one request).
     """
 
     if len(sys.argv) != 3 or sys.argv[1] not in PARSERS:
@@ -538,7 +511,7 @@ def main() -> int:
         return 2
     page = fetch(sys.argv[2])
     if page is None:
-        print("fetch failed", file=sys.stderr)
+        print("no page: see the KP_FETCH line above", file=sys.stderr)
         return 1
     print(json.dumps(PARSERS[sys.argv[1]](page), ensure_ascii=False, indent=2))
     return 0

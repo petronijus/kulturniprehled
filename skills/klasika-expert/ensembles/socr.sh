@@ -11,8 +11,11 @@ set -u
 lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib"
 export PYTHONPATH="$lib_dir${PYTHONPATH:+:$PYTHONPATH}"
 
+# Every page goes through the shared cache (skills/lib/kp_fetch.py): a
+# listing is re-checked about monthly, under a per-host budget and cooldown.
+KP_FETCH="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)/lib/kp_fetch.py"
+
 URL="https://socr.rozhlas.cz/koncerty-a-vstupenky"
-UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'
 ENSEMBLE_NAME="SOČR – Symfonický orchestr Českého rozhlasu"
 
 # Drupal pager (`?page=N`, zero-based). Page 0 is roughly the next two months,
@@ -24,7 +27,7 @@ trap 'rm -f "$TMP" "$PAGE_TMP"' EXIT
 
 page=0
 while [ "$page" -lt "$MAX_PAGES" ]; do
-    curl -sS -L -A "$UA" --max-time 30 -o "$PAGE_TMP" "$URL?page=$page" 2>/dev/null || break
+    python3 "$KP_FETCH" get --kind listing "$URL?page=$page" >"$PAGE_TMP" || break
     [ ! -s "$PAGE_TMP" ] && break
     # Count cards with the SAME pattern the parser uses below — the block's
     # class name rotates (b-099d → b-004 sometime before 2026-08), and keying
@@ -37,7 +40,6 @@ print(len(re.findall(r'<h3>\s*<a\s+href=\"/[^\"]+\"', src)))
     [ "${CARDS:-0}" -eq 0 ] && break
     cat "$PAGE_TMP" >> "$TMP"
     page=$((page + 1))
-    sleep 1   # politeness
 done
 
 [ ! -s "$TMP" ] && { echo '[]'; exit 0; }

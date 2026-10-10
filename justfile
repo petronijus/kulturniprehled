@@ -82,6 +82,7 @@ test-web: _web-deps
 # Stdlib tests of the skill, claudebox and dev-tool scripts (they run without pytest there)
 test-scripts:
     cd skills/kulturni-sezona/bin && python3 test_kp_validate.py
+    python3 skills/lib/test_kp_fetch.py
     python3 tools/dev/test_pii_scan.py
     python3 infra/claudebox/test_seat_watch.py
     python3 infra/claudebox/test_session_settings.py

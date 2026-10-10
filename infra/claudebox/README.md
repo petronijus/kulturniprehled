@@ -95,7 +95,8 @@ started in the checkout.
 - **The Bash sandbox** (bubblewrap). The runs need the shell whole —
   multi-line python heredocs, jq pipelines, `$(…)` — and they read
   untrusted web pages, so no command list could bound them. The sandbox
-  does: writes only to the checkout and `/tmp`; no reads of
+  does: writes only to the checkout, `/tmp` and the scrapers' page cache
+  (`~/.cache/kulturni-prehled`, see below); no reads of
   `denied-tools.txt`'s places (the gh token, SSH keys, the other runners'
   tokens, ai-config — whose scripts run on every machine after an
   autosync); network only to the KP API (the host of `$KP_API_BASE`), the
@@ -116,6 +117,15 @@ started in the checkout.
   throwaway plugin `kp`; the session calls them as `kp:<name>`.
 - **`--strict-mcp-config`**: no MCP servers, the claude.ai connectors
   included.
+
+**The scrapers' page cache.** Every venue page goes through
+`skills/lib/kp_fetch.py`: cached in `~/.cache/kulturni-prehled/fetch`,
+re-checked about monthly (club feeds weekly, the ticket watchdog's pages
+every few days) with conditional requests, under a per-host daily budget and
+a cooldown that closes a refusing host for 6 h up to 7 days. fok.cz banned
+this network when every run re-read all of it; now a normal week costs it
+nothing. `python3 skills/lib/kp_fetch.py status` shows each host's budget
+and cooldown.
 
 A scraper on a new host needs its line in `sandbox-domains.txt` (a
 private host: in `sandbox-domains.local` on the box), or its curl fails

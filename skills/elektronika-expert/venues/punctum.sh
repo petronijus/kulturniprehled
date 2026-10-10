@@ -13,13 +13,16 @@ set -u
 lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../klasika-expert/ensembles/lib"
 export PYTHONPATH="$lib_dir${PYTHONPATH:+:$PYTHONPATH}"
 
+# Every page goes through the shared cache (skills/lib/kp_fetch.py): a
+# feed is re-checked about weekly, under a per-host budget and cooldown.
+KP_FETCH="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)/lib/kp_fetch.py"
+
 URL="https://punctum.cz/rss"
-UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'
 VENUE_NAME="Punctum"
 
 TMP=$(mktemp -t punctum-XXXXXX.xml)
 trap 'rm -f "$TMP"' EXIT
-curl -sS -L -A "$UA" --max-time 30 -o "$TMP" "$URL" 2>/dev/null || { echo '[]'; exit 0; }
+python3 "$KP_FETCH" get --kind feed "$URL" >"$TMP" || { echo '[]'; exit 0; }
 [ ! -s "$TMP" ] && { echo '[]'; exit 0; }
 
 XML_PATH="$TMP" VENUE="$VENUE_NAME" python3 - <<'PY'

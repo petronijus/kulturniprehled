@@ -16,6 +16,8 @@
 www.fok.cz
 www.ceskafilharmonie.cz
 www.berg.cz
+# www.berg.cz answers with a redirect to the apex
+berg.cz
 www.prgphil.cz
 socr.rozhlas.cz
 # fetched from the shell by the experts

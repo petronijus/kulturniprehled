@@ -7,10 +7,10 @@ is the whole boundary next to the CLI flags. It holds
 
   * permissions.allow / permissions.deny — from allowed-tools-weekly.txt and
     denied-tools.txt ({HOME} and {REPO} filled in);
-  * sandbox — Bash runs inside bubblewrap: no write outside the checkout and
-    /tmp, no read of the denied places, network only to the allowed hosts,
-    and no way back out (allowUnsandboxedCommands false, failIfUnavailable
-    true).
+  * sandbox — Bash runs inside bubblewrap: no write outside the checkout,
+    /tmp and the scrapers' page cache, no read of the denied places, network
+    only to the allowed hosts, and no way back out (allowUnsandboxedCommands
+    false, failIfUnavailable true).
 
 The allowed hosts are the public ones in sandbox-domains.txt, the host of
 every --url (the runner passes $KP_API_BASE), and any further --domains
@@ -75,7 +75,15 @@ def url_host(url: str) -> str:
     return parts.hostname
 
 
-def build(allow: list[str], deny: list[str], domains: list[str]) -> dict:
+def writable_paths(home: str) -> list[str]:
+    """Where the sandboxed shell may write besides the checkout: /tmp (the
+    runs' work dirs, /tmp/kp-digest-CW<n> …) and the scrapers' page cache
+    (skills/lib/kp_fetch.py), which must outlive the run — it is what keeps
+    the venues from being asked for the same pages every week."""
+    return ["/tmp", f"{home}/.cache/kulturni-prehled"]
+
+
+def build(allow: list[str], deny: list[str], domains: list[str], writable: list[str]) -> dict:
     for d in domains:
         if "/" in d or " " in d or not d:
             raise ValueError(f"not a domain: {d!r}")
@@ -88,9 +96,8 @@ def build(allow: list[str], deny: list[str], domains: list[str]) -> dict:
             "allowUnsandboxedCommands": False,
             "network": {"allowedDomains": domains},
             "filesystem": {
-                # the checkout is the working directory (writable already);
-                # /tmp holds the runs' work dirs (/tmp/kp-digest-CW<n>, …)
-                "allowWrite": ["/tmp"],
+                # the checkout is the working directory (writable already)
+                "allowWrite": writable,
                 "denyRead": deny_read_paths(deny),
             },
         },
@@ -117,6 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         rules(a.allowed, a.home, a.repo),
         rules(a.denied, a.home, a.repo),
         list(dict.fromkeys(domains)),
+        writable_paths(a.home),
     )
     json.dump(settings, sys.stdout, indent=2)
     sys.stdout.write("\n")

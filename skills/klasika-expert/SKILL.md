@@ -230,8 +230,29 @@ The four ensemble scrapers read the programme themselves, off each venue's
 own detail page (`ensembles/lib/detail.py`) — one fetch per production URL,
 shared by every evening of a run. So their candidates arrive with `program`,
 `soloists`, `conductor` and `price_czk` already filled and cost step 5d
-nothing. Budget about a second per production: ~40 s for SOČR, ~2 min for
-Česká filharmonie.
+nothing.
+
+**Every page they read comes through the shared cache**
+(`skills/lib/kp_fetch.py`). A season's programme is published once and then
+sits, so listings and detail pages are re-checked about monthly, with a
+per-host daily budget and a cooldown on refusal — fok.cz banned this
+network outright when every run re-read all of it (2026-09, 2026-10). A
+normal week therefore costs the venues almost no requests, and a scraper
+returns in seconds. Two knobs, set by the commands below and nowhere else:
+
+- **weekly** — `KP_FETCH_FRESH_URLS=$DIGEST_DIR/fresh-urls.txt`: the
+  aggregator lists the detail pages of the concerts the ticket watchdog
+  follows (selected, sold out), and only those are re-checked every few
+  days, so a released ticket still shows up within the week;
+- **season** — `KP_FETCH_REFRESH=listing`: the season run re-checks every
+  listing (a 304 for an unchanged page), so a freshly published season is
+  seen in full. Budget and cooldown still apply.
+
+A page the cache cannot supply (host cooling down, budget spent) is not an
+error: the production keeps the listing only and a later run fills it. The
+scraper's stderr says so (`KP_FETCH cooldown|budget|stale …` and a
+`WARN: <site> detail pages unavailable …` summary) — mention it in the run
+log, never retry around it.
 
 A page the parser could not read prints `MISSING_PROGRAM=<url>` on the
 scraper's stderr (kept in `/tmp/kp-klasika-<ensemble>.err`); a page whose
@@ -241,13 +262,17 @@ WebFetch in step 5d — re-reading the second would buy nothing.
 
 
 ```bash
+# weekly: the watchdog's detail pages are re-checked every few days
+FETCH_ENV="KP_FETCH_FRESH_URLS=/tmp/kp-digest-CW$(date +%V)/fresh-urls.txt"
+# season: re-check every listing instead
+#   FETCH_ENV="KP_FETCH_REFRESH=listing"
 CANDIDATES='[]'
 for E in $ENSEMBLE_SCRAPERS; do
   SCRAPER="$SKILL_DIR/ensembles/$E.sh"
   if [ ! -x "$SCRAPER" ]; then
     echo "WARN: scraper '$E' missing"; continue
   fi
-  OUT=$("$SCRAPER" 2>/tmp/kp-klasika-$E.err)
+  OUT=$(env "$FETCH_ENV" "$SCRAPER" 2>/tmp/kp-klasika-$E.err)
   if [ -z "$OUT" ] || ! printf '%s' "$OUT" | jq -e . >/dev/null 2>&1; then
     echo "WARN: '$E' returned nothing parseable — likely HTML changed"
     continue

@@ -55,7 +55,9 @@ def test_deny_read_paths() -> None:
 
 
 def test_sandbox_cannot_be_left() -> None:
-    s = ss.build(["Bash"], ["Read(//h/.ssh/**)"], ["kulturniprehled.example.com"])["sandbox"]
+    s = ss.build(["Bash"], ["Read(//h/.ssh/**)"], ["kulturniprehled.example.com"], ["/tmp"])[
+        "sandbox"
+    ]
     assert s["enabled"] is True
     assert s["failIfUnavailable"] is True, "a missing bwrap must stop the run, not unsandbox it"
     assert s["allowUnsandboxedCommands"] is False, "dangerouslyDisableSandbox must be ignored"
@@ -70,7 +72,7 @@ def test_sandbox_cannot_be_left() -> None:
 def test_bad_domain_rejected() -> None:
     for bad in ("https://x.cz", "x.cz/path", "", "a b"):
         try:
-            ss.build([], [], [bad])
+            ss.build([], [], [bad], [])
         except ValueError:
             continue
         raise AssertionError(f"accepted {bad!r}")
@@ -124,6 +126,7 @@ def test_real_lists() -> None:
     for secret in ("/home/u/.ssh", "/home/u/.config/gh", "/home/u/Documents/Dev/ai-config"):
         assert secret in deny_read, secret
     assert "kulturniprehled.example.com" in s["sandbox"]["network"]["allowedDomains"]
+    assert s["sandbox"]["filesystem"]["allowWrite"] == ["/tmp", "/home/u/.cache/kulturni-prehled"]
     domains = s["sandbox"]["network"]["allowedDomains"]
     assert "www.fok.cz" in domains and "tickets.example.com" in domains
     assert domains.count("www.fok.cz") == 1, "duplicates across files are merged"

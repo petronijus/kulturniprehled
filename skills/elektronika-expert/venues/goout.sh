@@ -20,12 +20,15 @@ set -u
 lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../../klasika-expert/ensembles/lib"
 export PYTHONPATH="$lib_dir${PYTHONPATH:+:$PYTHONPATH}"
 
+# Every page goes through the shared cache (skills/lib/kp_fetch.py): a
+# page is re-checked about weekly, under a per-host budget and cooldown.
+KP_FETCH="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)/lib/kp_fetch.py"
+
 URL="${1:?usage: goout.sh <goout-url>}"
-UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'
 
 TMP=$(mktemp -t goout-XXXXXX.html)
 trap 'rm -f "$TMP"' EXIT
-curl -sS -L -A "$UA" --max-time 40 -o "$TMP" "$URL" 2>/dev/null || { echo '[]'; exit 0; }
+python3 "$KP_FETCH" get --kind feed "$URL" >"$TMP" || { echo '[]'; exit 0; }
 [ ! -s "$TMP" ] && { echo '[]'; exit 0; }
 
 HTML_PATH="$TMP" PAGE_URL="$URL" python3 - <<'PY'

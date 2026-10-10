@@ -87,6 +87,15 @@ Into `$DIGEST_DIR`:
 
 ### 3. Run experts (weekly mode)
 
+First list the detail pages the ticket watchdog (step 4) depends on, so the
+scrapers' monthly cache re-checks exactly these every few days
+(`skills/lib/kp_fetch.py`, `KP_FETCH_FRESH_URLS`; the experts pass it on):
+
+```bash
+jq -r '.[] | select(.plan_status == "selected" and .tickets_available == false)
+       | .url // empty' "$DIGEST_DIR/pool.json" | sort -u > "$DIGEST_DIR/fresh-urls.txt"
+```
+
 For each expert, call the `Skill` tool with `skill: "<expert>"` (no
 args — weekly is the default). Each writes
 `$DIGEST_DIR/<lane>.json`; missing/empty file → warn and continue.

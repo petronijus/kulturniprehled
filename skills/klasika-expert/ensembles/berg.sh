@@ -11,13 +11,16 @@ set -u
 lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib"
 export PYTHONPATH="$lib_dir${PYTHONPATH:+:$PYTHONPATH}"
 
+# Every page goes through the shared cache (skills/lib/kp_fetch.py): a
+# listing is re-checked about monthly, under a per-host budget and cooldown.
+KP_FETCH="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)/lib/kp_fetch.py"
+
 URL="https://www.berg.cz"
-UA='Mozilla/5.0 (compatible; kp-kulturni-kritik/1.0)'
 ENSEMBLE_NAME="Orchestr Berg"
 
 TMP=$(mktemp -t berg-XXXXXX.html)
 trap 'rm -f "$TMP"' EXIT
-curl -sS -L -A "$UA" --max-time 30 -o "$TMP" "$URL" 2>/dev/null || { echo '[]'; exit 0; }
+python3 "$KP_FETCH" get --kind listing "$URL" >"$TMP" || { echo '[]'; exit 0; }
 [ ! -s "$TMP" ] && { echo '[]'; exit 0; }
 
 HTML_PATH="$TMP" ENSEMBLE="$ENSEMBLE_NAME" python3 - <<'PY'

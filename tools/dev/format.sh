@@ -16,7 +16,7 @@
 # Plain bash 3.2 (macOS /bin/bash) compatible.
 set -uo pipefail
 
-root="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 cd "$root" || exit 1
 
 web_dir=apps/api/web

@@ -68,6 +68,7 @@ Read `docs/sync.md` before touching sync, the outbox or any synced entity,
 |---|---|
 | `just setup` | check the toolchain, install git hooks, `flutter pub get`, `uv sync`, `npm ci` |
 | `just check` | fast lane (~1 min): formatting, all analyzers, docs check, Dart, API (testcontainers), web and script tests |
+| `just check-affected` | the fast lane narrowed to the units changed since the last tree that passed it (the Claude Code Stop hook's check) |
 | `just ci` | full gate: fast lane + debug APK, SPA bundle, API image, and the iOS build on macOS |
 | `just fmt` | format everything (`tools/dev/format.sh`) |
 | `just test-api` / `test-dart` / `test-web` / `test-scripts` | one test layer |
@@ -114,7 +115,7 @@ infra/             compose files, deploy, backup, claudebox timers, iOS release 
 scripts/           image build + push, secrets, PAT minting, iOS private-value injection
 assets-source/     brand masters (Petr's; read-only)
 packages/          OpenAPI notes (no snapshot: the API serves /openapi.json)
-tools/dev/         formatter, doctor, commit-msg check, PII scan, docs check
+tools/dev/         formatter, doctor, commit-msg check, PII scan, docs check, affected lane
 docs/              architecture, sync, API, release, deployment, development
 private/           private overlay (gitignored; its own repo)
 ```

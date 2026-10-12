@@ -67,7 +67,8 @@ just secrets-decrypt   # .env for the dev stack (needs the overlay and 1Password
 
 | Recipe | Runs | When |
 |---|---|---|
-| `just check` | format check, `flutter analyze`, ruff + mypy, Biome + tsc, shellcheck, `just lint-docs`, and every test below except builds (~1 min) | pre-push hook; Claude Code Stop hook |
+| `just check` | format check, `flutter analyze`, ruff + mypy, Biome + tsc, shellcheck, `just lint-docs`, and every test below except builds (~1.5 min, most of it the API tests) | pre-push hook |
+| `just check-affected` | `tools/dev/check-affected.sh`: the format check of the changed files, the docs check, shellcheck, and the analyzers and tests of the units changed since the last tree that passed this lane (`apps/mobile`, `apps/api`, `apps/api/web`, the scripts); the whole `just check` when a shared file changed (the justfile, `tools/`, `.claude/hooks`, root config) or nothing has passed yet in this clone | Claude Code Stop hook (waits while background agents are working) |
 | `just lint-docs` | `tools/dev/docs-check.py`: every `just` recipe, relative link, heading anchor, repo path in inline code and `@import` the docs name exists; AGENTS.md and CLAUDE.md within 200 lines | pre-commit hook, `just check` |
 | `just test-api` | pytest against Postgres 16 and MinIO in testcontainers | API changes |
 | `just test-dart` | `flutter test` | app changes |

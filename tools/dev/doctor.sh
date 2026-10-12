@@ -5,7 +5,7 @@
 # shellcheck disable=SC2015
 set -uo pipefail
 
-root="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
 FLUTTER="$(tr -d "[:space:]" <"$root/.flutter-version")" # also enforced by pubspec.yaml
 JAVA_MAJOR=25
@@ -18,6 +18,30 @@ ok() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 bad() { printf '  \033[31m✗\033[0m %s\n      → %s\n' "$1" "$2"; fail=1; }
 warn() { printf '  \033[33m!\033[0m %s\n      → %s\n' "$1" "$2"; }
 has() { command -v "$1" >/dev/null 2>&1; }
+
+# The first version number in a command's output.
+ver() { "$@" 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1; }
+# at_least <have> <want>: version comparison by sort -V.
+at_least() { [[ -n "$1" && "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -1)" == "$2" ]]; }
+# The pacman package that owns a tool, if pacman installed it.
+pacman_pkg() { has pacman && has "$1" && pacman -Qqo "$(command -v "$1")" 2>/dev/null; }
+# tool_ver <tool> <args…>: the tool's own answer, else its package's version
+# (distro builds can lack the stamp: Arch's gitleaks prints "version is set
+# by build process").
+tool_ver() {
+  local v pkg
+  v="$(ver "$@")"
+  if [[ -z "$v" ]] && pkg="$(pacman_pkg "$1")"; then
+    v="$(pacman -Q "$pkg" | awk '{print $2}' | grep -Eo '^[0-9]+\.[0-9]+(\.[0-9]+)?')"
+  fi
+  printf '%s' "$v"
+}
+# How to install a package on this machine.
+install() {
+  if has pacman; then echo "sudo pacman -S $1"
+  elif has brew; then echo "brew install $1"
+  else echo "install $1 (docs/development.md, Toolchain)"; fi
+}
 
 echo "Toolchain"
 if has flutter; then
@@ -68,12 +92,18 @@ else
 fi
 
 echo "Dev tools"
-for t in just lefthook gitleaks python3 uv ktlint shellcheck; do
-  has "$t" && ok "$t" || bad "$t missing" "brew install $t   (Linux: see docs/development.md)"
+for t in just lefthook python3 uv ktlint shellcheck; do
+  has "$t" && ok "$t" || bad "$t missing" "$(install "${t/#python3/python}")"
 done
+# The pre-commit hook runs `gitleaks git --pre-commit --staged` (8.19+).
+v="$(tool_ver gitleaks version)"
+at_least "$v" 8.19 && ok "gitleaks $v" || bad "gitleaks ${v:-missing or unknown version} (want ≥ 8.19)" "$(install gitleaks)"
 
 echo "Project"
-[[ -x "$root/.git/hooks/pre-commit" ]] && grep -q lefthook "$root/.git/hooks/pre-commit" \
+# --git-path: in a linked worktree `.git` is a file and the hooks live in the
+# main checkout's git directory.
+pre_commit="$(git -C "$root" rev-parse --path-format=absolute --git-path hooks/pre-commit)"
+[[ -x "$pre_commit" ]] && grep -q lefthook "$pre_commit" \
   && ok "git hooks installed" || warn "git hooks not installed" "lefthook install"
 patterns="${KP_PII_PATTERNS:-$HOME/.claude/skills/repo-hygiene/patterns.txt}"
 [[ -f "$patterns" ]] && ok "PII patterns ($patterns)" \

@@ -1,6 +1,7 @@
 # Kulturní Přehled task runner — https://just.systems. `just` lists the recipes.
-# The fast lane (`just check`) is what the pre-push hook and the Claude Code
-# Stop hook run; `just ci` is the full gate before a change counts as done.
+# The fast lane (`just check`) is what the pre-push hook runs; the Claude Code
+# Stop hook runs its affected part (`just check-affected`); `just ci` is the
+# full gate before a change counts as done.
 # There is no hosted CI: these recipes are the CI, run on the Linux desktop
 # (everything except iOS) or the MacBook (all lanes).
 
@@ -34,6 +35,12 @@ doctor:
 
 # Formatting, static analysis, the docs check and every unit test that needs no build
 check: fmt-check lint lint-docs test-dart test-api test-web test-scripts
+
+# The Stop hook's lane, tools/dev/check-affected.sh; pre-push still runs the whole `just check`.
+
+# The fast lane narrowed to the units changed since the last tree that passed it (the Stop hook's check)
+check-affected:
+    tools/dev/check-affected.sh
 
 # Format every source file in place
 fmt: _web-deps

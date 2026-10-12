@@ -15,8 +15,13 @@ Project configuration lives in `.claude/` (committed). What it does for you:
     (`sudo -u x cat …`) or reached by a recursive search (`grep -r`; use `rg` or
     `git grep`, which skip gitignored files); a call the guard cannot parse
     is denied; `project.pbxproj` asks first;
-  - when you finish a turn with code changes, `just check` runs; if it
-    fails, you get the output and must fix it before stopping.
+  - when you finish a turn with code changes, `just check-affected` runs
+    (`just check` narrowed to the units changed since the last tree that
+    passed; a shared file — the justfile, `tools/`, root config — runs the
+    whole lane; pre-push still runs the whole `just check`); if it fails,
+    you get the output and must fix it before stopping. It waits while
+    background agents of the session are still working and runs in the turn
+    the last of them reports back.
 - **Rules** (`.claude/rules/`) load when you read files under
   `apps/mobile/lib`, `apps/mobile/android`, `apps/mobile/ios`, `apps/api`,
   `apps/api/web`, `skills` or `infra/claudebox`.
@@ -28,6 +33,15 @@ Project configuration lives in `.claude/` (committed). What it does for you:
 | `test-runner` | after code changes, on any failing test or build, and to write tests; keeps Gradle, Docker and pytest logs out of the main context |
 | `integrity-reviewer` | before committing anything under `apps/api/src`, `apps/api/alembic`, `apps/mobile/lib/features/{sync,outbox,auth,notifications}`, `apps/mobile/android`, `skills/kulturni-sezona` or `infra` |
 | `docs-writer` | after a change to behaviour, commands, the API, the sync protocol, the toolchain or the release flow |
+
+## Committing
+
+When Petr asks to run the checks and commit a stretch of work, follow the
+global `commit-in-background` skill: snapshot the finished tree, let a
+background fork split it into small commits and verify each one in its own
+git worktree (`just ci` after the last), keep working meanwhile, then adopt
+its commits with `git reset --mixed`. Small diffs are committed inline.
+Never push without its own word.
 
 ## Skills
 

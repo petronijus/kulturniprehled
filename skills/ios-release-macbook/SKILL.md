@@ -51,37 +51,66 @@ security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
 
 ### Bootstrap step 2: Install provisioning profile
 
-The profile is available from the macOS VM or from App Store Connect.
-Easiest path — download from VM (if running):
+Current Xcode keeps profiles in
+`~/Library/Developer/Xcode/UserData/Provisioning Profiles/`; older Xcode
+used `~/Library/MobileDevice/Provisioning Profiles/`. Check the new
+directory first: on a Mac that already has the profile (downloaded by
+Xcode), a check of the old directory alone misses it and sends you into a
+needless bootstrap. `infra/ios/bootstrap-signing.sh` still copies into the
+old directory, which Xcode reads as well.
 
 ```bash
-scp petronijus@192.0.2.154:~/Library/MobileDevice/Provisioning\ Profiles/f2ec53a5-77da-4bec-b73b-6d124438e666.mobileprovision \
-  ~/Library/MobileDevice/Provisioning\ Profiles/
+ls ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles/f2ec53a5-*.mobileprovision \
+  ~/Library/MobileDevice/Provisioning\ Profiles/f2ec53a5-*.mobileprovision 2>/dev/null
 ```
 
-If the VM is not running, download from ASC API:
+If neither has it, copy it from the macOS VM (if running):
 
 ```bash
-ASC_KEY_ID=$(op-cache "Kulturni prehled ASC API Key" "key_id")
-ASC_ISSUER=$(op-cache "Kulturni prehled ASC API Key" "issuer_id")
-# Use xcrun altool or the ASC API to fetch profile MY69457XDZ
+mkdir -p ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles
+scp "petronijus@192.0.2.154:~/Library/MobileDevice/Provisioning Profiles/f2ec53a5-77da-4bec-b73b-6d124438e666.mobileprovision" \
+  ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles/
 ```
 
-### Bootstrap step 3: Verify Flutter + SPM
+Otherwise download profile `KP Distribution` from the Apple Developer
+portal (Certificates, Identifiers & Profiles → Profiles) and open it, or
+let Xcode fetch it (Settings → Accounts → Download Manual Profiles).
+
+### Bootstrap step 3: App Store Connect API key
+
+`infra/ios/release-local.sh` uploads with the App Store Connect API key,
+not an Apple ID. It reads `key_id` and `issuer_id` from the 1Password item
+`Kulturni prehled ASC API Key` and expects the key file at
+`~/.appstoreconnect/private_keys/AuthKey_<key_id>.p8`. Save the item's
+private key there once (mode `600`); never print it.
+
+### Bootstrap step 4: Release config
+
+The script takes `KP_API_BASE` from the environment or from
+`private/config/mobile-release.conf` in the private overlay (the same file
+`just build-aab` reads). Clone the overlay into `private/` once; the script
+refuses a host that is not `https://` or still the `example.com`
+placeholder.
+
+### Bootstrap step 5: Verify Flutter + SPM
 
 ```bash
 flutter --version  # Must be 3.47.5
 flutter config --no-enable-swift-package-manager  # One-time per machine
 ```
 
-### Bootstrap step 4: Verify
+### Bootstrap step 6: Verify
 
 ```bash
 security find-identity -v -p codesigning | grep "Apple Distribution"
-ls ~/Library/MobileDevice/Provisioning\ Profiles/f2ec53a5-*.mobileprovision
+ls ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles/f2ec53a5-*.mobileprovision \
+  ~/Library/MobileDevice/Provisioning\ Profiles/f2ec53a5-*.mobileprovision 2>/dev/null
+ls ~/.appstoreconnect/private_keys/AuthKey_*.p8
+test -f private/config/mobile-release.conf
 ```
 
-Both must succeed. Bootstrap is done — never needs repeating on this Mac
+The cert, one profile, the key file and the config must all be there.
+Bootstrap is done — never needs repeating on this Mac
 unless the cert expires or the keychain is reset.
 
 ---
@@ -99,40 +128,24 @@ git checkout main && git pull --ff-only
 grep ^version: apps/mobile/pubspec.yaml
 ```
 
-### 2. Build IPA
+### 2. Build and upload
 
 ```bash
-cd apps/mobile
-GOOG_CLIENT_ID=$(op-cache "Kulturni prehled google Web OAuth client" "client ID")
-
-flutter build ipa --release \
-  --export-options-plist=ios/ExportOptions.plist \
-  --dart-define=KP_API_BASE=https://kulturniprehled.example.com \
-  --dart-define=KP_GOOGLE_OAUTH_SERVER_CLIENT_ID="$GOOG_CLIENT_ID"
-
-unset GOOG_CLIENT_ID
+infra/ios/release-local.sh
 ```
 
-Expect `✓ Built IPA to build/ios/ipa`. Takes 3-5 minutes.
+Run it from the repo root; never rebuild the `flutter build ipa` /
+`altool` commands by hand. The script checks the cert and the release
+config, injects the private iOS values (and restores the placeholders on
+exit), builds the IPA with the real `KP_API_BASE` and the OAuth client
+ID, and uploads it with the App Store Connect API key. Hand-typed
+commands with the public placeholder host would ship an app that talks to
+a server that does not exist.
 
-### 3. Upload to App Store Connect
+Expect `UPLOAD SUCCEEDED` after 3-5 minutes of build. ASC processes in
+~5-15 min, then Družina auto-distributes to TestFlight.
 
-```bash
-ALTOOL_PW=$(op-cache "Kulturni prehled Apple ID app-specific password" credential)
-
-xcrun altool --upload-app \
-  -f "build/ios/ipa/Kulturni Prehled.ipa" \
-  -t ios \
-  -u petronijus@example.com \
-  -p "$ALTOOL_PW"
-
-unset ALTOOL_PW
-```
-
-Expect `UPLOAD SUCCEEDED`. ASC processes in ~5-15 min, then Družina
-auto-distributes to TestFlight.
-
-### 4. Report
+### 3. Report
 
 Tell the user (in Czech):
 - Version uploaded
@@ -145,6 +158,8 @@ Tell the user (in Czech):
   profile `KP Distribution` (UUID `f2ec53a5-77da-4bec-b73b-6d124438e666`)
 - 1Password items:
   - `KP iOS Distribution .p12` — cert + key bundle (vault: Personal)
-  - `Kulturni prehled Apple ID app-specific password` → `credential`
+  - `Kulturni prehled ASC API Key` → `key_id`, `issuer_id`, the `.p8`
+    private key
   - `Kulturni prehled google Web OAuth client` → `client ID`
-- Shell script version: `infra/ios/release-local.sh`
+- Release script: `infra/ios/release-local.sh`; signing bootstrap:
+  `infra/ios/bootstrap-signing.sh`

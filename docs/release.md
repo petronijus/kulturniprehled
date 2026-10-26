@@ -67,6 +67,12 @@ The image is built **locally** and pushed to GHCR; the VM only pulls
 see Petr's deploy standard, `ai-config/docs/DEPLOY-STANDARD.md` in the
 ai-config repo).
 
+`scripts/build-push.sh` builds for `linux/amd64` (the VM's platform) on any
+machine, the arm64 MacBook included, and refuses to push if the built image
+reports another platform; an arm64-only image fails on the VM with "no
+matching manifest for linux/amd64". Set `KP_API_PLATFORM` only if the VM's
+architecture changes.
+
 **Order: deploy the API first, then upload the app** (Play and TestFlight)
 whenever the app relies on something the API adds. Example from the event
 notifications (2026-10-26): an older API answers the app's `notification`
@@ -161,8 +167,9 @@ see the next section.
 iOS distribution needs a Mac because Xcode + CocoaPods can't run on
 Linux. Two paths now exist:
 
-- **Local Mac (MacBook).** Original recipe — kept here for the case
-  when you're sitting at the MacBook and just want to ship. Petr's
+- **Local Mac (MacBook).** `infra/ios/release-local.sh`, uploads with
+  the App Store Connect API key — for when you're sitting at the MacBook
+  and just want to ship. Petr's
   MacBook should be on Flutter 3.47.5 (the `assets-source/brand`
   contract, the `import 'package:flutter/cupertino.dart'` change to
   `theme.dart`, and the manual-signing pbxproj edits all depend on
@@ -171,7 +178,8 @@ Linux. Two paths now exist:
 - **Headless via Proxmox MacOS VM (`server-mac`, `192.0.2.154`).**
   Documented end-to-end in `private/docs/handover.md`
   under the 2026-05-22 session, and in the `ios-release-vm` skill — drives the build over SSH from any
-  workstation, authed by the App Store Connect API key in 1Password.
+  workstation; uploads with the Apple ID app-specific password from
+  1Password.
   No GUI clicks. Preferred for routine releases.
 
 The section below is the **local Mac** recipe.
@@ -187,12 +195,18 @@ The section below is the **local Mac** recipe.
    `apps/mobile/ios/Runner.xcodeproj/project.pbxproj`. Automatic
    signing is enabled. Don't touch unless the team changes.
 
-3. **App-specific password** — stored in 1Password as
-   `Kulturni prehled Apple ID app-specific password` →
-   `credential`. Used by `xcrun altool` (see per-release flow below).
-   To rotate: <https://appleid.apple.com> → Sign-In and Security →
-   App-Specific Passwords → revoke old + create new + overwrite the
-   1Password item.
+3. **Upload credentials**:
+   - **App Store Connect API key** (local Mac, since 2026-10-26) —
+     1Password item `Kulturni prehled ASC API Key` holds `key_id`,
+     `issuer_id` and the `.p8` private key. The `.p8` lives at
+     `~/.appstoreconnect/private_keys/AuthKey_<key_id>.p8` on each Mac
+     that uploads; `xcrun altool --apiKey/--apiIssuer` finds it there.
+   - **App-specific password** (still used by
+     `infra/ios/release-from-vm.sh`) — 1Password item
+     `Kulturni prehled Apple ID app-specific password` → `credential`.
+     To rotate: <https://appleid.apple.com> → Sign-In and Security →
+     App-Specific Passwords → revoke old + create new + overwrite the
+     1Password item.
 
 4. **Internal Testing group `Družina`** — Běla is in App Store
    Connect as an **App Manager** team member (Users and Access →
@@ -225,32 +239,26 @@ The section below is the **local Mac** recipe.
 
 ### Per-release steps
 
-```bash
-cd apps/mobile
-# bump version in pubspec.yaml — `version: 1.0.X+Y` (Y must be unique
-# and monotonically increasing per CFBundleVersion)
+1. **Version**: bump `apps/mobile/pubspec.yaml` (`version: X.Y.Z+N`; `N`
+   is the `CFBundleVersion` and must only go up), commit and push.
+2. **Build and upload**: `infra/ios/release-local.sh`. It takes
+   `KP_API_BASE` from the environment or `private/config/mobile-release.conf`
+   (as `just build-aab` does) and refuses a non-`https` or `example.com`
+   host, injects the private iOS values and restores the placeholders on
+   exit, builds the IPA with the OAuth client ID from 1Password, and uploads
+   it with the App Store Connect API key.
 
-GOOG_CLIENT_ID=$(op-cache "Kulturni prehled google Web OAuth client" "client ID")
-ALTOOL_PW=$(op-cache "Kulturni prehled Apple ID app-specific password" credential)
+Do not type the `flutter build ipa` / `altool` commands by hand: with the
+public placeholder host they ship an app that talks to a server that does
+not exist. Signing bootstrap on a new Mac (cert, profile, ASC key, overlay):
+the `ios-release-macbook` skill (`skills/ios-release-macbook/SKILL.md`).
+Current Xcode keeps the provisioning profile in
+`~/Library/Developer/Xcode/UserData/Provisioning Profiles/`, not
+`~/Library/MobileDevice/Provisioning Profiles/`.
 
-flutter build ipa --release \
-  --export-options-plist=ios/ExportOptions.plist \
-  --dart-define=KP_API_BASE=https://kulturniprehled.example.com \
-  --dart-define=KP_GOOGLE_OAUTH_SERVER_CLIENT_ID="$GOOG_CLIENT_ID"
-
-xcrun altool --upload-app \
-  -f "build/ios/ipa/Kulturni Prehled.ipa" \
-  -t ios \
-  -u petronijus@example.com \
-  -p "$ALTOOL_PW"
-
-unset GOOG_CLIENT_ID ALTOOL_PW
-```
-
-That's the full release pipeline. Apple processes the build
-(~5–15 min), then the Auto-Distribute setting on `Družina` pushes
-it to Běla's TestFlight automatically. No clicks in App Store
-Connect, no clicks in Xcode.
+Apple processes the build (~5–15 min), then the Auto-Distribute setting on
+`Družina` pushes it to Běla's TestFlight automatically. No clicks in App
+Store Connect, no clicks in Xcode.
 
 ### Smoke test on iPhone
 

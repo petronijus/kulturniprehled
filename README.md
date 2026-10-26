@@ -172,10 +172,11 @@ For routine releases: `ssh deploy@kp-vm /opt/kp/infra/deploy/upgrade.sh`.
   from the Play Store. Procedure in [`docs/release.md`](docs/release.md).
 - **iOS** — TestFlight Internal Testing (group `Družina`,
   auto-distribute on). Two release paths:
-  - Local Mac with Xcode + app-specific password — recipe in
+  - Local Mac with Xcode + App Store Connect API key
+    (`infra/ios/release-local.sh`) — recipe in
     [`docs/release.md`](docs/release.md).
   - Headless from any SSH-capable workstation via the Proxmox MacOS VM
-    + App Store Connect API key — the `ios-release-vm` skill.
+    + Apple ID app-specific password — the `ios-release-vm` skill.
 
 ## Milestones
 

@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart'
-    show Dio, DioException, DioExceptionType, RequestOptions;
+    show Dio, DioException, DioExceptionType, RequestOptions, Response;
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -185,4 +185,66 @@ void main() {
     final List<PendingOpRow> rows = await db.readPendingBatch();
     expect(rows.map((r) => r.opId), contains(opId));
   });
+
+  // Regression: an app newer than the API (an entity type the server cannot
+  // parse) got a 422 for the whole batch, resent it on every push, and every
+  // later edit stayed stuck behind it.
+  test(
+    'a batch the server rejects is split and only the bad op dropped',
+    () async {
+      final KpDatabase db = buildInMemoryDatabase();
+      addTearDown(db.close);
+      await db.insertPendingOp(
+        PendingOpsCompanion.insert(
+          opId: 'op-bad',
+          entityType: 'notification',
+          op: 'create',
+          entityId: const Value<String?>('evt-1'),
+          payloadJson: '{}',
+          createdAt: DateTime(2026),
+        ),
+      );
+      await _seedPendingUpdate(db, 'op-good');
+
+      final List<List<String>> sent = <List<String>>[];
+      final KpClient client = _FakeKpClient((ops) async {
+        sent.add(<String>[for (final op in ops) op['op_id']! as String]);
+        if (ops.any((op) => op['entity'] == 'notification')) {
+          final RequestOptions request = RequestOptions(path: '/v1/sync/apply');
+          throw DioException(
+            requestOptions: request,
+            response: Response<dynamic>(
+              requestOptions: request,
+              statusCode: 422,
+              data: <String, Object?>{'detail': 'unknown entity'},
+            ),
+            type: DioExceptionType.badResponse,
+          );
+        }
+        return <String, dynamic>{
+          'results': <Map<String, Object?>>[
+            for (final Map<String, Object?> op in ops)
+              <String, Object?>{'op_id': op['op_id'], 'status': 'applied'},
+          ],
+        };
+      });
+
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          kpDatabaseProvider.overrideWithValue(db),
+          kpClientProvider.overrideWith((ref) => client),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(outboxControllerProvider.notifier).pushPending();
+
+      expect(sent, <List<String>>[
+        <String>['op-bad', 'op-good'],
+        <String>['op-bad'],
+        <String>['op-good'],
+      ]);
+      expect(await db.countPending(), equals(0));
+    },
+  );
 }

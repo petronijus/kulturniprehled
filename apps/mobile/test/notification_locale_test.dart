@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 
 // Regression guard for the silent "no background notification" bug.
 //
-// `NotificationService.showNewEvent` formats the event date with the Czech
+// `renderEventNotification` (shown by the background sync) formats the event date with the Czech
 // locale: `DateFormat("EEEE d.M. 'v' HH:mm", 'cs')`. The background
 // WorkManager / BGTask isolate never runs `main()`'s
 // `initializeDateFormatting('cs')`, so that format threw

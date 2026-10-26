@@ -165,6 +165,35 @@ class CachedCosts extends Table {
   Set<Column<Object>> get primaryKey => <Column<Object>>{id};
 }
 
+@DataClassName('CachedNotificationRow')
+class CachedNotifications extends Table {
+  // Mirror of the server-side `event_notifications` row. The server decides
+  // what is worth a notification; the phone shows it no sooner than
+  // `deliverAfter` measured on the server clock (`server_time` of the sync
+  // page). The last three columns are local-only — the sync upsert never
+  // writes them. `shownVersion` is the version last shown: a newer version
+  // (a merge that raced a pull near the deadline) is shown again, under the
+  // same platform id. `attempts`/`lastError` record failed shows.
+  TextColumn get id => text()();
+  TextColumn get workspaceId => text()();
+  TextColumn get eventId => text()();
+  TextColumn get kind => text()(); // event_created | event_changed | manual
+  TextColumn get changesJson => text()(); // JSON list: "venue", "program"
+  TextColumn get message => text().nullable()();
+  TextColumn get createdBy => text()();
+  DateTimeColumn get deliverAfter => dateTime()();
+  IntColumn get version => integer()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+  DateTimeColumn get cachedAt => dateTime()();
+  IntColumn get shownVersion => integer().nullable()();
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+  TextColumn get lastError => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => <Column<Object>>{id};
+}
+
 @DriftDatabase(
   tables: <Type>[
     CachedEvents,
@@ -175,6 +204,7 @@ class CachedCosts extends Table {
     CachedCosts,
     CachedWatchlistItems,
     CachedImages,
+    CachedNotifications,
   ],
 )
 class KpDatabase extends _$KpDatabase {
@@ -182,7 +212,7 @@ class KpDatabase extends _$KpDatabase {
   KpDatabase.test(super.executor);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -221,6 +251,9 @@ class KpDatabase extends _$KpDatabase {
       }
       if (from < 10) {
         await m.addColumn(cachedEvents, cachedEvents.spotifyPlaylistUrl);
+      }
+      if (from < 11) {
+        await m.createTable(cachedNotifications);
       }
     },
   );
@@ -437,6 +470,60 @@ class KpDatabase extends _$KpDatabase {
 
   Future<void> upsertWatchlistItem(CachedWatchlistItemsCompanion row) =>
       into(cachedWatchlistItems).insertOnConflictUpdate(row);
+
+  // ===== Notifications =====
+
+  Future<void> upsertNotification(CachedNotificationsCompanion row) =>
+      into(cachedNotifications).insertOnConflictUpdate(row);
+
+  /// Notifications that are due on the server clock [serverNow] and whose
+  /// current version has not been shown on this device, oldest first.
+  Future<List<CachedNotificationRow>> dueNotifications(DateTime serverNow) {
+    return (select(cachedNotifications)
+          ..where(
+            (tbl) =>
+                tbl.deletedAt.isNull() &
+                tbl.deliverAfter.isSmallerOrEqualValue(serverNow) &
+                (tbl.shownVersion.isNull() |
+                    tbl.shownVersion.isSmallerThan(tbl.version)),
+          )
+          ..orderBy(<OrderClauseGenerator<CachedNotifications>>[
+            (tbl) => OrderingTerm(expression: tbl.deliverAfter),
+          ]))
+        .get();
+  }
+
+  Future<void> markNotificationShown(String id, int version) async {
+    await (update(
+      cachedNotifications,
+    )..where((tbl) => tbl.id.equals(id))).write(
+      CachedNotificationsCompanion(shownVersion: Value<int?>(version)),
+    );
+  }
+
+  Future<void> recordNotificationFailure(String id, String error) async {
+    await (update(
+      cachedNotifications,
+    )..where((tbl) => tbl.id.equals(id))).write(
+      CachedNotificationsCompanion.custom(
+        attempts: cachedNotifications.attempts + const Constant<int>(1),
+        lastError: Variable<String>(error),
+      ),
+    );
+  }
+
+  /// Marks every notification already due on [serverNow] as shown without
+  /// showing it — the first sync of a fresh install must not replay the
+  /// history. Pending ones stay: they are news, not history.
+  Future<void> markDueNotificationsShown(DateTime serverNow) async {
+    await (update(
+      cachedNotifications,
+    )..where((tbl) => tbl.deliverAfter.isSmallerOrEqualValue(serverNow))).write(
+      CachedNotificationsCompanion.custom(
+        shownVersion: cachedNotifications.version,
+      ),
+    );
+  }
 
   // ===== Image cache =====
 

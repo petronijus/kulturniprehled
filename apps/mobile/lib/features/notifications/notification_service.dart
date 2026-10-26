@@ -12,6 +12,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
+import 'package:kp_mobile/features/notifications/event_notification.dart';
 
 /// Local-notifications service. Re-plans the full notification slate on
 /// every sync — weekly digest + per-event day-of + 10-min pre-departure.
@@ -47,14 +48,14 @@ class NotificationService {
   /// `FlutterTimezone` lookup (needed only for `zonedSchedule`) and the
   /// runtime-permission requests (which require an Activity and throw or
   /// no-op in the background). Calling the full [initialize] on the
-  /// background `showNewEvent` path was silently throwing here, so the
+  /// background event-notification path was silently throwing here, so the
   /// "new event" notification never fired (the WorkManager callback
   /// swallows the error).
   Future<void> _ensurePluginReady() async {
     if (_pluginReady) return;
     // The background WorkManager isolate never runs main()'s
     // `initializeDateFormatting('cs')`, so the `DateFormat(..., 'cs')` in
-    // showNewEvent throws LocaleDataException there and the notification
+    // the event notification throws LocaleDataException there and the notification
     // never posts. Initialize the locale data here — idempotent, cheap,
     // and covers every isolate that posts a notification.
     await initializeDateFormatting('cs');
@@ -104,31 +105,30 @@ class NotificationService {
     _initialized = true;
   }
 
-  Future<void> showNewEvent({
-    required String eventId,
-    required String title,
-    required DateTime startsAt,
-    required String? venueAddress,
-    required String? coverImageUrl,
-  }) async {
-    // Immediate `show()` only needs the plugin registered — NOT the
-    // timezone DB or permission prompts. This runs in the background
-    // isolate, so call the isolate-safe bootstrap, not full initialize().
+  /// Shows a server-decided event notification (new event, changed venue
+  /// or programme, a member's manual request) right away. Runs in the
+  /// background isolate too, so it uses the isolate-safe bootstrap, not
+  /// the full [initialize]. The id is per notification: showing the same
+  /// one twice (foreground and background sync racing) replaces it.
+  Future<void> showEventNotification(
+    CachedNotificationRow notification,
+    CachedEventRow event,
+  ) async {
     await _ensurePluginReady();
-    final DateFormat dateFmt = DateFormat("EEEE d.M. 'v' HH:mm", 'cs');
-    final String when = _capitalize(dateFmt.format(startsAt.toLocal()));
-    final String body = venueAddress != null && venueAddress.isNotEmpty
-        ? '$when — $venueAddress'
-        : when;
-    final String? cover = await _fetchCoverToFile(coverImageUrl);
+    final NotificationText text = renderEventNotification(notification, event);
+    final String? cover = await _fetchCoverToFile(event.coverImageUrl);
+    final bool created = notification.kind == 'event_created';
     await _plugin.show(
-      id: _idForEvent(eventId, 'new'),
-      title: 'Nová akce: $title',
-      body: body,
+      id: _idForEvent(notification.id, 'notification'),
+      title: text.title,
+      body: text.body,
       notificationDetails: _detailsWithCover(
-        channelId: 'new_event',
-        channelName: 'Nové akce',
+        channelId: created ? 'new_event' : 'event_updates',
+        channelName: created ? 'Nové akce' : 'Změny akcí',
         coverPath: cover,
+        // The foreground and background syncs can both show it; the shared
+        // id replaces the first, and this keeps the second one quiet.
+        onlyAlertOnce: true,
       ),
     );
   }
@@ -214,7 +214,10 @@ class NotificationService {
       coverPaths[url] = await _fetchCoverToFile(url);
     }
 
-    await _plugin.cancelAll();
+    // Pending only: cancelAll() would also take down notifications already
+    // on screen — an event notification shown moments ago by the same sync
+    // that triggered this reschedule.
+    await _plugin.cancelAllPendingNotifications();
 
     // 1) Weekly digest — next Monday at 09:00 local. Only schedule if
     //    there are events in the seven days starting on that Monday.
@@ -343,12 +346,14 @@ class NotificationService {
     required String channelName,
     required String? coverPath,
     String? bigSummary,
+    bool onlyAlertOnce = false,
   }) {
     final AndroidNotificationDetails android = AndroidNotificationDetails(
       channelId,
       channelName,
       importance: Importance.high,
       priority: Priority.high,
+      onlyAlertOnce: onlyAlertOnce,
       icon: 'ic_stat_notify',
       styleInformation: coverPath == null
           ? null

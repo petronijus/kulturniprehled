@@ -35,6 +35,12 @@ class _RecordingPlugin implements FlutterLocalNotificationsPlugin {
       return Future<bool?>.value(true);
     }
     if (invocation.memberName == #cancelAll) {
+      // Would also remove notifications already on screen; reschedule()
+      // must never call it (see the test at the bottom).
+      calls.add('cancelAllIncludingShown');
+      return Future<void>.value();
+    }
+    if (invocation.memberName == #cancelAllPendingNotifications) {
       calls.add('cancelAll');
       if (throwOnNextCancelAll) {
         throwOnNextCancelAll = false;
@@ -176,5 +182,22 @@ void main() {
     ]);
 
     expect(schedulesAfterLastCancel(), contains('schedule:Dnes: Healthy'));
+  });
+
+  // Regression: reschedule() used to call cancelAll(), which on Android also
+  // removes notifications already shown. The sync that shows an event
+  // notification triggers a reschedule moments later, so the notification
+  // could vanish before anyone saw it.
+  test('reschedule leaves notifications on screen alone', () async {
+    final DateTime tomorrow20 = DateTime.now()
+        .add(const Duration(days: 1))
+        .copyWith(hour: 20, minute: 0, second: 0, millisecond: 0);
+
+    await service.reschedule(<CachedEventRow>[
+      _event(id: 'e1', title: 'Concert', startsAt: tomorrow20),
+    ]);
+
+    expect(plugin.calls, contains('cancelAll'));
+    expect(plugin.calls, isNot(contains('cancelAllIncludingShown')));
   });
 }

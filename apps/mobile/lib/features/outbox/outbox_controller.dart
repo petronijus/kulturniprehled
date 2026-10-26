@@ -3,7 +3,9 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart' show DioException;
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:kp_mobile/data/api_client/kp_client.dart';
@@ -95,6 +97,33 @@ class OutboxController extends Notifier<bool> {
     unawaited(pushPending());
   }
 
+  /// Asks the server to notify every member's phone about the event. Goes
+  /// through the outbox like any edit, so it works offline and a retry
+  /// cannot notify twice (the op_id is the idempotency key).
+  Future<String> queueEventNotification({
+    required String eventId,
+    String? message,
+  }) async {
+    final String opId = const Uuid().v4();
+    final KpDatabase db = ref.read(kpDatabaseProvider);
+    final String? trimmed = message?.trim();
+    await db.insertPendingOp(
+      PendingOpsCompanion.insert(
+        opId: opId,
+        entityType: 'notification',
+        op: 'create',
+        entityId: Value<String?>(eventId),
+        baseVersion: const Value<int?>(null),
+        payloadJson: jsonEncode(<String, Object?>{
+          if (trimmed != null && trimmed.isNotEmpty) 'message': trimmed,
+        }),
+        createdAt: DateTime.now(),
+      ),
+    );
+    unawaited(pushPending());
+    return opId;
+  }
+
   Future<String> queueWatchlistCreate({
     required String entityId,
     required Map<String, Object?> payload,
@@ -183,44 +212,12 @@ class OutboxController extends Notifier<bool> {
     state = true;
     try {
       final KpDatabase db = ref.read(kpDatabaseProvider);
-      final KpClient client = ref.read(kpClientProvider);
       while (true) {
         final List<PendingOpRow> batch = await db.readPendingBatch();
         if (batch.isEmpty) {
           break;
         }
-        final List<Map<String, Object?>> operations = batch
-            .map(
-              (op) => <String, Object?>{
-                'op_id': op.opId,
-                'entity': op.entityType,
-                'op': op.op,
-                if (op.entityId != null) 'entity_id': op.entityId,
-                if (op.baseVersion != null) 'base_version': op.baseVersion,
-                'payload': jsonDecode(op.payloadJson),
-              },
-            )
-            .toList();
-
-        try {
-          final Map<String, dynamic> body = await client.applyOperations(
-            operations,
-          );
-          final List<dynamic> results =
-              body['results'] as List<dynamic>? ?? const <dynamic>[];
-          for (int i = 0; i < results.length; i++) {
-            final Map<String, dynamic> result =
-                results[i] as Map<String, dynamic>;
-            final PendingOpRow op = batch[i];
-            await _applyResult(op, result);
-          }
-        } on DioException catch (e) {
-          // Whole-batch network failure: bump attempts on every row, leave
-          // them pending. Push again on next trigger (manual refresh, app
-          // foreground, etc.).
-          for (final PendingOpRow op in batch) {
-            await db.markPendingError(op.opId, e.message ?? 'network error');
-          }
+        if (!await _send(batch)) {
           break;
         }
 
@@ -231,6 +228,73 @@ class OutboxController extends Notifier<bool> {
       }
     } finally {
       state = false;
+    }
+  }
+
+  /// Posts [batch] and applies the per-op results. Returns false when the
+  /// network failed and the push should stop until the next trigger.
+  ///
+  /// A 400/422 for the whole batch means the server could not even parse
+  /// one of the operations (e.g. an entity type an older API does not
+  /// know). Resending the same batch forever would wedge every later edit
+  /// behind it, so the batch is retried op by op, and an op the server
+  /// rejects on its own is dropped — logged and reported, never silent.
+  Future<bool> _send(List<PendingOpRow> batch) async {
+    final KpDatabase db = ref.read(kpDatabaseProvider);
+    final KpClient client = ref.read(kpClientProvider);
+    final List<Map<String, Object?>> operations = batch
+        .map(
+          (op) => <String, Object?>{
+            'op_id': op.opId,
+            'entity': op.entityType,
+            'op': op.op,
+            if (op.entityId != null) 'entity_id': op.entityId,
+            if (op.baseVersion != null) 'base_version': op.baseVersion,
+            'payload': jsonDecode(op.payloadJson),
+          },
+        )
+        .toList();
+    try {
+      final Map<String, dynamic> body = await client.applyOperations(
+        operations,
+      );
+      final List<dynamic> results =
+          body['results'] as List<dynamic>? ?? const <dynamic>[];
+      for (int i = 0; i < results.length; i++) {
+        await _applyResult(batch[i], results[i] as Map<String, dynamic>);
+      }
+      return true;
+    } on DioException catch (e, st) {
+      final int? status = e.response?.statusCode;
+      if (status == 400 || status == 422) {
+        if (batch.length > 1) {
+          for (final PendingOpRow op in batch) {
+            if (!await _send(<PendingOpRow>[op])) {
+              return false;
+            }
+          }
+          return true;
+        }
+        final PendingOpRow op = batch.single;
+        final String error =
+            'rejected by the server ($status): '
+            '${e.response?.data}';
+        debugPrint(
+          'kp-outbox: dropping ${op.entityType}/${op.op} '
+          '${op.opId}: $error',
+        );
+        await db.markPendingError(op.opId, error);
+        await db.deletePending(op.opId);
+        await Sentry.captureException(e, stackTrace: st);
+        return true;
+      }
+      // Network failure (or a server error): bump attempts on every row,
+      // leave them pending. Push again on next trigger (manual refresh,
+      // app foreground, etc.).
+      for (final PendingOpRow op in batch) {
+        await db.markPendingError(op.opId, e.message ?? 'network error');
+      }
+      return false;
     }
   }
 

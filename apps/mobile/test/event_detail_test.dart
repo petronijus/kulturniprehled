@@ -47,7 +47,25 @@ class _SyncEventRepository extends EventsRepository {
       Future<List<CachedTicketRow>>.value(<CachedTicketRow>[]);
 }
 
-Widget _appWithStub(CachedEventRow event, KpDatabase db) {
+/// Records manual notification requests instead of touching the network.
+class _RecordingOutbox extends OutboxController {
+  final List<(String, String?)> notified = <(String, String?)>[];
+
+  @override
+  Future<String> queueEventNotification({
+    required String eventId,
+    String? message,
+  }) async {
+    notified.add((eventId, message));
+    return 'op-1';
+  }
+}
+
+Widget _appWithStub(
+  CachedEventRow event,
+  KpDatabase db, {
+  _RecordingOutbox? outbox,
+}) {
   final GoRouter router = GoRouter(
     initialLocation: '/event/evt-1',
     routes: <RouteBase>[
@@ -67,6 +85,7 @@ Widget _appWithStub(CachedEventRow event, KpDatabase db) {
       outboxConflictStreamProvider.overrideWith(
         (ref) => const Stream<OutboxConflict>.empty(),
       ),
+      if (outbox != null) outboxControllerProvider.overrideWith(() => outbox),
     ],
     child: MaterialApp.router(routerConfig: router),
   );
@@ -106,5 +125,48 @@ void main() {
     }
 
     expect(find.text('Playlist na Spotify', skipOffstage: false), findsNothing);
+  });
+
+  testWidgets('the bell queues a notification with the typed message', (
+    tester,
+  ) async {
+    final KpDatabase db = buildInMemoryDatabase();
+    addTearDown(db.close);
+    final _RecordingOutbox outbox = _RecordingOutbox();
+
+    await tester.pumpWidget(_appWithStub(_makeEvent(), db, outbox: outbox));
+    for (int i = 0; i < 5; i++) {
+      await tester.pump();
+    }
+
+    await tester.tap(find.bySemanticsLabel('Poslat notifikaci'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Nová fotka');
+    await tester.tap(find.text('Poslat'));
+    await tester.pumpAndSettle();
+
+    expect(outbox.notified, <(String, String?)>[('evt-1', 'Nová fotka')]);
+    expect(
+      find.text('Notifikace dorazí na oba telefony při příští synchronizaci.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('cancelling the dialog sends nothing', (tester) async {
+    final KpDatabase db = buildInMemoryDatabase();
+    addTearDown(db.close);
+    final _RecordingOutbox outbox = _RecordingOutbox();
+
+    await tester.pumpWidget(_appWithStub(_makeEvent(), db, outbox: outbox));
+    for (int i = 0; i < 5; i++) {
+      await tester.pump();
+    }
+
+    await tester.tap(find.bySemanticsLabel('Poslat notifikaci'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Zrušit'));
+    await tester.pumpAndSettle();
+
+    expect(outbox.notified, isEmpty);
   });
 }

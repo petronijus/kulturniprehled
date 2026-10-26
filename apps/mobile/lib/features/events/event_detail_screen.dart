@@ -43,6 +43,32 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     super.dispose();
   }
 
+  /// Lets a member tell both phones about this event — typically right
+  /// after editing it. Venue and programme edits notify on their own; this
+  /// is for everything else, with an optional message.
+  Future<void> _sendNotification(CachedEventRow event) async {
+    final String? message = await showDialog<String>(
+      context: context,
+      builder: (context) => const _NotifyDialog(),
+    );
+    if (!mounted || message == null) {
+      return;
+    }
+    await ref
+        .read(outboxControllerProvider.notifier)
+        .queueEventNotification(eventId: event.id, message: message);
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Notifikace dorazí na oba telefony při příští synchronizaci.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Surface outbox conflicts for this event (if one comes in while we're
@@ -117,6 +143,7 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                   tickets: tickets,
                   onEdit: () =>
                       context.go('/agenda/events/${widget.eventId}/edit'),
+                  onNotify: () => _sendNotification(event),
                 );
               },
             );
@@ -132,11 +159,13 @@ class _EventDetailBody extends StatelessWidget {
     required this.event,
     required this.tickets,
     required this.onEdit,
+    required this.onNotify,
   });
 
   final CachedEventRow event;
   final List<CachedTicketRow> tickets;
   final VoidCallback onEdit;
+  final VoidCallback onNotify;
 
   String _categoryLabel(String category) {
     switch (category) {
@@ -227,7 +256,21 @@ class _EventDetailBody extends StatelessWidget {
                     child: SafeArea(
                       bottom: false,
                       left: false,
-                      child: _EditPill(onTap: onEdit),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          _CoverAction(
+                            icon: Icons.notifications_active_outlined,
+                            tooltip: 'Poslat notifikaci',
+                            onTap: onNotify,
+                          ),
+                          _CoverAction(
+                            icon: Icons.edit_outlined,
+                            tooltip: 'Upravit',
+                            onTap: onEdit,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   Positioned(
@@ -538,9 +581,15 @@ class _PlaylistLink extends StatelessWidget {
   }
 }
 
-class _EditPill extends StatelessWidget {
-  const _EditPill({required this.onTap});
+class _CoverAction extends StatelessWidget {
+  const _CoverAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
 
+  final IconData icon;
+  final String tooltip;
   final VoidCallback onTap;
 
   @override
@@ -550,13 +599,14 @@ class _EditPill extends StatelessWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: const Padding(
-          padding: EdgeInsets.all(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Icon(
-            Icons.edit_outlined,
+            icon,
+            semanticLabel: tooltip,
             color: Colors.white,
             size: 22,
-            shadows: <Shadow>[
+            shadows: const <Shadow>[
               Shadow(
                 color: Color(0x80000000),
                 offset: Offset(0, 1),
@@ -566,6 +616,54 @@ class _EditPill extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Asks for an optional message. Pops the message ('' when left empty) on
+/// send, null on cancel.
+class _NotifyDialog extends StatefulWidget {
+  const _NotifyDialog();
+
+  @override
+  State<_NotifyDialog> createState() => _NotifyDialogState();
+}
+
+class _NotifyDialogState extends State<_NotifyDialog> {
+  final TextEditingController _message = TextEditingController();
+
+  @override
+  void dispose() {
+    _message.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Poslat notifikaci'),
+      content: TextField(
+        controller: _message,
+        autofocus: true,
+        maxLength: 500,
+        minLines: 1,
+        maxLines: 4,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: const InputDecoration(
+          labelText: 'Zpráva (nepovinná)',
+          helperText: 'Přijde na oba telefony.',
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Zrušit'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_message.text),
+          child: const Text('Poslat'),
+        ),
+      ],
     );
   }
 }

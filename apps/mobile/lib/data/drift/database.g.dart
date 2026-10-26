@@ -5095,6 +5095,876 @@ class CachedImagesCompanion extends UpdateCompanion<CachedImageRow> {
   }
 }
 
+class $CachedNotificationsTable extends CachedNotifications
+    with TableInfo<$CachedNotificationsTable, CachedNotificationRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CachedNotificationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _workspaceIdMeta = const VerificationMeta(
+    'workspaceId',
+  );
+  @override
+  late final GeneratedColumn<String> workspaceId = GeneratedColumn<String>(
+    'workspace_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _eventIdMeta = const VerificationMeta(
+    'eventId',
+  );
+  @override
+  late final GeneratedColumn<String> eventId = GeneratedColumn<String>(
+    'event_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _changesJsonMeta = const VerificationMeta(
+    'changesJson',
+  );
+  @override
+  late final GeneratedColumn<String> changesJson = GeneratedColumn<String>(
+    'changes_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _messageMeta = const VerificationMeta(
+    'message',
+  );
+  @override
+  late final GeneratedColumn<String> message = GeneratedColumn<String>(
+    'message',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdByMeta = const VerificationMeta(
+    'createdBy',
+  );
+  @override
+  late final GeneratedColumn<String> createdBy = GeneratedColumn<String>(
+    'created_by',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deliverAfterMeta = const VerificationMeta(
+    'deliverAfter',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deliverAfter = GeneratedColumn<DateTime>(
+    'deliver_after',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cachedAtMeta = const VerificationMeta(
+    'cachedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cachedAt = GeneratedColumn<DateTime>(
+    'cached_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _shownVersionMeta = const VerificationMeta(
+    'shownVersion',
+  );
+  @override
+  late final GeneratedColumn<int> shownVersion = GeneratedColumn<int>(
+    'shown_version',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _attemptsMeta = const VerificationMeta(
+    'attempts',
+  );
+  @override
+  late final GeneratedColumn<int> attempts = GeneratedColumn<int>(
+    'attempts',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastErrorMeta = const VerificationMeta(
+    'lastError',
+  );
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+    'last_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    workspaceId,
+    eventId,
+    kind,
+    changesJson,
+    message,
+    createdBy,
+    deliverAfter,
+    version,
+    updatedAt,
+    deletedAt,
+    cachedAt,
+    shownVersion,
+    attempts,
+    lastError,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cached_notifications';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CachedNotificationRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('workspace_id')) {
+      context.handle(
+        _workspaceIdMeta,
+        workspaceId.isAcceptableOrUnknown(
+          data['workspace_id']!,
+          _workspaceIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_workspaceIdMeta);
+    }
+    if (data.containsKey('event_id')) {
+      context.handle(
+        _eventIdMeta,
+        eventId.isAcceptableOrUnknown(data['event_id']!, _eventIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_eventIdMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('changes_json')) {
+      context.handle(
+        _changesJsonMeta,
+        changesJson.isAcceptableOrUnknown(
+          data['changes_json']!,
+          _changesJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_changesJsonMeta);
+    }
+    if (data.containsKey('message')) {
+      context.handle(
+        _messageMeta,
+        message.isAcceptableOrUnknown(data['message']!, _messageMeta),
+      );
+    }
+    if (data.containsKey('created_by')) {
+      context.handle(
+        _createdByMeta,
+        createdBy.isAcceptableOrUnknown(data['created_by']!, _createdByMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdByMeta);
+    }
+    if (data.containsKey('deliver_after')) {
+      context.handle(
+        _deliverAfterMeta,
+        deliverAfter.isAcceptableOrUnknown(
+          data['deliver_after']!,
+          _deliverAfterMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_deliverAfterMeta);
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_versionMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    if (data.containsKey('cached_at')) {
+      context.handle(
+        _cachedAtMeta,
+        cachedAt.isAcceptableOrUnknown(data['cached_at']!, _cachedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cachedAtMeta);
+    }
+    if (data.containsKey('shown_version')) {
+      context.handle(
+        _shownVersionMeta,
+        shownVersion.isAcceptableOrUnknown(
+          data['shown_version']!,
+          _shownVersionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('attempts')) {
+      context.handle(
+        _attemptsMeta,
+        attempts.isAcceptableOrUnknown(data['attempts']!, _attemptsMeta),
+      );
+    }
+    if (data.containsKey('last_error')) {
+      context.handle(
+        _lastErrorMeta,
+        lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CachedNotificationRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CachedNotificationRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      workspaceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}workspace_id'],
+      )!,
+      eventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}event_id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      changesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}changes_json'],
+      )!,
+      message: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message'],
+      ),
+      createdBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_by'],
+      )!,
+      deliverAfter: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deliver_after'],
+      )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+      cachedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}cached_at'],
+      )!,
+      shownVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}shown_version'],
+      ),
+      attempts: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}attempts'],
+      )!,
+      lastError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error'],
+      ),
+    );
+  }
+
+  @override
+  $CachedNotificationsTable createAlias(String alias) {
+    return $CachedNotificationsTable(attachedDatabase, alias);
+  }
+}
+
+class CachedNotificationRow extends DataClass
+    implements Insertable<CachedNotificationRow> {
+  final String id;
+  final String workspaceId;
+  final String eventId;
+  final String kind;
+  final String changesJson;
+  final String? message;
+  final String createdBy;
+  final DateTime deliverAfter;
+  final int version;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final DateTime cachedAt;
+  final int? shownVersion;
+  final int attempts;
+  final String? lastError;
+  const CachedNotificationRow({
+    required this.id,
+    required this.workspaceId,
+    required this.eventId,
+    required this.kind,
+    required this.changesJson,
+    this.message,
+    required this.createdBy,
+    required this.deliverAfter,
+    required this.version,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.cachedAt,
+    this.shownVersion,
+    required this.attempts,
+    this.lastError,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['workspace_id'] = Variable<String>(workspaceId);
+    map['event_id'] = Variable<String>(eventId);
+    map['kind'] = Variable<String>(kind);
+    map['changes_json'] = Variable<String>(changesJson);
+    if (!nullToAbsent || message != null) {
+      map['message'] = Variable<String>(message);
+    }
+    map['created_by'] = Variable<String>(createdBy);
+    map['deliver_after'] = Variable<DateTime>(deliverAfter);
+    map['version'] = Variable<int>(version);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['cached_at'] = Variable<DateTime>(cachedAt);
+    if (!nullToAbsent || shownVersion != null) {
+      map['shown_version'] = Variable<int>(shownVersion);
+    }
+    map['attempts'] = Variable<int>(attempts);
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
+    }
+    return map;
+  }
+
+  CachedNotificationsCompanion toCompanion(bool nullToAbsent) {
+    return CachedNotificationsCompanion(
+      id: Value(id),
+      workspaceId: Value(workspaceId),
+      eventId: Value(eventId),
+      kind: Value(kind),
+      changesJson: Value(changesJson),
+      message: message == null && nullToAbsent
+          ? const Value.absent()
+          : Value(message),
+      createdBy: Value(createdBy),
+      deliverAfter: Value(deliverAfter),
+      version: Value(version),
+      updatedAt: Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      cachedAt: Value(cachedAt),
+      shownVersion: shownVersion == null && nullToAbsent
+          ? const Value.absent()
+          : Value(shownVersion),
+      attempts: Value(attempts),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
+    );
+  }
+
+  factory CachedNotificationRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CachedNotificationRow(
+      id: serializer.fromJson<String>(json['id']),
+      workspaceId: serializer.fromJson<String>(json['workspaceId']),
+      eventId: serializer.fromJson<String>(json['eventId']),
+      kind: serializer.fromJson<String>(json['kind']),
+      changesJson: serializer.fromJson<String>(json['changesJson']),
+      message: serializer.fromJson<String?>(json['message']),
+      createdBy: serializer.fromJson<String>(json['createdBy']),
+      deliverAfter: serializer.fromJson<DateTime>(json['deliverAfter']),
+      version: serializer.fromJson<int>(json['version']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      cachedAt: serializer.fromJson<DateTime>(json['cachedAt']),
+      shownVersion: serializer.fromJson<int?>(json['shownVersion']),
+      attempts: serializer.fromJson<int>(json['attempts']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'workspaceId': serializer.toJson<String>(workspaceId),
+      'eventId': serializer.toJson<String>(eventId),
+      'kind': serializer.toJson<String>(kind),
+      'changesJson': serializer.toJson<String>(changesJson),
+      'message': serializer.toJson<String?>(message),
+      'createdBy': serializer.toJson<String>(createdBy),
+      'deliverAfter': serializer.toJson<DateTime>(deliverAfter),
+      'version': serializer.toJson<int>(version),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'cachedAt': serializer.toJson<DateTime>(cachedAt),
+      'shownVersion': serializer.toJson<int?>(shownVersion),
+      'attempts': serializer.toJson<int>(attempts),
+      'lastError': serializer.toJson<String?>(lastError),
+    };
+  }
+
+  CachedNotificationRow copyWith({
+    String? id,
+    String? workspaceId,
+    String? eventId,
+    String? kind,
+    String? changesJson,
+    Value<String?> message = const Value.absent(),
+    String? createdBy,
+    DateTime? deliverAfter,
+    int? version,
+    DateTime? updatedAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+    DateTime? cachedAt,
+    Value<int?> shownVersion = const Value.absent(),
+    int? attempts,
+    Value<String?> lastError = const Value.absent(),
+  }) => CachedNotificationRow(
+    id: id ?? this.id,
+    workspaceId: workspaceId ?? this.workspaceId,
+    eventId: eventId ?? this.eventId,
+    kind: kind ?? this.kind,
+    changesJson: changesJson ?? this.changesJson,
+    message: message.present ? message.value : this.message,
+    createdBy: createdBy ?? this.createdBy,
+    deliverAfter: deliverAfter ?? this.deliverAfter,
+    version: version ?? this.version,
+    updatedAt: updatedAt ?? this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    cachedAt: cachedAt ?? this.cachedAt,
+    shownVersion: shownVersion.present ? shownVersion.value : this.shownVersion,
+    attempts: attempts ?? this.attempts,
+    lastError: lastError.present ? lastError.value : this.lastError,
+  );
+  CachedNotificationRow copyWithCompanion(CachedNotificationsCompanion data) {
+    return CachedNotificationRow(
+      id: data.id.present ? data.id.value : this.id,
+      workspaceId: data.workspaceId.present
+          ? data.workspaceId.value
+          : this.workspaceId,
+      eventId: data.eventId.present ? data.eventId.value : this.eventId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      changesJson: data.changesJson.present
+          ? data.changesJson.value
+          : this.changesJson,
+      message: data.message.present ? data.message.value : this.message,
+      createdBy: data.createdBy.present ? data.createdBy.value : this.createdBy,
+      deliverAfter: data.deliverAfter.present
+          ? data.deliverAfter.value
+          : this.deliverAfter,
+      version: data.version.present ? data.version.value : this.version,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      cachedAt: data.cachedAt.present ? data.cachedAt.value : this.cachedAt,
+      shownVersion: data.shownVersion.present
+          ? data.shownVersion.value
+          : this.shownVersion,
+      attempts: data.attempts.present ? data.attempts.value : this.attempts,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedNotificationRow(')
+          ..write('id: $id, ')
+          ..write('workspaceId: $workspaceId, ')
+          ..write('eventId: $eventId, ')
+          ..write('kind: $kind, ')
+          ..write('changesJson: $changesJson, ')
+          ..write('message: $message, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('deliverAfter: $deliverAfter, ')
+          ..write('version: $version, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('shownVersion: $shownVersion, ')
+          ..write('attempts: $attempts, ')
+          ..write('lastError: $lastError')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    workspaceId,
+    eventId,
+    kind,
+    changesJson,
+    message,
+    createdBy,
+    deliverAfter,
+    version,
+    updatedAt,
+    deletedAt,
+    cachedAt,
+    shownVersion,
+    attempts,
+    lastError,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CachedNotificationRow &&
+          other.id == this.id &&
+          other.workspaceId == this.workspaceId &&
+          other.eventId == this.eventId &&
+          other.kind == this.kind &&
+          other.changesJson == this.changesJson &&
+          other.message == this.message &&
+          other.createdBy == this.createdBy &&
+          other.deliverAfter == this.deliverAfter &&
+          other.version == this.version &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt &&
+          other.cachedAt == this.cachedAt &&
+          other.shownVersion == this.shownVersion &&
+          other.attempts == this.attempts &&
+          other.lastError == this.lastError);
+}
+
+class CachedNotificationsCompanion
+    extends UpdateCompanion<CachedNotificationRow> {
+  final Value<String> id;
+  final Value<String> workspaceId;
+  final Value<String> eventId;
+  final Value<String> kind;
+  final Value<String> changesJson;
+  final Value<String?> message;
+  final Value<String> createdBy;
+  final Value<DateTime> deliverAfter;
+  final Value<int> version;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<DateTime> cachedAt;
+  final Value<int?> shownVersion;
+  final Value<int> attempts;
+  final Value<String?> lastError;
+  final Value<int> rowid;
+  const CachedNotificationsCompanion({
+    this.id = const Value.absent(),
+    this.workspaceId = const Value.absent(),
+    this.eventId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.changesJson = const Value.absent(),
+    this.message = const Value.absent(),
+    this.createdBy = const Value.absent(),
+    this.deliverAfter = const Value.absent(),
+    this.version = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.cachedAt = const Value.absent(),
+    this.shownVersion = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CachedNotificationsCompanion.insert({
+    required String id,
+    required String workspaceId,
+    required String eventId,
+    required String kind,
+    required String changesJson,
+    this.message = const Value.absent(),
+    required String createdBy,
+    required DateTime deliverAfter,
+    required int version,
+    required DateTime updatedAt,
+    this.deletedAt = const Value.absent(),
+    required DateTime cachedAt,
+    this.shownVersion = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       workspaceId = Value(workspaceId),
+       eventId = Value(eventId),
+       kind = Value(kind),
+       changesJson = Value(changesJson),
+       createdBy = Value(createdBy),
+       deliverAfter = Value(deliverAfter),
+       version = Value(version),
+       updatedAt = Value(updatedAt),
+       cachedAt = Value(cachedAt);
+  static Insertable<CachedNotificationRow> custom({
+    Expression<String>? id,
+    Expression<String>? workspaceId,
+    Expression<String>? eventId,
+    Expression<String>? kind,
+    Expression<String>? changesJson,
+    Expression<String>? message,
+    Expression<String>? createdBy,
+    Expression<DateTime>? deliverAfter,
+    Expression<int>? version,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<DateTime>? cachedAt,
+    Expression<int>? shownVersion,
+    Expression<int>? attempts,
+    Expression<String>? lastError,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (workspaceId != null) 'workspace_id': workspaceId,
+      if (eventId != null) 'event_id': eventId,
+      if (kind != null) 'kind': kind,
+      if (changesJson != null) 'changes_json': changesJson,
+      if (message != null) 'message': message,
+      if (createdBy != null) 'created_by': createdBy,
+      if (deliverAfter != null) 'deliver_after': deliverAfter,
+      if (version != null) 'version': version,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (cachedAt != null) 'cached_at': cachedAt,
+      if (shownVersion != null) 'shown_version': shownVersion,
+      if (attempts != null) 'attempts': attempts,
+      if (lastError != null) 'last_error': lastError,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CachedNotificationsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? workspaceId,
+    Value<String>? eventId,
+    Value<String>? kind,
+    Value<String>? changesJson,
+    Value<String?>? message,
+    Value<String>? createdBy,
+    Value<DateTime>? deliverAfter,
+    Value<int>? version,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<DateTime>? cachedAt,
+    Value<int?>? shownVersion,
+    Value<int>? attempts,
+    Value<String?>? lastError,
+    Value<int>? rowid,
+  }) {
+    return CachedNotificationsCompanion(
+      id: id ?? this.id,
+      workspaceId: workspaceId ?? this.workspaceId,
+      eventId: eventId ?? this.eventId,
+      kind: kind ?? this.kind,
+      changesJson: changesJson ?? this.changesJson,
+      message: message ?? this.message,
+      createdBy: createdBy ?? this.createdBy,
+      deliverAfter: deliverAfter ?? this.deliverAfter,
+      version: version ?? this.version,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      cachedAt: cachedAt ?? this.cachedAt,
+      shownVersion: shownVersion ?? this.shownVersion,
+      attempts: attempts ?? this.attempts,
+      lastError: lastError ?? this.lastError,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (workspaceId.present) {
+      map['workspace_id'] = Variable<String>(workspaceId.value);
+    }
+    if (eventId.present) {
+      map['event_id'] = Variable<String>(eventId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (changesJson.present) {
+      map['changes_json'] = Variable<String>(changesJson.value);
+    }
+    if (message.present) {
+      map['message'] = Variable<String>(message.value);
+    }
+    if (createdBy.present) {
+      map['created_by'] = Variable<String>(createdBy.value);
+    }
+    if (deliverAfter.present) {
+      map['deliver_after'] = Variable<DateTime>(deliverAfter.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (cachedAt.present) {
+      map['cached_at'] = Variable<DateTime>(cachedAt.value);
+    }
+    if (shownVersion.present) {
+      map['shown_version'] = Variable<int>(shownVersion.value);
+    }
+    if (attempts.present) {
+      map['attempts'] = Variable<int>(attempts.value);
+    }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CachedNotificationsCompanion(')
+          ..write('id: $id, ')
+          ..write('workspaceId: $workspaceId, ')
+          ..write('eventId: $eventId, ')
+          ..write('kind: $kind, ')
+          ..write('changesJson: $changesJson, ')
+          ..write('message: $message, ')
+          ..write('createdBy: $createdBy, ')
+          ..write('deliverAfter: $deliverAfter, ')
+          ..write('version: $version, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('cachedAt: $cachedAt, ')
+          ..write('shownVersion: $shownVersion, ')
+          ..write('attempts: $attempts, ')
+          ..write('lastError: $lastError, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$KpDatabase extends GeneratedDatabase {
   _$KpDatabase(QueryExecutor e) : super(e);
   $KpDatabaseManager get managers => $KpDatabaseManager(this);
@@ -5108,6 +5978,8 @@ abstract class _$KpDatabase extends GeneratedDatabase {
   late final $CachedWatchlistItemsTable cachedWatchlistItems =
       $CachedWatchlistItemsTable(this);
   late final $CachedImagesTable cachedImages = $CachedImagesTable(this);
+  late final $CachedNotificationsTable cachedNotifications =
+      $CachedNotificationsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5121,6 +5993,7 @@ abstract class _$KpDatabase extends GeneratedDatabase {
     cachedCosts,
     cachedWatchlistItems,
     cachedImages,
+    cachedNotifications,
   ];
 }
 
@@ -5580,7 +6453,16 @@ class $$CachedEventsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedEventsTable, CachedEventRow>(table),
+                  BaseReferences<
+                    _$KpDatabase,
+                    $CachedEventsTable,
+                    CachedEventRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -5900,7 +6782,16 @@ class $$CachedTicketsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedTicketsTable, CachedTicketRow>(table),
+                  BaseReferences<
+                    _$KpDatabase,
+                    $CachedTicketsTable,
+                    CachedTicketRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -6058,7 +6949,16 @@ class $$SyncCursorsTableTableManager
                 lastSyncedAt: lastSyncedAt,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$SyncCursorsTable, SyncCursorRow>(table),
+                  BaseReferences<
+                    _$KpDatabase,
+                    $SyncCursorsTable,
+                    SyncCursorRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -6380,7 +7280,16 @@ class $$PendingOpsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$PendingOpsTable, PendingOpRow>(table),
+                  BaseReferences<_$KpDatabase, $PendingOpsTable, PendingOpRow>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -6612,7 +7521,18 @@ class $$CachedTicketFilesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedTicketFilesTable, CachedTicketFileRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$KpDatabase,
+                    $CachedTicketFilesTable,
+                    CachedTicketFileRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -6972,7 +7892,16 @@ class $$CachedCostsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedCostsTable, CachedCostRow>(table),
+                  BaseReferences<
+                    _$KpDatabase,
+                    $CachedCostsTable,
+                    CachedCostRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -7376,7 +8305,19 @@ class $$CachedWatchlistItemsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $CachedWatchlistItemsTable,
+                    CachedWatchlistItemRow
+                  >(table),
+                  BaseReferences<
+                    _$KpDatabase,
+                    $CachedWatchlistItemsTable,
+                    CachedWatchlistItemRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -7582,7 +8523,16 @@ class $$CachedImagesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$CachedImagesTable, CachedImageRow>(table),
+                  BaseReferences<
+                    _$KpDatabase,
+                    $CachedImagesTable,
+                    CachedImageRow
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -7606,6 +8556,431 @@ typedef $$CachedImagesTableProcessedTableManager =
       CachedImageRow,
       PrefetchHooks Function()
     >;
+typedef $$CachedNotificationsTableCreateCompanionBuilder =
+    CachedNotificationsCompanion Function({
+      required String id,
+      required String workspaceId,
+      required String eventId,
+      required String kind,
+      required String changesJson,
+      Value<String?> message,
+      required String createdBy,
+      required DateTime deliverAfter,
+      required int version,
+      required DateTime updatedAt,
+      Value<DateTime?> deletedAt,
+      required DateTime cachedAt,
+      Value<int?> shownVersion,
+      Value<int> attempts,
+      Value<String?> lastError,
+      Value<int> rowid,
+    });
+typedef $$CachedNotificationsTableUpdateCompanionBuilder =
+    CachedNotificationsCompanion Function({
+      Value<String> id,
+      Value<String> workspaceId,
+      Value<String> eventId,
+      Value<String> kind,
+      Value<String> changesJson,
+      Value<String?> message,
+      Value<String> createdBy,
+      Value<DateTime> deliverAfter,
+      Value<int> version,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<DateTime> cachedAt,
+      Value<int?> shownVersion,
+      Value<int> attempts,
+      Value<String?> lastError,
+      Value<int> rowid,
+    });
+
+class $$CachedNotificationsTableFilterComposer
+    extends Composer<_$KpDatabase, $CachedNotificationsTable> {
+  $$CachedNotificationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get changesJson => $composableBuilder(
+    column: $table.changesJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get message => $composableBuilder(
+    column: $table.message,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deliverAfter => $composableBuilder(
+    column: $table.deliverAfter,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get shownVersion => $composableBuilder(
+    column: $table.shownVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CachedNotificationsTableOrderingComposer
+    extends Composer<_$KpDatabase, $CachedNotificationsTable> {
+  $$CachedNotificationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get changesJson => $composableBuilder(
+    column: $table.changesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get message => $composableBuilder(
+    column: $table.message,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdBy => $composableBuilder(
+    column: $table.createdBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deliverAfter => $composableBuilder(
+    column: $table.deliverAfter,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cachedAt => $composableBuilder(
+    column: $table.cachedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get shownVersion => $composableBuilder(
+    column: $table.shownVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get attempts => $composableBuilder(
+    column: $table.attempts,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CachedNotificationsTableAnnotationComposer
+    extends Composer<_$KpDatabase, $CachedNotificationsTable> {
+  $$CachedNotificationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get workspaceId => $composableBuilder(
+    column: $table.workspaceId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get eventId =>
+      $composableBuilder(column: $table.eventId, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get changesJson => $composableBuilder(
+    column: $table.changesJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get message =>
+      $composableBuilder(column: $table.message, builder: (column) => column);
+
+  GeneratedColumn<String> get createdBy =>
+      $composableBuilder(column: $table.createdBy, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deliverAfter => $composableBuilder(
+    column: $table.deliverAfter,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cachedAt =>
+      $composableBuilder(column: $table.cachedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get shownVersion => $composableBuilder(
+    column: $table.shownVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get attempts =>
+      $composableBuilder(column: $table.attempts, builder: (column) => column);
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
+}
+
+class $$CachedNotificationsTableTableManager
+    extends
+        RootTableManager<
+          _$KpDatabase,
+          $CachedNotificationsTable,
+          CachedNotificationRow,
+          $$CachedNotificationsTableFilterComposer,
+          $$CachedNotificationsTableOrderingComposer,
+          $$CachedNotificationsTableAnnotationComposer,
+          $$CachedNotificationsTableCreateCompanionBuilder,
+          $$CachedNotificationsTableUpdateCompanionBuilder,
+          (
+            CachedNotificationRow,
+            BaseReferences<
+              _$KpDatabase,
+              $CachedNotificationsTable,
+              CachedNotificationRow
+            >,
+          ),
+          CachedNotificationRow,
+          PrefetchHooks Function()
+        > {
+  $$CachedNotificationsTableTableManager(
+    _$KpDatabase db,
+    $CachedNotificationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CachedNotificationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CachedNotificationsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$CachedNotificationsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> workspaceId = const Value.absent(),
+                Value<String> eventId = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> changesJson = const Value.absent(),
+                Value<String?> message = const Value.absent(),
+                Value<String> createdBy = const Value.absent(),
+                Value<DateTime> deliverAfter = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<DateTime> cachedAt = const Value.absent(),
+                Value<int?> shownVersion = const Value.absent(),
+                Value<int> attempts = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedNotificationsCompanion(
+                id: id,
+                workspaceId: workspaceId,
+                eventId: eventId,
+                kind: kind,
+                changesJson: changesJson,
+                message: message,
+                createdBy: createdBy,
+                deliverAfter: deliverAfter,
+                version: version,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                cachedAt: cachedAt,
+                shownVersion: shownVersion,
+                attempts: attempts,
+                lastError: lastError,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String workspaceId,
+                required String eventId,
+                required String kind,
+                required String changesJson,
+                Value<String?> message = const Value.absent(),
+                required String createdBy,
+                required DateTime deliverAfter,
+                required int version,
+                required DateTime updatedAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                required DateTime cachedAt,
+                Value<int?> shownVersion = const Value.absent(),
+                Value<int> attempts = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CachedNotificationsCompanion.insert(
+                id: id,
+                workspaceId: workspaceId,
+                eventId: eventId,
+                kind: kind,
+                changesJson: changesJson,
+                message: message,
+                createdBy: createdBy,
+                deliverAfter: deliverAfter,
+                version: version,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                cachedAt: cachedAt,
+                shownVersion: shownVersion,
+                attempts: attempts,
+                lastError: lastError,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CachedNotificationsTable, CachedNotificationRow>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$KpDatabase,
+                    $CachedNotificationsTable,
+                    CachedNotificationRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CachedNotificationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$KpDatabase,
+      $CachedNotificationsTable,
+      CachedNotificationRow,
+      $$CachedNotificationsTableFilterComposer,
+      $$CachedNotificationsTableOrderingComposer,
+      $$CachedNotificationsTableAnnotationComposer,
+      $$CachedNotificationsTableCreateCompanionBuilder,
+      $$CachedNotificationsTableUpdateCompanionBuilder,
+      (
+        CachedNotificationRow,
+        BaseReferences<
+          _$KpDatabase,
+          $CachedNotificationsTable,
+          CachedNotificationRow
+        >,
+      ),
+      CachedNotificationRow,
+      PrefetchHooks Function()
+    >;
 
 class $KpDatabaseManager {
   final _$KpDatabase _db;
@@ -7626,4 +9001,6 @@ class $KpDatabaseManager {
       $$CachedWatchlistItemsTableTableManager(_db, _db.cachedWatchlistItems);
   $$CachedImagesTableTableManager get cachedImages =>
       $$CachedImagesTableTableManager(_db, _db.cachedImages);
+  $$CachedNotificationsTableTableManager get cachedNotifications =>
+      $$CachedNotificationsTableTableManager(_db, _db.cachedNotifications);
 }

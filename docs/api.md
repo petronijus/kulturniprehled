@@ -14,7 +14,7 @@ the API.
 |----------------------|---------------------------------------------------------|--------|
 | `/healthz`           | Liveness probe; returns `{"status":"ok",…}`            | `api/v1/healthz.py` |
 | `/v1/auth/*`         | Google OAuth callback, refresh, logout, list PATs      | `api/v1/auth.py` |
-| `/v1/events/*`       | Event CRUD + listings (agenda, calendar window)        | `api/v1/events.py` |
+| `/v1/events/*`       | Event CRUD + listings (agenda, calendar window), manual event notification | `api/v1/events.py` |
 | `/v1/watchlist/*`    | Watchlist items + reordering                           | `api/v1/watchlist.py` |
 | `/v1/tickets/*`      | Ticket CRUD + signed download URL                      | `api/v1/tickets.py` |
 | `/v1/costs/*`        | Per-event cost rows                                    | `api/v1/costs.py` |
@@ -22,6 +22,15 @@ the API.
 | `/v1/sync/*`         | Change-log pull + outbox apply                         | `api/v1/sync.py` |
 | `/v1/season/*`       | Season planner: plans, candidate pool (bulk upsert + plan state), scenarios (upsert/apply), novelty cursor, shared-calendar view, programme media links | `api/v1/season.py` |
 | `/app`               | Season-planner SPA (static bundle, history-API fallback, relaxed CSP). **Home-only + login-less**: with `WEB_PUBLIC=false` (default) Cloudflare-proxied requests get 404 — reachable only via LAN / Tailscale | `web.py` + `web/dist` |
+
+`POST /v1/events/{id}/notifications` with `{"message": "…"}` (optional,
+≤ 500 characters) asks both phones to show a notification about the event;
+it answers `201` with the notification, or `404` when the event is gone
+(also when it was deleted while the request ran). Creating an event and changing its
+`venue_address` or `notes` produce one on their own, through REST and the
+outbox alike. Like the rest of `/v1/events/*` it needs an unscoped
+credential. Coalescing, delivery and the sync payload:
+[sync.md](./sync.md#5-event-notifications).
 
 `GET /v1/season/calendar?from=&to=` is the one place the shared household
 calendar (Kocourek&Prdelčička) is read and classified. The API fetches its
@@ -197,17 +206,23 @@ two endpoints:
 
 ```
 GET  /v1/sync?since=<seq>&limit=<n>
+     →    { changes: [ … ], next_seq, has_more, server_time }
 POST /v1/sync/apply
-     Body: { ops: [ { op_id, entity_type, entity_id, op, payload, version }, … ] }
-     →    { results: [ { op_id, status: "applied"|"conflict", … } ] }
+     Body: { operations: [ { op_id, entity, op, entity_id, base_version, payload }, … ] }
+     →    { results: [ { op_id, status, entity_id, version, seq, current_version, error } ] }
 ```
+
+- `entity` and `op` are free strings (≤ 40 and ≤ 20 characters); an
+  unknown pair comes back as an `invalid` result for that op only, never
+  as a `422` for the whole batch. `server_time` on the pull is the
+  database clock, taken before the page is read.
 
 - `op_id` is the **idempotency key**. Retries on the same `op_id` are
   no-ops that return the original result.
-- `version` is the row version the client observed when it built the
-  op. If the server has moved on, the result is `conflict` and the
-  server's current `payload` + `version` come back so the client can
-  surface a "use mine / use server" choice.
+- `base_version` is the row version the client observed when it built
+  the op. If the server has moved on, the result is `conflict` with the
+  server's `current_version`, and the client surfaces a "use mine / use
+  server" choice.
 - Soft delete only. `op="delete"` updates `deleted_at = now()`; the row
   still exists in the database for 90 days for clients that missed it.
 

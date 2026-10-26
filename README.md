@@ -34,6 +34,9 @@ tickets and creates events automatically.
   the server when the network returns; version conflicts surface a
   "keep yours / use server" dialog.
 - Local notifications for event start time, configurable per-event.
+- Event notifications on both phones when an event is added or its venue
+  or programme changes, plus a "send a notification" button on the event
+  detail; the server decides, each phone shows them on its next sync.
 - Optional self-hosted GlitchTip / Sentry error reporting.
 - Infrastructure prepared for a future proactive AI recommendations agent.
 

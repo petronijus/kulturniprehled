@@ -69,14 +69,28 @@ The original plan reserved a `NotificationProvider` abstraction with APNs
   BGTaskScheduler (iOS). Pulls server changes, primes the offline cache,
   exits.
 - Local notifications scheduled by the app itself for upcoming events
-  (via `flutter_local_notifications`). No server push needed — the
-  client knows when its own events start.
+  (via `flutter_local_notifications`): the weekly digest, the day-of
+  reminder and "leave in 10 min". No server push needed — the client
+  knows when its own events start. Every sync re-plans them; the
+  re-plan cancels only *pending* ones (`cancelAllPendingNotifications()`),
+  never notifications already on screen.
+- Event notifications decided by the server (since 2026-10-26): a new
+  event, a changed venue or programme, or a member's manual "send a
+  notification" from the event detail. The server records them in
+  `event_notifications`, coalesces bursts inside a 2-minute window
+  (timed by the database clock) and syncs them like any entity; each
+  phone shows the due ones after its next pull, judged by the page's
+  `server_time`, the author's included. Contract and edge cases:
+  [sync.md](./sync.md#5-event-notifications). This replaced the old
+  client-side guess ("an event id I have not seen is a new event").
 
-Trade-off: server-pushed alerts (e.g. "a new event was just added by
-the other user") arrive on the next 30-min poll instead of instantly.
-For two users sharing one agenda, that latency is invisible; the
-operational simplicity (no APNs cert renewal, no FCM project, no
-per-device push token table) is worth it.
+Trade-off: an event notification arrives on the next sync (app open or
+resume, else the 30-min background job; iOS BGTaskScheduler decides its
+own timing) instead of instantly. For two users sharing one agenda, that
+latency is invisible; the operational simplicity (no APNs cert renewal,
+no FCM project, no per-device push token table) is worth it. The
+server-side `event_notifications` table keeps the door open: a push
+sender would read the same rows.
 
 ## Sync layer
 

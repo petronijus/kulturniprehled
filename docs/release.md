@@ -67,6 +67,13 @@ The image is built **locally** and pushed to GHCR; the VM only pulls
 see Petr's deploy standard, `ai-config/docs/DEPLOY-STANDARD.md` in the
 ai-config repo).
 
+**Order: deploy the API first, then upload the app** (Play and TestFlight)
+whenever the app relies on something the API adds. Example from the event
+notifications (2026-10-26): an older API answers the app's `notification`
+outbox op with a `422` for the whole batch. The new app copes by retrying
+op by op and dropping the rejected op, so the manual notification is lost,
+and that API produces no notifications for the app to show at all.
+
 ```bash
 KP_API_TAG=$(git rev-parse --short HEAD) ./scripts/build-push.sh
 ssh petronijus@192.0.2.101 'cd /opt/kp \

@@ -1,6 +1,6 @@
 ---
 name: kulturni-prehled-ingest
-description: Processes downloaded cultural-event tickets — registers the event with cover/venue images and price in the Kulturní Přehled backend, builds a Spotify concert playlist (concerts only), then mirrors the event into the shared Google Calendar and uploads tickets to Google Drive. Běla gets notified automatically via the mobile app's background sync.
+description: Processes downloaded cultural-event tickets — registers the event with cover/venue images and price in the Kulturní Přehled backend, builds a Spotify concert playlist (concerts only), then mirrors the event into the shared Google Calendar and uploads tickets to Google Drive. Both phones get a "new event" notification automatically on their next sync.
 ---
 
 ## Task
@@ -265,6 +265,15 @@ curl -fsS -A 'kp-skill/1.0' -X PATCH \
 The PATCH response should echo both URLs back — if either field
 shows `null`, the backend silently dropped it (see test
 `test_create_persists_image_urls_and_venue_address`).
+
+**Notification timing.** The POST in step 6 makes the server queue one
+"new event" notification for both phones, due 2 minutes later. Image and
+playlist PATCHes do not add notifications, and the phones render the text
+and cover from the event as it is when they show it, so do this PATCH
+within those 2 minutes and the cover is in the notification. A later
+change to `venue_address` or `notes` sends a "Změna" notification of its
+own (merged into the first one while it is still pending). Contract:
+`docs/sync.md`, section 5.
 
 ### 7. Upload each ticket PDF to KP MinIO
 
@@ -542,11 +551,21 @@ Reply to the user in Czech:
 - "Hotovo. V Kulturním přehledu jsi {EVENT_TITLE} na {DATETIME} v
   {VENUE}. Lístky ({N} ks, {TOTAL_PRICE_CZK}) jsou nahraný v KP i na
   Drivu, kalendář hotový. Playlist na přípravu: {PLAYLIST_URL}. Běla dostane notifikaci v appce automaticky
-  (background sync, max 30 min)." (Omit the "Playlist na přípravu:" sentence when `PLAYLIST_URL` is empty.)
+  (při příští synchronizaci, obvykle do 30 min)." (Omit the "Playlist na přípravu:" sentence when `PLAYLIST_URL` is empty.)
 - Include the KP event id and the Drive links.
 
-*Email Běle odebrán — appka teď posílá push-style lokální notifikaci
-při syncu nových eventů (viz `sync_controller.dart`).*
+There is no e-mail to Běla: the server queues the notification when the
+event is created and each phone shows it on its next sync (app open,
+else the 30-minute background job). If the user asks to tell Běla
+something more about the event, send a manual notification instead of an
+e-mail (the message is optional, at most 500 characters):
+
+```bash
+curl -fsS -A 'kp-skill/1.0' \
+  -H "Authorization: Bearer $KP_TOKEN" -H 'Content-Type: application/json' \
+  -d "$(jq -n --arg m "$MESSAGE" '{message:$m}')" \
+  "$KP_API_BASE/v1/events/$EVENT_ID/notifications" | jq '{id, kind, deliver_after}'
+```
 
 ### Notes
 

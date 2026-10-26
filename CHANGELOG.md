@@ -8,6 +8,17 @@ drives the `vX.Y.Z` tags; per-release detail is on the
 
 ## [Unreleased]
 
+### Added
+- **Event notifications decided by the server** — both phones are notified
+  when an event is added or its venue or programme changes (bursts within
+  two minutes become one notification), and the event detail has a button
+  to send one by hand with an optional message.
+
+### Fixed
+- Re-planning reminders no longer clears notifications already on screen.
+- An edit the server rejects outright no longer blocks every later edit in
+  the offline queue: it is dropped and reported, the rest go through.
+
 ## [1.2.0] - 2026-09-30
 
 The season planner arrives, and the Android app moves to Google Play.

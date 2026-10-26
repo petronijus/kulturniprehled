@@ -19,15 +19,30 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api.adapters.storage import minio as storage
 from kp_api.api.deps import CurrentUser, SessionDep, require_scope
-from kp_api.domain.enums import ChangeOp, EventCategory, EventSource, EventStatus
+from kp_api.domain.enums import (
+    ChangeOp,
+    EventCategory,
+    EventSource,
+    EventStatus,
+    NotificationKind,
+)
 from kp_api.domain.models import Event, User, Workspace, WorkspaceMember
 from kp_api.domain.schemas import (
     EventCreate,
     EventListResponse,
     EventResponse,
     EventUpdate,
+    NotificationCreate,
+    NotificationResponse,
 )
 from kp_api.domain.scopes import SCOPE_EVENTS_READ
+from kp_api.notifications import (
+    EventGone,
+    announce,
+    changes_since,
+    watched_snapshot,
+    withdraw_pending,
+)
 from kp_api.sync.changelog import record_event_change
 
 router = APIRouter(prefix="/v1/events", tags=["events"])
@@ -111,6 +126,7 @@ async def create_event(
     session.add(event)
     await session.flush()
     await record_event_change(session, event, user.id, ChangeOp.UPSERT)
+    await announce(session, event, user.id, NotificationKind.EVENT_CREATED)
     await session.commit()
     await session.refresh(event)
     return EventResponse.model_validate(event)
@@ -154,12 +170,16 @@ async def update_event(
             status.HTTP_409_CONFLICT,
             {"code": "version_mismatch", "current_version": event.version},
         )
+    before = watched_snapshot(event)
     data = body.model_dump(exclude_unset=True, exclude={"version"})
     for key, value in data.items():
         setattr(event, key, value)
     event.version += 1
     await session.flush()
     await record_event_change(session, event, user.id, ChangeOp.UPSERT)
+    changes = changes_since(before, event)
+    if changes:
+        await announce(session, event, user.id, NotificationKind.EVENT_CHANGED, changes)
     await session.commit()
     await session.refresh(event)
     return EventResponse.model_validate(event)
@@ -177,8 +197,38 @@ async def delete_event(
     event.version += 1
     await session.flush()
     await record_event_change(session, event, user.id, ChangeOp.DELETE)
+    await withdraw_pending(session, event, user.id)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{event_id}/notifications",
+    response_model=NotificationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def notify_event(
+    event_id: UUID,
+    body: NotificationCreate,
+    session: SessionDep,
+    user: CurrentUser,
+) -> NotificationResponse:
+    """Send a notification about the event to every member's phone.
+
+    It merges into a pending automatic one for the same event if there is
+    one; otherwise the phones show it on their next sync."""
+
+    workspace = await _user_workspace(session, user)
+    event = await _get_active_event(session, workspace, event_id)
+    try:
+        notification = await announce(
+            session, event, user.id, NotificationKind.MANUAL, message=body.message
+        )
+    except EventGone as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "event not found") from exc
+    await session.commit()
+    await session.refresh(notification)
+    return NotificationResponse.model_validate(notification)
 
 
 class EventImageUploadRequest(BaseModel):

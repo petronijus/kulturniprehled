@@ -10,8 +10,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from kp_api.domain.enums import ChangeOp
 
-OperationKind = Literal["create", "update", "delete", "move"]
-EntityKind = Literal["event", "watchlist_item"]
 OperationStatus = Literal["applied", "conflict", "not_found", "invalid", "forbidden"]
 
 
@@ -30,14 +28,21 @@ class ChangesPage(BaseModel):
     changes: list[ChangeEntry]
     next_seq: int
     has_more: bool
+    # Clients compare notification `deliver_after` against this, not their
+    # own clock, so a phone running fast cannot show a notification that is
+    # still collecting merges.
+    server_time: datetime
 
 
 class OperationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     op_id: UUID
-    entity: EntityKind
-    op: OperationKind
+    # Any string: an entity this server does not know fails as one
+    # `invalid` result (see `_APPLIERS`), not as a 422 for the whole batch —
+    # a newer app talking to an older API must not wedge its outbox.
+    entity: str = Field(min_length=1, max_length=40)
+    op: str = Field(min_length=1, max_length=20)  # unknown → `invalid`, as `entity`
     entity_id: UUID | None = None
     base_version: int | None = Field(default=None, ge=1)
     payload: dict[str, Any] | None = None

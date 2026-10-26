@@ -167,6 +167,7 @@ async def _clean_db(engine: AsyncEngine) -> AsyncIterator[None]:
                   costs,
                   tickets,
                   watchlist_items,
+                  event_notifications,
                   change_log,
                   events,
                   workspace_members,

@@ -32,7 +32,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -44,6 +44,7 @@ from kp_api.domain.enums import (
     EventSource,
     EventStatus,
     FeedbackRating,
+    NotificationKind,
     PlanStatus,
     SeasonLane,
     SeasonStatus,
@@ -307,6 +308,57 @@ class Cost(Base):
     split: Mapped[CostSplit] = mapped_column(String(20), nullable=False, default=CostSplit.SHARED)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     paid_at: Mapped[date] = mapped_column(Date, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EventNotification(Base):
+    """A notification about an event, shown on every member's phone.
+
+    The server decides that something is worth telling (an event was added,
+    its venue or programme changed, or a member asked for it); the phones
+    only deliver what arrives through `/v1/sync`. A notification is shown no
+    sooner than `deliver_after`: until then it is pending, and every further
+    reason for the same event merges into it instead of producing a second
+    one — the ingest skill creates an event and PATCHes its images a few
+    seconds later, which must reach the phones as one notification carrying
+    the final cover.
+    """
+
+    __tablename__ = "event_notifications"
+    __table_args__ = (
+        Index(
+            "ix_event_notifications_event_pending",
+            "event_id",
+            "deliver_after",
+            postgresql_where="deleted_at IS NULL",
+        ),
+    )
+
+    id: Mapped[UUID] = _uuid_pk()
+    workspace_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("workspaces.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    event_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("events.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kind: Mapped[NotificationKind] = mapped_column(String(20), nullable=False)
+    changes: Mapped[list[str]] = mapped_column(
+        ARRAY(String(20)), nullable=False, server_default="{}"
+    )
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    deliver_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()

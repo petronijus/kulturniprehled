@@ -19,6 +19,8 @@ from kp_api.domain.enums import (
     EventCategory,
     EventSource,
     EventStatus,
+    NotificationChange,
+    NotificationKind,
     PlanStatus,
     SeasonLane,
     SeasonStatus,
@@ -63,6 +65,31 @@ class EventUpdate(BaseModel):
     venue_address: str | None = None
     departure_at: datetime | None = None
     spotify_playlist_url: str | None = Field(default=None, max_length=1024)
+
+
+class NotificationCreate(BaseModel):
+    """A member asks for a notification about an event, e.g. after editing
+    it. `message` is shown as the notification body when given."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    message: str | None = Field(default=None, max_length=500)
+
+
+class NotificationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    workspace_id: UUID
+    event_id: UUID
+    kind: NotificationKind
+    changes: list[NotificationChange]
+    message: str | None
+    created_by: UUID
+    deliver_after: datetime
+    version: int
+    created_at: datetime
+    updated_at: datetime
 
 
 class EventResponse(BaseModel):

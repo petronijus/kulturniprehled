@@ -24,7 +24,14 @@ from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api.domain.enums import ChangeOp
-from kp_api.domain.models import ChangeLog, Cost, Event, Ticket, WatchlistItem
+from kp_api.domain.models import (
+    ChangeLog,
+    Cost,
+    Event,
+    EventNotification,
+    Ticket,
+    WatchlistItem,
+)
 
 
 def _isoformat(value: datetime | None) -> str | None:
@@ -207,6 +214,45 @@ async def record_watchlist_change(
             entity_id=item.id,
             op=op,
             payload=serialize_watchlist_item(item),
+            actor_id=actor_id,
+        )
+        .returning(ChangeLog.seq)
+    )
+    seq = result.scalar_one()
+    return int(seq)
+
+
+def serialize_notification(notification: EventNotification) -> dict[str, Any]:
+    return {
+        "id": str(notification.id),
+        "workspace_id": str(notification.workspace_id),
+        "event_id": str(notification.event_id),
+        "kind": notification.kind,
+        "changes": list(notification.changes),
+        "message": notification.message,
+        "created_by": str(notification.created_by),
+        "deliver_after": notification.deliver_after.isoformat(),
+        "version": notification.version,
+        "created_at": _isoformat(notification.created_at),
+        "updated_at": _isoformat(notification.updated_at),
+        "deleted_at": _isoformat(notification.deleted_at),
+    }
+
+
+async def record_notification_change(
+    session: AsyncSession,
+    notification: EventNotification,
+    actor_id: UUID,
+    op: ChangeOp,
+) -> int:
+    result = await session.execute(
+        insert(ChangeLog)
+        .values(
+            workspace_id=notification.workspace_id,
+            entity_type="notification",
+            entity_id=notification.id,
+            op=op,
+            payload=serialize_notification(notification),
             actor_id=actor_id,
         )
         .returning(ChangeLog.seq)

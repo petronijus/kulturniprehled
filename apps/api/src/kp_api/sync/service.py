@@ -23,7 +23,7 @@ from pydantic import ValidationError
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from kp_api.domain.enums import ChangeOp
+from kp_api.domain.enums import ChangeOp, NotificationKind
 from kp_api.domain.models import (
     AppliedOp,
     ChangeLog,
@@ -35,9 +35,18 @@ from kp_api.domain.models import (
 from kp_api.domain.schemas import (
     EventCreate,
     EventUpdate,
+    NotificationCreate,
     WatchlistItemCreate,
     WatchlistItemSyncMove,
     WatchlistItemSyncUpdate,
+)
+from kp_api.notifications import (
+    EventGone,
+    announce,
+    changes_since,
+    db_clock,
+    watched_snapshot,
+    withdraw_pending,
 )
 from kp_api.sync.changelog import record_event_change, record_watchlist_change
 from kp_api.sync.schemas import (
@@ -64,6 +73,9 @@ async def fetch_changes(
     since: int,
     limit: int,
 ) -> ChangesPage:
+    # Taken before the read: a merge committed after the page's snapshot
+    # must not be judged against a clock that already passed its deadline.
+    server_time = await db_clock(session)
     rows = (
         await session.scalars(
             select(ChangeLog)
@@ -95,6 +107,7 @@ async def fetch_changes(
         ],
         next_seq=int(next_seq),
         has_more=has_more,
+        server_time=server_time,
     )
 
 
@@ -162,6 +175,7 @@ async def _apply_event_create(
     session.add(event)
     await session.flush()
     seq = await record_event_change(session, event, user.id, ChangeOp.UPSERT)
+    await announce(session, event, user.id, NotificationKind.EVENT_CREATED)
     return OperationResult(
         op_id=op.op_id,
         status="applied",
@@ -218,12 +232,16 @@ async def _apply_event_update(
             OperationResult(op_id=op.op_id, status="invalid", error=str(exc))
         ) from exc
 
+    before = watched_snapshot(event)
     data = body.model_dump(exclude_unset=True, exclude={"version"})
     for key, value in data.items():
         setattr(event, key, value)
     event.version += 1
     await session.flush()
     seq = await record_event_change(session, event, user.id, ChangeOp.UPSERT)
+    changes = changes_since(before, event)
+    if changes:
+        await announce(session, event, user.id, NotificationKind.EVENT_CHANGED, changes)
     return OperationResult(
         op_id=op.op_id,
         status="applied",
@@ -261,12 +279,59 @@ async def _apply_event_delete(
     event.version += 1
     await session.flush()
     seq = await record_event_change(session, event, user.id, ChangeOp.DELETE)
+    await withdraw_pending(session, event, user.id)
     return OperationResult(
         op_id=op.op_id,
         status="applied",
         entity_id=event.id,
         version=event.version,
         seq=seq,
+    )
+
+
+async def _apply_notification_create(
+    session: AsyncSession,
+    user: User,
+    workspace: Workspace,
+    op: OperationRequest,
+) -> OperationResult:
+    """A member's manual notification about an event, queued offline.
+
+    The event goes in `entity_id`; the result's `entity_id` is the
+    notification's, which is a pending one's when it merged into it."""
+
+    if op.entity_id is None:
+        raise _OperationFailed(
+            OperationResult(op_id=op.op_id, status="invalid", error="missing entity_id")
+        )
+    try:
+        body = NotificationCreate.model_validate(op.payload or {})
+    except ValidationError as exc:
+        raise _OperationFailed(
+            OperationResult(op_id=op.op_id, status="invalid", error=str(exc))
+        ) from exc
+    try:
+        event = await _ensure_event_for_workspace(session, workspace, op.entity_id)
+    except _OperationFailed as exc:
+        exc.result = exc.result.model_copy(update={"op_id": op.op_id})
+        raise
+    if event.deleted_at is not None:
+        raise _OperationFailed(
+            OperationResult(op_id=op.op_id, status="not_found", error="event was deleted")
+        )
+    try:
+        notification = await announce(
+            session, event, user.id, NotificationKind.MANUAL, message=body.message
+        )
+    except EventGone as exc:
+        raise _OperationFailed(
+            OperationResult(op_id=op.op_id, status="not_found", error="event was deleted")
+        ) from exc
+    return OperationResult(
+        op_id=op.op_id,
+        status="applied",
+        entity_id=notification.id,
+        version=notification.version,
     )
 
 
@@ -691,6 +756,7 @@ _APPLIERS = {
     ("event", "create"): _apply_event_create,
     ("event", "update"): _apply_event_update,
     ("event", "delete"): _apply_event_delete,
+    ("notification", "create"): _apply_notification_create,
     ("watchlist_item", "create"): _apply_watchlist_create,
     ("watchlist_item", "update"): _apply_watchlist_update,
     ("watchlist_item", "delete"): _apply_watchlist_delete,

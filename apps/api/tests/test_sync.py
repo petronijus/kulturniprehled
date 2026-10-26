@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -17,6 +18,12 @@ def _iso(dt: datetime) -> str:
 
 def _future(days: int = 14) -> str:
     return _iso(datetime.now(UTC) + timedelta(days=days))
+
+
+def _events(changes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # Creating an event also logs its notification; these tests are about
+    # the events themselves (test_notifications.py covers the rest).
+    return [c for c in changes if c["entity_type"] == "event"]
 
 
 def _event_payload(**overrides: object) -> dict[str, object]:
@@ -47,7 +54,7 @@ async def test_crud_emits_change_log_entries(client: AsyncClient) -> None:
     sync_response = await client.get("/v1/sync", headers=headers)
     assert sync_response.status_code == 200
     page = sync_response.json()
-    ops = [(c["op"], c["payload"]["title"]) for c in page["changes"]]
+    ops = [(c["op"], c["payload"]["title"]) for c in _events(page["changes"])]
     assert ops == [
         ("upsert", "PJ Harvey"),
         ("upsert", "Renamed"),
@@ -69,7 +76,7 @@ async def test_sync_cursor_returns_only_newer_changes(client: AsyncClient) -> No
     await client.post("/v1/events", json=_event_payload(title="C"), headers=headers)
 
     delta = (await client.get(f"/v1/sync?since={cursor}", headers=headers)).json()
-    titles = [c["payload"]["title"] for c in delta["changes"]]
+    titles = [c["payload"]["title"] for c in _events(delta["changes"])]
     assert titles == ["B", "C"]
 
 
@@ -80,14 +87,16 @@ async def test_sync_pagination_signals_more(client: AsyncClient) -> None:
     for title in ("A", "B", "C"):
         await client.post("/v1/events", json=_event_payload(title=title), headers=headers)
 
-    page = (await client.get("/v1/sync?limit=2", headers=headers)).json()
-    assert len(page["changes"]) == 2
+    # Six entries: each event and its notification.
+    page = (await client.get("/v1/sync?limit=4", headers=headers)).json()
+    assert len(page["changes"]) == 4
     assert page["has_more"] is True
 
     next_page = (
-        await client.get(f"/v1/sync?since={page['next_seq']}&limit=2", headers=headers)
+        await client.get(f"/v1/sync?since={page['next_seq']}&limit=4", headers=headers)
     ).json()
-    assert [c["payload"]["title"] for c in next_page["changes"]] == ["C"]
+    assert len(next_page["changes"]) == 2
+    assert [c["payload"]["title"] for c in _events(next_page["changes"])] == ["C"]
     assert next_page["has_more"] is False
 
 
@@ -296,4 +305,4 @@ async def test_sync_changes_appear_to_other_workspace_member(
 
     bela = await login_as(client, "bela@example.com")
     page = (await client.get("/v1/sync", headers=auth_header(bela["access_token"]))).json()
-    assert [c["payload"]["title"] for c in page["changes"]] == ["Shared"]
+    assert [c["payload"]["title"] for c in _events(page["changes"])] == ["Shared"]

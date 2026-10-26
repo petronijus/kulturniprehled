@@ -30,6 +30,23 @@ class UserRole(StrEnum):
     MEMBER = "member"
 
 
+class NotificationKind(StrEnum):
+    """Why an event notification exists. When several reasons fall into one
+    coalescing window they merge into a single notification, and the
+    strongest kind wins: created > manual > changed."""
+
+    EVENT_CREATED = "event_created"
+    MANUAL = "manual"
+    EVENT_CHANGED = "event_changed"
+
+
+class NotificationChange(StrEnum):
+    """The event fields whose change is worth telling both of us about."""
+
+    VENUE = "venue"
+    PROGRAM = "program"
+
+
 class ChangeOp(StrEnum):
     UPSERT = "upsert"
     DELETE = "delete"

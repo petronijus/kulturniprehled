@@ -8,6 +8,10 @@ drives the `vX.Y.Z` tags; per-release detail is on the
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-26
+
+Both phones hear about it when an event is added or changes.
+
 ### Added
 - **Event notifications decided by the server** — both phones are notified
   when an event is added or its venue or programme changes (bursts within

@@ -167,9 +167,9 @@ For routine releases: `ssh deploy@kp-vm /opt/kp/infra/deploy/upgrade.sh`.
 
 ## Mobile release
 
-- **Android** — a bundle signed with the Play upload key (`just build-aab`),
-  shipped through the Google Play internal testing track; testers update
-  from the Play Store. Procedure in [`docs/release.md`](docs/release.md).
+- **Android** — a bundle signed with the Play upload key, built and released
+  to the Google Play internal testing track by the Play Developer API in one
+  step (`just release-android "notes"`); testers update from the Play Store. Procedure in [`docs/release.md`](docs/release.md).
 - **iOS** — TestFlight Internal Testing (group `Družina`,
   auto-distribute on). Two release paths:
   - Local Mac with Xcode + App Store Connect API key

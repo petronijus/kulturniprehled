@@ -8,6 +8,14 @@ drives the `vX.Y.Z` tags; per-release detail is on the
 
 ## [Unreleased]
 
+### Added
+
+- `just release-android "notes"` builds the Play bundle and releases it to
+  the internal testing track through the Play Developer API
+  (`scripts/play.py`, a service account limited to testing tracks);
+  `just play-tracks` shows what each track serves. The Play Console upload
+  stays as the manual fallback.
+
 ## [1.3.0] - 2026-10-26
 
 Both phones hear about it when an event is added or changes.

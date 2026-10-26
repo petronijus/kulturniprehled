@@ -75,6 +75,7 @@ Read `docs/sync.md` before touching sync, the outbox or any synced entity,
 | `just lint-py` / `lint-dart` / `lint-web` / `lint-shell` | one analyzer |
 | `just lint-docs` | the docs name only recipes, files, headings and imports that exist (also a pre-commit job) |
 | `just build-aab` | signed bundle for Play internal testing (upload key from 1Password) |
+| `just release-android "notes"` | build the bundle and release it to Play internal testing through the API |
 | `just dev-up` / `dev-down` | the dev stack (Postgres, MinIO, API) |
 | `just secrets-decrypt` | materialise `.env` from the private overlay |
 | `just run` | the app on a connected device or simulator |

@@ -34,12 +34,26 @@ same upload. Until 1.2.0 it was a sideloaded APK on GitHub Releases.
   `KP Mobile (Play, hybrid classical)` and `KP Mobile (Play, hybrid PQC)`;
   `KP Mobile (debug)` stays for debug builds. A missing SHA-1 shows up as a
   sign-in that fails right after the account is picked.
+- **Play release service account** (for `just release-android`): Google
+  Cloud project `petr-apps` → enable the *Google Play Android Developer API*
+  → IAM & Admin → Service accounts → create `kp-play-release` with **no**
+  project roles → Keys → add a JSON key. Its contents go to 1Password as
+  `Kulturni Prehled Play release service account`, field
+  `service_account_json` (vault Personal); the downloaded file then goes to
+  the trash. In Play Console → Users and permissions → Invite new users, add
+  the account's e-mail with app permissions for Kulturní Přehled only:
+  *View app information (read-only)* and *Release apps to testing tracks*.
+  It can never release to production. `just play-tracks` checks the access.
+  Pinkni's `pinkni-play-release` account is not reused: it may release
+  Pinkni only, and each app keeps its own key.
 - **Moving a phone from the old APK**: the sideloaded APK was signed with the
   retired `kp-release.keystore`, so Play cannot update it in place. Uninstall
   it once, then install from the testers' opt-in link. Everything that
   matters is on the server; the phone re-syncs after sign-in.
 
 ### Per release
+
+`just release-android "release notes"` runs steps 3 and 4 in one go.
 
 1. **Version**: `apps/mobile/pubspec.yaml` → `version: X.Y.Z+N`. `N` is the
    Android version code; Play refuses a code it has seen, so it only goes up.
@@ -53,10 +67,16 @@ same upload. Until 1.2.0 it was a sideloaded APK on GitHub Releases.
    checks that the upload key signed it. A plain `flutter build appbundle`
    without the key fails on purpose, so a debug-signed bundle never reaches
    Play.
-4. **Upload**: Play Console → Kulturní Přehled → Test and release → Testing →
-   Internal testing → Create new release → upload the `.aab` → release notes
-   → Save → Review release → Start rollout. Testers get the update from the
-   Play Store within minutes.
+4. **Upload**: `scripts/play.py upload <aab> --notes "…"` (what
+   `just release-android` calls after the build). One Play edit uploads the
+   bundle, refuses it if its version code differs from `pubspec.yaml`, makes
+   it the internal track's only completed release and commits; a failure
+   before the commit leaves Play untouched. `--track alpha|beta` picks another
+   testing track. `just play-tracks` shows what each track serves afterwards.
+   Testers get the update from the Play Store within minutes. The manual
+   fallback is Play Console → Kulturní Přehled → Test and release → Testing →
+   Internal testing → Create new release → upload the `.aab` → Save → Review
+   release → Start rollout.
 5. **GitHub Release**: the tag's release carries the notes only; the bundle
    goes to Play, not to GitHub.
 

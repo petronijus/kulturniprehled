@@ -91,6 +91,7 @@ test-scripts:
     cd skills/kulturni-sezona/bin && python3 test_kp_validate.py
     python3 skills/lib/test_kp_fetch.py
     python3 tools/dev/test_pii_scan.py
+    python3 scripts/test_play.py
     python3 infra/claudebox/test_seat_watch.py
     python3 infra/claudebox/test_session_settings.py
     bash infra/claudebox/test_lib.sh
@@ -151,6 +152,14 @@ build-aab:
     [[ "$signer" == "CN=Kulturni Prehled upload, O=Bastla, C=CZ" ]] || { echo "build-aab: unexpected signer: $signer" >&2; exit 1; }
     echo "signed by: $signer"
     echo "upload:    {{mobile}}/$aab"
+
+# Build the Play bundle and release it to a testing track (default internal): just release-android "notes"
+release-android notes="" track="internal": build-aab
+    scripts/play.py upload {{mobile}}/build/app/outputs/bundle/release/app-release.aab --track {{track}} --notes {{quote(notes)}}
+
+# What each Play testing track serves now (read-only)
+play-tracks:
+    scripts/play.py tracks
 
 # The API image exactly as scripts/build-push.sh builds it, tagged locally only
 build-api: _docker

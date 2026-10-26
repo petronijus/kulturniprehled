@@ -11,14 +11,26 @@
 # Usage:
 #   scripts/build-push.sh              # tag = git short sha + :latest
 #   KP_API_TAG=v1.2.0 scripts/build-push.sh
+#
+# The image is built for the VM's platform, not the build machine's: a build
+# on the arm64 MacBook used to push an arm64-only image that the amd64 VM
+# could not pull ("no matching manifest for linux/amd64"). Override with
+# KP_API_PLATFORM only if the VM's architecture changes.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 REG="ghcr.io/petronijus/kulturniprehled-api"
 TAG="${KP_API_TAG:-$(git rev-parse --short HEAD)}"
+PLATFORM="${KP_API_PLATFORM:-linux/amd64}"
 
-echo "→ building ${REG}:${TAG} (+ latest)  [context: apps/api]"
-docker build -t "${REG}:${TAG}" -t "${REG}:latest" -f apps/api/Dockerfile apps/api
+echo "→ building ${REG}:${TAG} (+ latest) for ${PLATFORM}  [context: apps/api]"
+docker build --platform "${PLATFORM}" \
+    -t "${REG}:${TAG}" -t "${REG}:latest" -f apps/api/Dockerfile apps/api
+built="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "${REG}:${TAG}")"
+if [[ "${built}" != "${PLATFORM}" ]]; then
+    echo "✗ built ${built}, expected ${PLATFORM} — not pushing" >&2
+    exit 1
+fi
 docker push "${REG}:${TAG}"
 docker push "${REG}:latest"
 echo "✓ pushed ${REG}:{${TAG},latest}"

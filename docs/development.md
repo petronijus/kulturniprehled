@@ -173,7 +173,7 @@ VM the manual MinIO step in `infra/deploy/README.md`.
   `hooks/` (guard and format every write, shell writes included; refuse to
   print key material, also through wrappers and recursive searches, and
   deny a call the guard cannot parse; run `just check` before a turn ends), `agents/` (`test-runner`,
-  `docs-writer`, `integrity-reviewer`), `rules/` (Flutter app, Android,
+  `test-writer`, `docs-writer`, `integrity-reviewer`), `rules/` (Flutter app, Android,
   iOS, API, web, skills), and `harness-version` — the version of Petr's
   harness standard this repo follows (`/project-setup upgrade` brings it up
   to date).

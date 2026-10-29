@@ -28,17 +28,23 @@ Project configuration lives in `.claude/` (committed). What it does for you:
 
 ## Subagents — delegate to them
 
-| Agent | When |
-|---|---|
-| `test-runner` | after code changes, on any failing test or build, and to write tests; keeps Gradle, Docker and pytest logs out of the main context |
-| `integrity-reviewer` | before committing anything under `apps/api/src`, `apps/api/alembic`, `apps/mobile/lib/features/{sync,outbox,auth,notifications}`, `apps/mobile/android`, `skills/kulturni-sezona` or `infra` |
-| `docs-writer` | after a change to behaviour, commands, the API, the sync protocol, the toolchain or the release flow |
+| Agent | Model / effort | When |
+|---|---|---|
+| `test-runner` | haiku / low | after code changes and before calling work done; read-only verdict; keeps Gradle, Docker and pytest logs out of the main context |
+| `test-writer` | sonnet / high | when test-runner reports red, and to write tests; pass `model: "opus"` for a cross-layer, racy or flaky failure |
+| `integrity-reviewer` | session / high | before committing anything under `apps/api/src`, `apps/api/alembic`, `apps/mobile/lib/features/{sync,outbox,auth,notifications}`, `apps/mobile/android`, `skills/kulturni-sezona` or `infra` |
+| `docs-writer` | sonnet / medium | after a change to behaviour, commands, the API, the sync protocol, the toolchain or the release flow |
+
+Each agent runs on the cheapest model that matches the session's result;
+the reviewer keeps the session model. Escalate one call with the Agent
+tool's `model` parameter rather than editing the frontmatter.
 
 ## Committing
 
 When Petr asks to run the checks and commit a stretch of work, follow the
 global `commit-in-background` skill: snapshot the finished tree, let a
-background fork split it into small commits and verify each one in its own
+background agent (haiku for a fully written plan, sonnet when it must split
+hunks or write tests) make small commits and verify each one in its own
 git worktree (`just ci` after the last), keep working meanwhile, then adopt
 its commits with `git reset --mixed`. Small diffs are committed inline.
 Never push without its own word.

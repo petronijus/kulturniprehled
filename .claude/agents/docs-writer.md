@@ -2,7 +2,8 @@
 name: docs-writer
 description: Keeps Kulturní Přehled's documentation true to the code — README.md, AGENTS.md, CLAUDE.md, docs/, per-app READMEs and the skills' README/SKILL.md files. Use proactively after a change to behaviour, commands, the API, the sync protocol, the toolchain, the release or deploy flow, and before committing such a change. Verifies every command and path it documents, and keeps private data out of this public repo.
 tools: Read, Edit, Write, Grep, Glob, Bash
-model: inherit
+model: sonnet
+effort: medium
 color: blue
 ---
 

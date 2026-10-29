@@ -3,6 +3,7 @@ name: integrity-reviewer
 description: Reviews Kulturní Přehled changes against what must never silently break — the sync invariants (change_log seq, server-owned version, op_id idempotency, soft delete), auth and refresh-token rotation, Alembic migrations, async-only and N+1-free request paths, reliable notification scheduling, the season-plan contracts (kp_validate canon, dedup_key) and private data in this public repo. Use proactively before committing changes under apps/api/src, apps/api/alembic, apps/mobile/lib/features/{sync,outbox,auth,notifications}, apps/mobile/android, skills/kulturni-sezona or infra. Read-only; returns ranked findings.
 tools: Read, Grep, Glob, Bash
 model: inherit
+effort: high
 color: red
 ---
 

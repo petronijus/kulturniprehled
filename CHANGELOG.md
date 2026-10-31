@@ -8,8 +8,28 @@ drives the `vX.Y.Z` tags; per-release detail is on the
 
 ## [Unreleased]
 
-### Added
+## [1.3.1] - 2026-10-31
 
+The agenda scrolls smoothly again.
+
+### Changed
+- **Smoother agenda scrolling.** The agenda stuttered while scrolling, worst
+  on 120 Hz phones. On a Pixel 9 Pro Fold the slowest frames went from
+  41 ms to 9 ms, and frames over the 8.3 ms budget from 65 to 6 per run. Looks and animations are
+  unchanged, including the parallax, the tilt and the letter-by-letter title
+  reveal.
+- The app no longer redraws the agenda while the phone lies still; tilt
+  noise from the sensor is ignored.
+
+### Fixed
+- The giant month label no longer jumps a few pixels on the first scroll.
+- While a title revealed itself, a letter reaching into the next one (the
+  hook of an "f") was briefly cut off; faint letter fragments could also
+  show before the reveal started.
+
+### Added
+- `just perf-agenda <device>`: a profile-mode scroll benchmark for the
+  agenda on an Android phone or emulator.
 - `just release-android "notes"` builds the Play bundle and releases it to
   the internal testing track through the Play Developer API
   (`scripts/play.py`, a service account limited to testing tracks);

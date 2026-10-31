@@ -62,6 +62,17 @@ android {
     }
 }
 
+// Profile builds (`just perf-agenda`) install next to the Play app instead of
+// over it: they are signed with the debug key, so installing one under the
+// real id would uninstall the Play app and wipe its data, unsent outbox
+// included. Only the profile variant's id changes; debug and release keep the
+// app's identity.
+androidComponents {
+    onVariants(selector().withBuildType("profile")) { variant ->
+        variant.applicationId.set("com.kulturniprehled.kp_mobile.profile")
+    }
+}
+
 // A bundle for Play must be signed with the upload key, never the debug key.
 tasks.configureEach {
     if (name == "bundleRelease" && uploadKeystore == null) {

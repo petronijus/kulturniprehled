@@ -78,6 +78,14 @@ lint-docs:
 test-dart:
     cd {{mobile}} && flutter test
 
+# Agenda scroll benchmark on a device or emulator (profile build); frame
+# timings land in apps/mobile/build/agenda_*.json. Use a physical phone for
+# absolute numbers — an emulator only compares before/after.
+perf-agenda device:
+    cd {{mobile}} && flutter drive --profile --no-dds -d {{device}} \
+        --driver=test_driver/perf_driver.dart \
+        --target=integration_test/agenda_scroll_perf_test.dart
+
 # API tests against real Postgres and MinIO (testcontainers)
 test-api: _docker
     cd {{api}} && uv run --quiet --frozen pytest -q

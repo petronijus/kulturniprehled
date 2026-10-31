@@ -103,6 +103,7 @@ test-scripts:
     cd skills/kulturni-sezona/bin && python3 test_kp_validate.py
     python3 skills/lib/test_kp_fetch.py
     python3 skills/klasika-expert/ensembles/lib/test_prague_time.py
+    python3 skills/ticket-parser/bin/test_pdf_pages.py
     python3 tools/dev/test_pii_scan.py
     python3 scripts/test_play.py
     python3 infra/claudebox/test_seat_watch.py

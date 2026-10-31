@@ -17,7 +17,21 @@ the Google steps remain for now to keep historical workflows alive.
 Run `ls -lt ~/Downloads/ | head -20`. From the most recent files pick the
 one(s) that look like cultural-event tickets — typically PDFs with names
 suggesting a ticket (e.g. `vstupenky`, `ticket`, `eTicket`, `listek`, a
-festival name, etc.). One event can have multiple ticket files.
+festival name, etc.). One event can have multiple ticket files, and **one
+file can hold several tickets** — box offices (Národní divadlo, Rudolfinum,
+GoOut) put every ticket of an order on its own page of a single PDF.
+
+Count the pages of every ticket file before reading them:
+
+```bash
+PDF_PAGES=~/Documents/Dev/kulturniprehled/skills/ticket-parser/bin/pdf_pages.py
+TICKET_PDFS=(~/Downloads/vstupenky-1.pdf ~/Downloads/vstupenky-2.pdf)  # the files picked above
+python3 "$PDF_PAGES" "${TICKET_PDFS[@]}" \
+  || { echo "cannot count the pages of a ticket PDF"; exit 1; }
+```
+
+It prints `<pages>\t<path>` per file and fails loudly on a PDF it cannot
+read — then stop and ask, don't guess the count.
 
 **Filename gotcha.** Some browsers save tickets with brackets in the name
 (`[object Object]_5330.pdf`). `curl` interprets `[...]` as a glob range and
@@ -39,8 +53,21 @@ Read each PDF and extract:
   ZIP + city`) — this also drives the "Mapa" button on the mobile
   detail screen, which opens mapy.cz with that address pre-filled, so
   there's no separate map URL field to populate.
-- **Seat info** (sector, row, seat numbers) — kept for the event
-  description and the email.
+- **The tickets, one entry per ticket — not per file.** Read every page
+  of every file; for each ticket note its seat (sector, row, seat number)
+  and its price. These are `TICKETS` below: the seats all go into the
+  event notes and the calendar, and every ticket gets its own cost row in
+  step 8.
+
+  **Reconcile with the page count from step 1** before going on: the
+  number of tickets must equal the total number of pages. A page that is
+  not a ticket (terms and conditions, an advert, a parking voucher) is
+  the only acceptable difference, and the report in step 11 names it
+  ("2 stránky, 1 lístek — druhá stránka jsou obchodní podmínky"). Two
+  tickets on one page are the other way round: say so too. A count that
+  does not reconcile is a misread — read the file again. The 2026-10-31
+  opera went in with one seat and one price because only the first page
+  of a two-ticket PDF was read.
 - **Ticket price** in Kč — read from the PDF (e.g. `1690 Kč`). Convert
   to cents (`1690 * 100 = 169000`) for step 8. If the ticket shows the
   total only (festival packs), divide evenly by ticket count.
@@ -334,9 +361,10 @@ state.
 ### 8. Record the ticket price as a cost (feeds Stats)
 
 For every ticket post a `cost` row so the price lands in the Stats
-screen (PODLE KATEGORIE + roční útrata). One POST per ticket — same
-ticket count as step 7 — keeps the totals honest and lets the price
-travel with the ticket if you ever delete just one.
+screen (PODLE KATEGORIE + roční útrata). One POST per **ticket** in
+`TICKETS` from step 2 — not per file uploaded in step 7: a two-ticket PDF
+is one upload and two cost rows. That keeps the totals honest and lets the
+price travel with the ticket if you ever delete just one.
 
 ```bash
 TODAY=$(date -I)            # ISO date, e.g. 2026-05-18
@@ -570,6 +598,8 @@ Reply to the user in Czech:
   {VENUE}. Lístky ({N} ks, {TOTAL_PRICE_CZK}) jsou nahraný v KP i na
   Drivu, kalendář hotový. Playlist na přípravu: {PLAYLIST_URL}. Běla dostane notifikaci v appce automaticky
   (při příští synchronizaci, obvykle do 30 min)." (Omit the "Playlist na přípravu:" sentence when `PLAYLIST_URL` is empty.)
+- `{N}` is the number of tickets from step 2, not of files. Add the
+  page reconciliation when pages and tickets differ.
 - Include the KP event id and the Drive links.
 
 There is no e-mail to Běla: the server queues the notification when the

@@ -3,7 +3,9 @@
 End-to-end ingestion of downloaded cultural-event tickets:
 
 1. Reads the PDFs from `~/Downloads`.
-2. Extracts the metadata (performer/title, date, venue, seats).
+2. Extracts the metadata (performer/title, date, venue, a seat and a price
+   per ticket — one PDF often holds several tickets; `bin/pdf_pages.py`
+   counts its pages so none is skipped).
 3. Looks up MHD travel time from Svatovítská 16 to the venue.
 4. Creates the event in Kulturní Přehled (`POST /v1/events`).
 5. Uploads each ticket to KP via presigned MinIO URL.

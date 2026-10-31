@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +9,8 @@ import 'package:kp_mobile/core/widgets/blend_mask.dart';
 import 'package:kp_mobile/core/widgets/blur_in_text.dart';
 import 'package:kp_mobile/core/widgets/date_row.dart';
 import 'package:kp_mobile/core/widgets/morphing_hero_cover.dart';
+import 'package:kp_mobile/core/widgets/parallax_layer.dart';
+import 'package:kp_mobile/core/widgets/prerendered_blur_text.dart';
 import 'package:kp_mobile/data/drift/database.dart';
 import 'package:kp_mobile/features/events/agenda_replay_provider.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
@@ -137,81 +137,27 @@ class _ParallaxScope extends InheritedWidget {
       scrollCtrl != old.scrollCtrl || tilt != old.tilt;
 }
 
-/// Wraps a layer with a Transform.translate driven by the layer's position
-/// **relative to the viewport** (plus device tilt). Keying off the layer's own
-/// on-screen position — rather than the list's absolute scroll offset — keeps
-/// the parallax per-card: a card sitting at a given spot on screen always
-/// shows the same layer displacement, no matter how far down the list it is.
-/// (The old absolute-offset version made the cover/title gap grow without
-/// bound the further you scrolled.) Apply the widget multiple times with
-/// different scale factors to build a multi-layer parallax — a larger factor
-/// lags more and reads as "further back".
-class _ParallaxLayer extends StatefulWidget {
-  const _ParallaxLayer({
+/// [ParallaxLayer] wired to the agenda's scroll position and device tilt.
+class _AgendaParallax extends StatelessWidget {
+  const _AgendaParallax({
+    required this.scrollFactor,
+    required this.tiltAmplitude,
     required this.child,
-    this.scrollFactor = 0,
-    this.tiltAmplitude = Offset.zero,
   });
 
-  final Widget child;
-
-  /// Drift per pixel of the card's offset from the viewport centre. A
-  /// *positive* factor slides the layer **down** as you scroll further down
-  /// the list (it lags, reading as "further back"); a *negative* factor leads
-  /// by sliding up. Bounded per card — keyed to viewport position, not the
-  /// absolute scroll offset.
   final double scrollFactor;
-
-  /// Pixels of drift at full tilt (±1 on the normalised tilt input).
   final Offset tiltAmplitude;
-
-  @override
-  State<_ParallaxLayer> createState() => _ParallaxLayerState();
-}
-
-class _ParallaxLayerState extends State<_ParallaxLayer> {
-  @override
-  void initState() {
-    super.initState();
-    // The first build runs before layout, so the render box has no position
-    // to measure yet — schedule one repaint once it does.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() {});
-    });
-  }
-
-  /// Signed distance (px) from the viewport centre **up to** this layer's
-  /// centre, read from the previous frame's layout: positive while the layer
-  /// sits above the centre, and it grows as the list scrolls down — so
-  /// `delta * factor` keeps the original scroll direction while resetting per
-  /// card. Measuring the layer's own (untransformed) position is safe:
-  /// `RenderTransform` never folds its own translate into its own
-  /// `localToGlobal`, so there's no feedback loop with the offset we apply.
-  double _viewportDelta() {
-    final RenderObject? ro = context.findRenderObject();
-    if (ro is! RenderBox || !ro.hasSize || !ro.attached) {
-      return 0;
-    }
-    final double centreY =
-        ro.localToGlobal(Offset.zero).dy + ro.size.height / 2;
-    final double viewportCentre = MediaQuery.of(context).size.height / 2;
-    return viewportCentre - centreY;
-  }
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final _ParallaxScope scope = _ParallaxScope.of(context);
-    return AnimatedBuilder(
-      animation: Listenable.merge(<Listenable>[scope.scrollCtrl, scope.tilt]),
-      builder: (context, child) {
-        final double delta = _viewportDelta();
-        final Offset tilt = scope.tilt.value;
-        final double dx = tilt.dx * widget.tiltAmplitude.dx;
-        final double dy =
-            delta * widget.scrollFactor + tilt.dy * widget.tiltAmplitude.dy;
-        return Transform.translate(offset: Offset(dx, dy), child: child);
-      },
-      child: widget.child,
+    return ParallaxLayer(
+      scroll: scope.scrollCtrl,
+      tilt: scope.tilt,
+      scrollFactor: scrollFactor,
+      tiltAmplitude: tiltAmplitude,
+      child: child,
     );
   }
 }
@@ -264,136 +210,156 @@ class _AgendaList extends StatelessWidget {
       }
     }
 
-    final List<_MonthGroup> months = _groupByMonth(future);
-    // Cumulative event count before each month — lets each card know
-    // its global index for the blur-in stagger (each card adds another
-    // _staggerMs of delay so titles cascade rather than blur in
-    // together).
-    final List<int> startEventIndices = <int>[];
-    int running = 0;
-    for (final _MonthGroup g in months) {
-      startEventIndices.add(running);
-      running += g.events.length;
-    }
+    final List<_AgendaEntry> entries = _entriesFor(future);
     final bool showPastTile = past.isNotEmpty;
-    final int itemCount = months.length + (showPastTile ? 1 : 0);
+    final int itemCount = entries.length + (showPastTile ? 1 : 0);
 
     final MediaQueryData mq = MediaQuery.of(context);
-    return ListView.builder(
-      controller: scrollCtrl,
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.only(
-        top: mq.padding.top + 64,
-        // Cap scroll so the last item (Minulé tile) ends up in the bottom
-        // third of the viewport at max scroll instead of being pullable
-        // all the way to the middle of the screen.
-        bottom: mq.size.height * 0.2,
+    return ScrollConfiguration(
+      behavior: const _WhiteBackdropScrollBehavior(),
+      child: ListView.builder(
+        controller: scrollCtrl,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(
+          top: mq.padding.top + 64,
+          // Cap scroll so the last item (Minulé tile) ends up in the bottom
+          // third of the viewport at max scroll instead of being pullable
+          // all the way to the middle of the screen.
+          bottom: mq.size.height * 0.2,
+        ),
+        itemCount: itemCount,
+        itemBuilder: (context, index) => index < entries.length
+            ? _AgendaCardItem(entry: entries[index])
+            : _PastTile(count: past.length),
       ),
-      itemCount: itemCount,
-      itemBuilder: (context, index) {
-        final Widget item = index < months.length
-            ? _MonthSection(
-                group: months[index],
-                startEventIndex: startEventIndices[index],
-              )
-            : _PastTile(count: past.length);
-        // Opaque white painted *inside* the scroll content (behind the ghost
-        // month, so that still shows through). It rides into Android's
-        // stretch-overscroll layer with the content, giving the date/title
-        // difference-blend a backdrop there too — without it the black-on-white
-        // text drops out on the end-bounce, leaving only text over the photos.
-        return ColoredBox(color: Colors.white, child: item);
-      },
     );
   }
 
-  static List<_MonthGroup> _groupByMonth(List<CachedEventRow> rows) {
-    final List<_MonthGroup> out = <_MonthGroup>[];
-    int? lastYear;
-    int? lastMonth;
-    for (final CachedEventRow e in rows) {
-      final DateTime local = e.startsAt.toLocal();
-      if (local.year != lastYear || local.month != lastMonth) {
-        out.add(_MonthGroup(year: local.year, month: local.month, events: []));
-        lastYear = local.year;
-        lastMonth = local.month;
-      }
-      out.last.events.add(e);
+  /// One list item per event, so the list builds, lays out and paints only
+  /// the cards near the viewport. The first card of each month carries that
+  /// month's ghost label; spacing reproduces the per-month layout (80 above a
+  /// month, 20 between its cards, 16 after it).
+  static List<_AgendaEntry> _entriesFor(List<CachedEventRow> rows) {
+    final List<_AgendaEntry> out = <_AgendaEntry>[];
+    for (int i = 0; i < rows.length; i++) {
+      final DateTime local = rows[i].startsAt.toLocal();
+      final DateTime? previous = i > 0 ? rows[i - 1].startsAt.toLocal() : null;
+      final DateTime? next = i + 1 < rows.length
+          ? rows[i + 1].startsAt.toLocal()
+          : null;
+      out.add(
+        _AgendaEntry(
+          event: rows[i],
+          // Global position across the agenda — drives the blur-in stagger
+          // so card N starts N × _staggerMs after the first.
+          index: i,
+          monthLabel: previous == null || !_sameMonth(previous, local)
+              ? _monthLabel(local)
+              : null,
+          endsMonth: next == null || !_sameMonth(local, next),
+        ),
+      );
     }
     return out;
   }
-}
 
-class _MonthGroup {
-  _MonthGroup({required this.year, required this.month, required this.events});
+  static bool _sameMonth(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month;
 
-  final int year;
-  final int month;
-  final List<CachedEventRow> events;
-}
-
-class _MonthSection extends StatelessWidget {
-  const _MonthSection({required this.group, required this.startEventIndex});
-
-  final _MonthGroup group;
-  // Global position of this month's first event across the whole
-  // agenda — drives the blur-in stagger so card N starts blurring in
-  // N × _staggerMs after the cards above it.
-  final int startEventIndex;
-
-  @override
-  Widget build(BuildContext context) {
+  static String _monthLabel(DateTime local) {
     final String raw = DateFormat(
       'LLLL',
       'cs',
-    ).format(DateTime(group.year, group.month));
-    final String label = raw.isEmpty
-        ? raw
-        : raw[0].toUpperCase() + raw.substring(1);
+    ).format(DateTime(local.year, local.month));
+    return raw.isEmpty ? raw : raw[0].toUpperCase() + raw.substring(1);
+  }
+}
 
+/// Paints opaque white under the whole list *inside* the scroll content, so
+/// it rides into Android's stretch-overscroll layer with the cards (behind
+/// the ghost month, which still shows through). That layer isolates its
+/// content, and the date/title difference-blend needs a backdrop in it —
+/// without one the black-on-white text drops out on the end-bounce, leaving
+/// only text over the photos. One backdrop for the whole list rather than one
+/// per card: a per-card fill would cut off the cover above it where its
+/// parallax drift spills over the card boundary.
+class _WhiteBackdropScrollBehavior extends MaterialScrollBehavior {
+  const _WhiteBackdropScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) => super.buildOverscrollIndicator(
+    context,
+    ColoredBox(color: Colors.white, child: child),
+    details,
+  );
+}
+
+class _AgendaEntry {
+  const _AgendaEntry({
+    required this.event,
+    required this.index,
+    required this.monthLabel,
+    required this.endsMonth,
+  });
+
+  final CachedEventRow event;
+  final int index;
+
+  /// Set on the first card of a month: the ghost label drawn behind it.
+  final String? monthLabel;
+  final bool endsMonth;
+}
+
+class _AgendaCardItem extends StatelessWidget {
+  const _AgendaCardItem({required this.entry});
+
+  final _AgendaEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final String? monthLabel = entry.monthLabel;
+    final Widget card = Padding(
+      padding: EdgeInsets.only(
+        top: monthLabel != null ? 80 : 20,
+        bottom: entry.endsMonth ? 16 : 0,
+      ),
+      child: _EventCard(event: entry.event, index: entry.index),
+    );
+    if (monthLabel == null) {
+      return card;
+    }
     return Stack(
       clipBehavior: Clip.none,
       children: <Widget>[
         // Giant blurred month label — slowest scroll layer, smallest tilt
-        // drift. Sits behind the first card.
+        // drift. Sits behind the month's first card.
         Positioned(
           left: -20,
           top: 24,
           right: 0,
           child: IgnorePointer(
-            child: _ParallaxLayer(
+            child: _AgendaParallax(
               scrollFactor: 0.12,
               tiltAmplitude: const Offset(2, 2),
-              child: ImageFiltered(
-                imageFilter: ImageFilter.blur(
-                  sigmaX: _ghostBlur,
-                  sigmaY: _ghostBlur,
-                ),
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontFamily: 'StackSansHeadline',
-                    fontWeight: FontWeight.w700,
-                    fontSize: _ghostFontSize,
-                    color: _ghostColor,
-                    height: 1.0,
-                  ),
+              child: PrerenderedBlurText(
+                monthLabel,
+                sigma: _ghostBlur,
+                style: const TextStyle(
+                  fontFamily: 'StackSansHeadline',
+                  fontWeight: FontWeight.w700,
+                  fontSize: _ghostFontSize,
+                  color: _ghostColor,
+                  height: 1.0,
                 ),
               ),
             ),
           ),
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            const SizedBox(height: 80),
-            for (int i = 0; i < group.events.length; i++) ...<Widget>[
-              if (i > 0) const SizedBox(height: 20),
-              _EventCard(event: group.events[i], index: startEventIndex + i),
-            ],
-            const SizedBox(height: 16),
-          ],
-        ),
+        card,
       ],
     );
   }
@@ -461,7 +427,7 @@ class _EventCard extends StatelessWidget {
               Positioned(
                 right: -16,
                 top: 0,
-                child: _ParallaxLayer(
+                child: _AgendaParallax(
                   scrollFactor: 0.10,
                   tiltAmplitude: const Offset(3, 3),
                   child: SizedBox(
@@ -487,19 +453,23 @@ class _EventCard extends StatelessWidget {
               // Foreground: title + date row. Modest tilt drift — title
               // shouldn't fly around vs cover. Top inset pushes the title
               // below the cover's visual centre.
-              _ParallaxLayer(
+              _AgendaParallax(
                 scrollFactor: -0.02,
                 tiltAmplitude: const Offset(6, 6),
                 child: Padding(
                   padding: const EdgeInsets.only(top: 80, right: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      SizedBox(
-                        width: 240,
-                        // Same white + difference trick as the date row, so the
-                        // title stays legible where it crosses the dark cover.
-                        child: BlendMask(
+                  // White + difference blend inverts whatever is behind the
+                  // title and date row, so both stay legible where they cross
+                  // the dark cover circle (and read black on the plain
+                  // background). One blend layer for the pair: each
+                  // difference layer makes the GPU read back the backdrop,
+                  // and that readback is the bulk of a scroll frame's cost.
+                  child: BlendMask(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        SizedBox(
+                          width: 240,
                           child: BlurInText(
                             key: ValueKey<String>('title-${event.id}'),
                             text: event.title,
@@ -515,17 +485,12 @@ class _EventCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      Hero(
-                        tag: 'daterow-${event.id}',
-                        child: Material(
-                          type: MaterialType.transparency,
-                          // White + difference blend inverts whatever is behind
-                          // the row, so the date/time stays legible where it
-                          // overlaps the dark cover circle (and reads black on
-                          // the plain background to its left).
-                          child: BlendMask(
+                        const SizedBox(height: 24),
+                        Hero(
+                          tag: 'daterow-${event.id}',
+                          flightShuttleBuilder: _dateRowShuttle,
+                          child: Material(
+                            type: MaterialType.transparency,
                             child: DateRow(
                               leading: catLabel,
                               center: dateLabel,
@@ -534,8 +499,8 @@ class _EventCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -544,6 +509,23 @@ class _EventCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// The white date row only reads through the card's blend layer, which
+  /// stays behind when the row flies. Landing back on the agenda (pop), the
+  /// shuttle is this white row, so it carries its own blend; flying to the
+  /// detail screen it is the detail's plain black row.
+  static Widget _dateRowShuttle(
+    BuildContext flightContext,
+    Animation<double> animation,
+    HeroFlightDirection direction,
+    BuildContext fromHeroContext,
+    BuildContext toHeroContext,
+  ) {
+    final Widget child = (toHeroContext.widget as Hero).child;
+    return direction == HeroFlightDirection.pop
+        ? BlendMask(child: child)
+        : child;
   }
 
   String _capitalize(String s) =>

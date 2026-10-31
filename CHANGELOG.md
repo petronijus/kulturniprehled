@@ -8,6 +8,25 @@ drives the `vX.Y.Z` tags; per-release detail is on the
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-11-01
+
+Page transitions are back.
+
+### Fixed
+- **Transitions between screens are back.** Since 1.2.0 every screen
+  appeared instantly: the cover and the date no longer flew from the agenda
+  card into the event detail. A router update stopped recognising the app as
+  a Material app and silently turned all transitions off; every screen now
+  asks for its transition explicitly, and the date flies along an arc again.
+- **Ticket import (skill): start times in winter.** An event imported from a
+  ticket after the switch to winter time was stored an hour early, because
+  the summer UTC offset was copied onto it. The skill now takes the time as
+  printed on the ticket and computes the offset for that date.
+- **Ticket import (skill): several tickets in one PDF.** When a box office
+  put two tickets on two pages of one PDF, only the first seat and one price
+  were recorded. The skill now counts the pages of every ticket file and
+  records a seat and a cost for each ticket.
+
 ## [1.3.1] - 2026-10-31
 
 The agenda scrolls smoothly again.

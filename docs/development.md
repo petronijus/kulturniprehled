@@ -89,14 +89,16 @@ What the tests cover:
 - **Scripts**: the season validator, the seat watcher's hall parser, the
   claudebox runner's git handling, the PII scan.
 - **Performance** (on demand, not in any lane): `just perf-agenda <device>`
-  scrolls a seeded agenda on a device or emulator in a profile build while
+  scrolls a seeded agenda on an Android device or emulator in a profile build while
   the tilt sensor jitters, and writes build/raster frame percentiles to
   `apps/mobile/build/agenda_*.json`. Absolute numbers need a physical phone.
   Without one, an emulator started with `-no-window -gpu
   swiftshader_indirect` still compares a change against its baseline: the
   software rasteriser makes GPU-heavy effects (blur, blend layers) cost in
   proportion. With `-gpu host`, raster time is pinned to vsync and tells
-  nothing.
+  nothing. Profile builds install as `com.kulturniprehled.kp_mobile.profile`
+  next to the Play app. There is no iOS counterpart: an iOS profile build
+  shares the TestFlight app's bundle id and would replace it.
 - **Not automated**: end-to-end flows on devices. Notifications and
   background sync need a check on a real, locked Android phone
   (`adb shell dumpsys alarm` and `dumpsys activity broadcasts history` show

@@ -52,10 +52,12 @@ TiltSmoother _handHeldTilt() {
       );
     }),
   );
+  _cleanups.add(tilt.dispose);
   return tilt;
 }
 
 final List<Timer> _timers = <Timer>[];
+final List<void Function()> _cleanups = <void Function()>[];
 
 /// A photo-like cover (smooth gradients plus grain) at the size the ingest
 /// skill uploads, encoded once and reused under several URLs so every card
@@ -93,6 +95,7 @@ Future<Uint8List> _coverBytes(int seed) async {
 
 Future<List<CachedEventRow>> _seed(KpDatabase db) async {
   final Directory dir = await Directory.systemTemp.createTemp('kp_perf');
+  _cleanups.add(() => dir.deleteSync(recursive: true));
   final List<Uint8List> covers = <Uint8List>[
     for (int s = 0; s < 4; s++) await _coverBytes(s),
   ];
@@ -170,6 +173,9 @@ void main() {
   tearDownAll(() {
     for (final Timer t in _timers) {
       t.cancel();
+    }
+    for (final void Function() cleanup in _cleanups) {
+      cleanup();
     }
   });
 

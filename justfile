@@ -78,10 +78,14 @@ lint-docs:
 test-dart:
     cd {{mobile}} && flutter test
 
-# Agenda scroll benchmark on a device or emulator (profile build); frame
-# timings land in apps/mobile/build/agenda_*.json. Use a physical phone for
-# absolute numbers — an emulator only compares before/after.
+# Agenda scroll benchmark on an Android device or emulator (profile build);
+# frame timings land in apps/mobile/build/agenda_*.json. Use a physical phone
+# for absolute numbers — an emulator only compares before/after. Android only:
+# an iOS profile build shares the TestFlight app's bundle id and would
+# replace it.
 perf-agenda device:
+    @adb devices | awk 'NR > 1 && $2 == "device" { print $1 }' | grep -qxF '{{device}}' \
+        || { echo "perf-agenda: '{{device}}' is not a connected Android device (adb devices)" >&2; exit 1; }
     cd {{mobile}} && flutter drive --profile --no-dds -d {{device}} \
         --driver=test_driver/perf_driver.dart \
         --target=integration_test/agenda_scroll_perf_test.dart

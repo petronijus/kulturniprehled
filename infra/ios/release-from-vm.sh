@@ -10,8 +10,13 @@
 #   5. Optionally shuts down the macOS VM and restarts Windows
 #
 # Usage:
-#   infra/ios/release-from-vm.sh            # interactive — prompts before VM swap
-#   infra/ios/release-from-vm.sh --no-swap  # skip VM power management (VM already up)
+#   infra/ios/release-from-vm.sh              # swap VMs; ask before swapping back
+#   infra/ios/release-from-vm.sh --swap-back  # swap VMs; swap back without asking
+#   infra/ios/release-from-vm.sh --keep-mac   # swap VMs; leave the macOS VM up
+#   infra/ios/release-from-vm.sh --no-swap    # skip VM power management (VM already up)
+#
+# Without --swap-back or --keep-mac the final question needs a terminal; with
+# none the script says so and leaves the VMs as they are.
 
 # Variables expand locally on purpose and the commands run on the remote
 # hosts, where ~ in REPO_DIR expands to the remote home.
@@ -27,12 +32,36 @@ MAC_HOST="petronijus@192.0.2.154"
 REPO_DIR="~/Documents/Dev/kulturniprehled"
 APPLE_ID="petronijus@example.com"
 API_BASE="https://kulturniprehled.example.com"
-NO_SWAP="${1:-}"
+VM_STOP_TIMEOUT=300   # seconds a VM gets to power off before the script gives up
 ##############################################################################
 
 info()  { printf '\033[1;34m→ %s\033[0m\n' "$*"; }
 ok()    { printf '\033[1;32m✓ %s\033[0m\n' "$*"; }
 die()   { printf '\033[1;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
+
+NO_SWAP=""
+SWAP_BACK=""   # yes | no | empty = ask at the end
+for arg in "$@"; do
+  case "$arg" in
+    --no-swap) NO_SWAP="--no-swap" ;;
+    --swap-back) SWAP_BACK=yes ;;
+    --keep-mac) SWAP_BACK=no ;;
+    *) die "unknown argument: $arg (see the usage at the top of $0)" ;;
+  esac
+done
+
+# Every ssh below would otherwise read this script's stdin and swallow the
+# answer meant for the final question; the caller's stdin stays on fd 3.
+exec 3<&0 </dev/null
+
+wait_stopped() {
+  local vm=$1 waited=0
+  until [[ "$(ssh "$PVE_HOST" "qm status $vm" | awk '{print $2}')" == "stopped" ]]; do
+    ((waited += 5))
+    ((waited <= VM_STOP_TIMEOUT)) || die "VM $vm did not stop within ${VM_STOP_TIMEOUT}s"
+    sleep 5
+  done
+}
 
 ### 0. VM power management ###################################################
 if [[ "$NO_SWAP" != "--no-swap" ]]; then
@@ -47,9 +76,7 @@ if [[ "$NO_SWAP" != "--no-swap" ]]; then
       info "Shutting down Windows VM (graceful, via guest agent)..."
       ssh "$PVE_HOST" "qm shutdown $WIN_VM_ID --timeout 120"
       info "Waiting for Windows VM to stop..."
-      until [[ "$(ssh "$PVE_HOST" "qm status $WIN_VM_ID" | awk '{print $2}')" == "stopped" ]]; do
-        sleep 5
-      done
+      wait_stopped "$WIN_VM_ID"
       ok "Windows VM stopped"
     fi
     info "Starting macOS VM..."
@@ -147,14 +174,27 @@ ok "Upload complete — ASC will process in ~5-15 min, then Družina auto-distri
 
 ### 7. Swap VMs back (optional) ##############################################
 if [[ "$NO_SWAP" != "--no-swap" ]]; then
-  read -rp "Shut down macOS VM and start Windows? [y/N] " answer
-  if [[ "$answer" =~ ^[Yy]$ ]]; then
+  if [[ -z "$SWAP_BACK" ]]; then
+    answer=""
+    if [[ -t 3 ]]; then
+      read -r -u 3 -p "Shut down macOS VM and start Windows? [y/N] " answer || true
+      [[ "$answer" =~ ^[Yy]$ ]] && SWAP_BACK=yes || SWAP_BACK=no
+    elif read -r -u 3 answer && [[ -n "$answer" ]]; then
+      [[ "$answer" =~ ^[Yy]$ ]] && SWAP_BACK=yes || SWAP_BACK=no
+    else
+      printf '\033[1;33m! No terminal to ask on: the macOS VM stays up and Windows stays off.\033[0m\n'
+      printf '  Swap back by hand, or pass --swap-back / --keep-mac next time.\n'
+      SWAP_BACK=no
+    fi
+  fi
+  if [[ "$SWAP_BACK" == yes ]]; then
     info "Shutting down macOS VM..."
-    ssh "$MAC_HOST" 'sudo shutdown -h now' 2>/dev/null || true
-    sleep 10
-    until [[ "$(ssh "$PVE_HOST" "qm status $MAC_VM_ID" | awk '{print $2}')" == "stopped" ]]; do
-      sleep 5
-    done
+    # macOS ignores the ACPI power button, so the VM is stopped from inside.
+    # The connection drops as the VM goes down; wait_stopped is the check.
+    op-cache "sudo server-mac" password \
+      | ssh "$MAC_HOST" 'sudo -S -p "" shutdown -h now' >/dev/null 2>&1 || true
+    wait_stopped "$MAC_VM_ID"
+    ok "macOS VM stopped"
     info "Starting Windows VM..."
     ssh "$PVE_HOST" "qm start $WIN_VM_ID"
     ok "Windows VM starting"

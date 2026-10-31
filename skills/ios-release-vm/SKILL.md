@@ -169,4 +169,6 @@ Tell the user (in Czech):
 - Proxmox: `root@192.0.2.100` (VM 108 = macOS, VM 106 = Windows)
 - Signing: manual, `Apple Distribution: Petr Parkan Janda (YOURTEAMID)`,
   profile `KP Distribution`
-- Shell script version: `infra/ios/release-from-vm.sh`
+- Shell script version: `infra/ios/release-from-vm.sh` — `--swap-back` or
+  `--keep-mac` decides the swap back without a terminal (`--no-swap` skips
+  VM power management); tested by `infra/ios/test_release_from_vm.sh`

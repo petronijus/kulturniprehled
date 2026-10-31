@@ -109,6 +109,7 @@ test-scripts:
     python3 infra/claudebox/test_seat_watch.py
     python3 infra/claudebox/test_session_settings.py
     bash infra/claudebox/test_lib.sh
+    bash infra/ios/test_release_from_vm.sh
 
 # ── full gate ────────────────────────────────────────────────────────────
 

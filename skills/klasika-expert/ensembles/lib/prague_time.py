@@ -16,14 +16,23 @@ Venue stamps come in three flavours and each needs its own call:
 
 Emitted stamps always carry an explicit offset, so whoever parses them next
 cannot repeat the guess.
+
+The same guess bit the ticket ingest: the model wrote the offset of a ticket's
+start time by hand, copied the summer `+02:00` of the skill's example, and
+put the 2026-10-31 opera an hour early. Skills that start from a wall-clock
+reading call the command line instead of writing an offset:
+
+    python3 prague_time.py wall-clock "2026-10-31 19:00" [Europe/Prague]
+    → 2026-10-31T19:00:00+01:00
 """
 
 from __future__ import annotations
 
 import html
 import re
-from datetime import datetime
-from zoneinfo import ZoneInfo
+import sys
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 PRAGUE = ZoneInfo("Europe/Prague")
 
@@ -56,3 +65,47 @@ def stamp(raw: str, *, trust_offset: bool = True) -> str | None:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=PRAGUE)
     return parsed.isoformat()
+
+
+def wall_clock(text: str, tz_name: str = "Europe/Prague") -> str:
+    """ISO stamp with the right offset for a wall-clock reading in `tz_name`.
+
+    `text` is a local date and time without any offset ("2026-10-31 19:00" or
+    "2026-10-31T19:00"); one with an offset is refused, since the point is
+    that nobody writes the offset by hand. A time that does not exist on that
+    day (inside the spring-forward gap) is refused rather than shifted.
+    """
+
+    try:
+        naive = datetime.fromisoformat(text.strip())
+    except ValueError as error:
+        raise ValueError(f"not a local date and time: {text!r}") from error
+    if naive.tzinfo is not None:
+        raise ValueError(f"give the wall-clock time without an offset: {text!r}")
+    try:
+        zone = ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, ValueError) as error:
+        raise ValueError(f"unknown time zone: {tz_name!r}") from error
+    local = naive.replace(tzinfo=zone)
+    if local.astimezone(timezone.utc).astimezone(zone).replace(tzinfo=None) != naive:
+        raise ValueError(f"{text!r} does not exist in {tz_name} (clocks skip it)")
+    return local.isoformat()
+
+
+def _main(argv: list[str]) -> int:
+    if len(argv) not in (2, 3) or argv[0] != "wall-clock":
+        print(
+            "usage: prague_time.py wall-clock 'YYYY-MM-DD HH:MM' [IANA zone]",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        print(wall_clock(*argv[1:]))
+    except ValueError as error:
+        print(f"prague_time: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(_main(sys.argv[1:]))

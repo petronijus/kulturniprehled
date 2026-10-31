@@ -183,7 +183,22 @@ The cover / venue image URLs are PATCH-ed in step 6.5 after we have
 an `EVENT_ID` to upload under, so the POST below only sends the
 address + notes; the URL fields stay null for one frame.
 
+**Never write a UTC offset by hand.** Take the start and the departure as
+the wall-clock times the ticket and step 4 give, and let the time helper add
+the offset the zone has *on that date*. A hand-written offset is how the
+2026-10-31 opera landed an hour early: the summer `+02:00` was copied onto a
+date after the switch to winter time.
+
 ```bash
+PRAGUE_TIME=~/Documents/Dev/kulturniprehled/skills/klasika-expert/ensembles/lib/prague_time.py
+EVENT_STARTS_AT_ISO=$(python3 "$PRAGUE_TIME" wall-clock "$EVENT_STARTS_LOCAL" "$EVENT_TIMEZONE") \
+  || { echo "start time rejected: $EVENT_STARTS_LOCAL ($EVENT_TIMEZONE)"; exit 1; }
+EVENT_DEPARTURE_AT_ISO=""
+if [ -n "$EVENT_DEPARTURE_LOCAL" ]; then
+  EVENT_DEPARTURE_AT_ISO=$(python3 "$PRAGUE_TIME" wall-clock "$EVENT_DEPARTURE_LOCAL" "$EVENT_TIMEZONE") \
+    || { echo "departure time rejected: $EVENT_DEPARTURE_LOCAL ($EVENT_TIMEZONE)"; exit 1; }
+fi
+
 EVENT_RESPONSE=$(curl -fsS -A 'kp-skill/1.0' \
   -H "Authorization: Bearer $KP_TOKEN" \
   -H 'Content-Type: application/json' \
@@ -209,9 +224,11 @@ Fields:
 
 - `EVENT_TITLE` — performer / play / film name
 - `EVENT_CATEGORY` — `concert` / `theatre` / `cinema` / `other`
-- `EVENT_STARTS_AT_ISO` — start in ISO 8601 with timezone, e.g.
-  `2026-06-12T20:00:00+02:00`
-- `EVENT_TIMEZONE` — IANA tz, e.g. `Europe/Prague`
+- `EVENT_STARTS_LOCAL` — the start exactly as the ticket prints it, as a
+  wall-clock time without an offset: `2026-06-12 20:00`.
+  `EVENT_STARTS_AT_ISO` is derived from it above
+  (`2026-06-12T20:00:00+02:00` in summer, `+01:00` in winter).
+- `EVENT_TIMEZONE` — IANA tz of the venue, e.g. `Europe/Prague`
 - `EVENT_NOTES` — Czech-formatted: program (or "Program zatím
   nezveřejněn"), seat info, departure time + transit hint. **Do not
   include a `Místo:` block** — venue is rendered separately on mobile
@@ -220,11 +237,12 @@ Fields:
 - `EVENT_VENUE_ADDRESS` — full venue address as a single string,
   e.g. `Rudolfinum, Alšovo nábřeží 12, 110 00 Praha 1`. **Required**
   for the "Mapa" button to work.
-- `EVENT_DEPARTURE_AT_ISO` — ISO 8601 of when the user needs to
-  leave home to arrive 15 min before the show, computed in step 4
-  from journey time. The mobile app fires a "leave in 10 min"
-  local notification 10 minutes before this timestamp. Leave empty
-  if journey lookup failed; the notification just gets skipped.
+- `EVENT_DEPARTURE_LOCAL` — wall-clock time the user needs to leave
+  home to arrive 15 min before the show, computed in step 4 from
+  journey time (`2026-06-12 19:20`); `EVENT_DEPARTURE_AT_ISO` is
+  derived from it above. The mobile app fires a "leave in 10 min"
+  local notification 10 minutes before it. Leave empty if the journey
+  lookup failed; the notification just gets skipped.
 
 ### 6.5. Upload resized cover + venue → PATCH event
 

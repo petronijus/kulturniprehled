@@ -124,8 +124,11 @@ if [[ "$BUILD_EXIT" != "0" ]]; then
   die "IPA build failed (exit $BUILD_EXIT) — see log above"
 fi
 
-IPA_PATH="$REPO_DIR/apps/mobile/build/ios/ipa/Kulturni Prehled.ipa"
-ssh "$MAC_HOST" "test -f '$IPA_PATH'" || die "IPA not found at expected path"
+# Relative to the repo, after a cd: REPO_DIR starts with ~, which the remote
+# shell does not expand inside quotes, so a quoted absolute path never
+# matches.
+IPA_PATH="apps/mobile/build/ios/ipa/Kulturni Prehled.ipa"
+ssh "$MAC_HOST" "cd $REPO_DIR && test -f '$IPA_PATH'" || die "IPA not found at $REPO_DIR/$IPA_PATH"
 ok "IPA built"
 
 ### 6. Upload to App Store Connect ###########################################
@@ -133,7 +136,7 @@ info "Uploading to App Store Connect..."
 ALTOOL_PW=$(op-cache "Kulturni prehled Apple ID app-specific password" credential)
 
 ssh "$MAC_HOST" "bash -lc '
-  xcrun altool --upload-app \
+  cd $REPO_DIR && xcrun altool --upload-app \
     -f \"$IPA_PATH\" \
     -t ios \
     -u $APPLE_ID \

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'package:kp_mobile/core/routing/app_router.dart';
 import 'package:kp_mobile/core/widgets/date_row.dart';
@@ -73,6 +74,36 @@ Finder _inFlight(Type type) => find.byElementPredicate((Element element) {
   return !underHero;
 }, description: '$type in a hero flight');
 
+/// The app through its own router, signed in, with one agenda event.
+Future<void> _pumpApp(WidgetTester tester) async {
+  final KpDatabase db = buildInMemoryDatabase();
+  addTearDown(db.close);
+  final ProviderContainer container = ProviderContainer(
+    overrides: <Override>[
+      authControllerProvider.overrideWith(_SignedIn.new),
+      kpDatabaseProvider.overrideWith((ref) => db),
+      agendaProvider.overrideWith(
+        (ref) => Stream<List<CachedEventRow>>.value(<CachedEventRow>[_event]),
+      ),
+      syncControllerProvider.overrideWith(_IdleSyncController.new),
+      eventsRepositoryProvider.overrideWith((ref) => _StubEventsRepository(db)),
+      outboxConflictStreamProvider.overrideWith(
+        (ref) => const Stream<OutboxConflict>.empty(),
+      ),
+    ],
+  );
+  addTearDown(container.dispose);
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp.router(
+        routerConfig: container.read(appRouterProvider),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUpAll(() async => initializeDateFormatting('cs'));
 
@@ -81,34 +112,7 @@ void main() {
   testWidgets('cover and date row fly from the agenda to the detail', (
     tester,
   ) async {
-    final KpDatabase db = buildInMemoryDatabase();
-    addTearDown(db.close);
-    final ProviderContainer container = ProviderContainer(
-      overrides: <Override>[
-        authControllerProvider.overrideWith(_SignedIn.new),
-        kpDatabaseProvider.overrideWith((ref) => db),
-        agendaProvider.overrideWith(
-          (ref) => Stream<List<CachedEventRow>>.value(<CachedEventRow>[_event]),
-        ),
-        syncControllerProvider.overrideWith(_IdleSyncController.new),
-        eventsRepositoryProvider.overrideWith(
-          (ref) => _StubEventsRepository(db),
-        ),
-        outboxConflictStreamProvider.overrideWith(
-          (ref) => const Stream<OutboxConflict>.empty(),
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp.router(
-          routerConfig: container.read(appRouterProvider),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await _pumpApp(tester);
 
     await tester.tap(find.text('Sokolov'));
     await tester.pump();
@@ -121,5 +125,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(_inFlight(LocalFirstImage), findsNothing);
     expect(find.byType(EventDetailScreen), findsOneWidget);
+  });
+
+  testWidgets('the logo menu shows the installed version and build', (
+    tester,
+  ) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'Kulturní Přehled',
+      packageName: 'com.kulturniprehled.kp_mobile',
+      version: '1.3.2',
+      buildNumber: '25',
+      buildSignature: '',
+    );
+    await _pumpApp(tester);
+
+    await tester.tap(find.image(const AssetImage('assets/brand/kp_logo.png')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kulturní Přehled 1.3.2 (25)'), findsOneWidget);
   });
 }

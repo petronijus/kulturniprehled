@@ -17,6 +17,7 @@ import 'package:kp_mobile/features/events/past_agenda_screen.dart';
 import 'package:kp_mobile/features/stats/stats_replay_provider.dart';
 import 'package:kp_mobile/features/stats/stats_screen.dart';
 import 'package:kp_mobile/features/sync/sync_controller.dart';
+import 'package:kp_mobile/features/system/app_version.dart';
 import 'package:kp_mobile/features/tickets/ticket_viewer_screen.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_replay_provider.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_screen.dart';
@@ -263,7 +264,29 @@ class _HomeShellState extends ConsumerState<_HomeShell>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Odhlásit?'),
-        content: const Text('Odhlásí tě z účtu Kulturní Přehled.'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text('Odhlásí tě z účtu Kulturní Přehled.'),
+            const SizedBox(height: 16),
+            Consumer(
+              builder: (BuildContext context, WidgetRef ref, Widget? _) {
+                final String version = switch (ref.watch(appVersionProvider)) {
+                  AsyncData<String>(:final String value) => value,
+                  AsyncError<String>() => '?',
+                  _ => '…',
+                };
+                return Text(
+                  'Kulturní Přehled $version',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),

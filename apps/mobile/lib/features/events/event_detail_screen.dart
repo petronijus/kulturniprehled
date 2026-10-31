@@ -301,6 +301,10 @@ class _EventDetailBody extends StatelessWidget {
             children: <Widget>[
               Hero(
                 tag: 'daterow-${event.id}',
+                // Material's arc, which go_router's navigators no longer
+                // supply (see app_router.dart).
+                createRectTween: (begin, end) =>
+                    MaterialRectArcTween(begin: begin, end: end),
                 child: Material(
                   type: MaterialType.transparency,
                   child: DateRow(

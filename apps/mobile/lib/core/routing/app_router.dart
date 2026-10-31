@@ -21,6 +21,27 @@ import 'package:kp_mobile/features/tickets/ticket_viewer_screen.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_replay_provider.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_screen.dart';
 
+/// Every route asks for a [MaterialPage] by name. go_router 18 picks the page
+/// type by looking for `MaterialApp` from `package:material_ui`, which is not
+/// the `MaterialApp` this app is built on (`package:flutter/material.dart`);
+/// the lookup fails and every route silently falls back to a
+/// `NoTransitionPage` — no page transitions and no hero flights. Asking
+/// explicitly keeps the transitions with the app's
+/// [PageTransitionsTheme] whatever the lookup decides.
+GoRouterPageBuilder _materialPage(
+  Widget Function(BuildContext context, GoRouterState state) build,
+) =>
+    (BuildContext context, GoRouterState state) => MaterialPage<void>(
+      key: state.pageKey,
+      name: state.name ?? state.path,
+      arguments: <String, String>{
+        ...state.pathParameters,
+        ...state.uri.queryParameters,
+      },
+      restorationId: state.pageKey.value,
+      child: build(context, state),
+    );
+
 final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
   final Listenable refresh = ValueNotifier<AuthSession?>(
     ref.read(authControllerProvider).session,
@@ -44,7 +65,10 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: <RouteBase>[
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/login',
+        pageBuilder: _materialPage((context, state) => const LoginScreen()),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
             _HomeShell(navigationShell: navigationShell),
@@ -53,34 +77,46 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             routes: <RouteBase>[
               GoRoute(
                 path: '/agenda',
-                builder: (context, state) => const AgendaScreen(),
+                pageBuilder: _materialPage(
+                  (context, state) => const AgendaScreen(),
+                ),
                 routes: <RouteBase>[
                   GoRoute(
                     path: 'past',
-                    builder: (context, state) => const PastAgendaScreen(),
+                    pageBuilder: _materialPage(
+                      (context, state) => const PastAgendaScreen(),
+                    ),
                   ),
                   GoRoute(
                     path: 'events/:eventId',
-                    builder: (context, state) => EventDetailScreen(
-                      eventId: state.pathParameters['eventId']!,
+                    pageBuilder: _materialPage(
+                      (context, state) => EventDetailScreen(
+                        eventId: state.pathParameters['eventId']!,
+                      ),
                     ),
                     routes: <RouteBase>[
                       GoRoute(
                         path: 'edit',
-                        builder: (context, state) => EditEventScreen(
-                          eventId: state.pathParameters['eventId']!,
+                        pageBuilder: _materialPage(
+                          (context, state) => EditEventScreen(
+                            eventId: state.pathParameters['eventId']!,
+                          ),
                         ),
                       ),
                       GoRoute(
                         path: 'tickets/:ticketId',
-                        builder: (context, state) => TicketViewerScreen(
-                          ticketId: state.pathParameters['ticketId']!,
+                        pageBuilder: _materialPage(
+                          (context, state) => TicketViewerScreen(
+                            ticketId: state.pathParameters['ticketId']!,
+                          ),
                         ),
                       ),
                       GoRoute(
                         path: 'costs/new',
-                        builder: (context, state) => CostEditorScreen(
-                          eventId: state.pathParameters['eventId']!,
+                        pageBuilder: _materialPage(
+                          (context, state) => CostEditorScreen(
+                            eventId: state.pathParameters['eventId']!,
+                          ),
                         ),
                       ),
                     ],
@@ -93,7 +129,9 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             routes: <RouteBase>[
               GoRoute(
                 path: '/month',
-                builder: (context, state) => const CalendarScreen(),
+                pageBuilder: _materialPage(
+                  (context, state) => const CalendarScreen(),
+                ),
               ),
             ],
           ),
@@ -101,7 +139,9 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             routes: <RouteBase>[
               GoRoute(
                 path: '/watchlist',
-                builder: (context, state) => const WatchlistScreen(),
+                pageBuilder: _materialPage(
+                  (context, state) => const WatchlistScreen(),
+                ),
               ),
             ],
           ),
@@ -109,7 +149,9 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
             routes: <RouteBase>[
               GoRoute(
                 path: '/stats',
-                builder: (context, state) => const StatsScreen(),
+                pageBuilder: _materialPage(
+                  (context, state) => const StatsScreen(),
+                ),
               ),
             ],
           ),

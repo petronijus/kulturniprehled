@@ -56,6 +56,18 @@ class _BlurInTextState extends State<BlurInText>
   late AnimationController _ctrl;
   late int _totalMs;
 
+  /// Shaped text and per-glyph geometry, shared by every paint. Shaping in
+  /// `paint()` re-laid the title — and one painter per animating glyph —
+  /// on every frame, which on a parallax list is every frame of a scroll.
+  _TitleLayout? _layout;
+
+  _TitleLayout get _titleLayout => _layout ??= _TitleLayout(
+    text: widget.text,
+    style: widget.style,
+    maxLines: widget.maxLines,
+    textAlign: widget.textAlign ?? TextAlign.start,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -99,6 +111,13 @@ class _BlurInTextState extends State<BlurInText>
       oldWidget.restartTrigger?.removeListener(_replay);
       widget.restartTrigger?.addListener(_replay);
     }
+    if (oldWidget.text != widget.text ||
+        oldWidget.style != widget.style ||
+        oldWidget.maxLines != widget.maxLines ||
+        oldWidget.textAlign != widget.textAlign) {
+      _layout?.dispose();
+      _layout = null;
+    }
     if (oldWidget.text != widget.text) {
       _ctrl.dispose();
       _initController();
@@ -109,6 +128,7 @@ class _BlurInTextState extends State<BlurInText>
   void dispose() {
     widget.restartTrigger?.removeListener(_replay);
     _ctrl.dispose();
+    _layout?.dispose();
     super.dispose();
   }
 
@@ -137,16 +157,13 @@ class _BlurInTextState extends State<BlurInText>
               builder: (context, _) => CustomPaint(
                 size: Size(constraints.maxWidth, constraints.maxHeight),
                 painter: _BlurInPainter(
-                  text: widget.text,
-                  style: widget.style,
+                  layout: _titleLayout,
                   startBlur: widget.startBlur,
                   perCharStaggerMs: widget.perCharStagger.inMilliseconds
                       .toDouble(),
                   charDurationMs: widget.duration.inMilliseconds.toDouble(),
                   totalMs: _totalMs.toDouble(),
                   animationT: _ctrl.value,
-                  maxLines: widget.maxLines,
-                  textAlign: widget.textAlign ?? TextAlign.start,
                 ),
               ),
             ),
@@ -157,122 +174,186 @@ class _BlurInTextState extends State<BlurInText>
   }
 }
 
+/// One grapheme of the title: where the master painted it and a painter
+/// that redraws it alone.
+class _Glyph {
+  _Glyph({required this.start, required this.rects, required this.painter});
+
+  /// UTF-16 offset of the grapheme; drives its place in the stagger.
+  final int start;
+
+  /// The grapheme's boxes with line height (`BoxHeightStyle.max`), so erasing
+  /// one removes the whole line slice of the master's drawing.
+  final List<Rect> rects;
+
+  /// The grapheme alone, in the full style colour; opacity is applied by the
+  /// layer it is drawn into.
+  final TextPainter painter;
+}
+
+/// The shaped title and its glyphs for one layout width. Built on the first
+/// paint at a width and reused by every frame after it.
+class _TitleLayout {
+  _TitleLayout({
+    required String text,
+    required this.style,
+    required int? maxLines,
+    required TextAlign textAlign,
+  }) : master = TextPainter(
+         text: TextSpan(text: text, style: style),
+         textDirection: TextDirection.ltr,
+         maxLines: maxLines,
+         textAlign: textAlign,
+       );
+
+  final TextStyle style;
+  final TextPainter master;
+  double? _width;
+  List<_Glyph> _glyphs = const <_Glyph>[];
+
+  List<_Glyph> glyphsFor(double width) {
+    master.layout(maxWidth: width);
+    if (_width == width) {
+      return _glyphs;
+    }
+    _disposeGlyphs();
+    _width = width;
+    final String text = master.plainText;
+    final List<_Glyph> glyphs = <_Glyph>[];
+    int start = 0;
+    for (final String grapheme in text.characters) {
+      final int end = start + grapheme.length;
+      final List<Rect> rects = master
+          .getBoxesForSelection(
+            TextSelection(baseOffset: start, extentOffset: end),
+            boxHeightStyle: ui.BoxHeightStyle.max,
+          )
+          .map((ui.TextBox box) => box.toRect())
+          .toList(growable: false);
+      if (rects.isNotEmpty) {
+        glyphs.add(
+          _Glyph(
+            start: start,
+            rects: rects,
+            painter: TextPainter(
+              text: TextSpan(text: grapheme, style: style),
+              textDirection: TextDirection.ltr,
+            )..layout(),
+          ),
+        );
+      }
+      start = end;
+    }
+    _glyphs = glyphs;
+    return glyphs;
+  }
+
+  void _disposeGlyphs() {
+    for (final _Glyph glyph in _glyphs) {
+      glyph.painter.dispose();
+    }
+    _glyphs = const <_Glyph>[];
+  }
+
+  void dispose() {
+    _disposeGlyphs();
+    master.dispose();
+  }
+}
+
 class _BlurInPainter extends CustomPainter {
   _BlurInPainter({
-    required this.text,
-    required this.style,
+    required this.layout,
     required this.startBlur,
     required this.perCharStaggerMs,
     required this.charDurationMs,
     required this.totalMs,
     required this.animationT,
-    required this.maxLines,
-    required this.textAlign,
   });
 
-  final String text;
-  final TextStyle style;
+  final _TitleLayout layout;
   final double startBlur;
   final double perCharStaggerMs;
   final double charDurationMs;
   final double totalMs;
   final double animationT;
-  final int? maxLines;
-  final TextAlign textAlign;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final TextPainter master = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
-      maxLines: maxLines,
-      textAlign: textAlign,
-    )..layout(maxWidth: size.width);
+    final List<_Glyph> glyphs = layout.glyphsFor(size.width);
+    final TextPainter master = layout.master;
 
     if (animationT >= 1.0) {
       // Fast path once everything has finished animating in.
       master.paint(canvas, Offset.zero);
       return;
     }
+    if (animationT <= 0) {
+      // Nothing has started: the title is fully transparent. Erasing glyph
+      // boxes from the master would leave the parts of letters that
+      // overhang their box (the hook of "f") faintly visible.
+      return;
+    }
 
-    // Composite everything into one offscreen layer so BlendMode.clear can
-    // erase parts of the master after we draw it (clear has no effect when
-    // drawing straight to the screen layer).
-    final Rect bounds = Offset.zero & size;
-    canvas.saveLayer(bounds, Paint());
+    // Composite everything into one offscreen layer so the clear / dstOut
+    // passes below act on the master's drawing only (they would punch
+    // through to the screen otherwise).
+    canvas.saveLayer(Offset.zero & size, Paint());
     master.paint(canvas, Offset.zero);
 
-    int unitOffset = 0;
-    int i = 0;
-    while (i < text.length) {
-      final String slice = text.substring(i).characters.first.toString();
-      final int sliceLen = slice.length;
-      final int start = unitOffset;
-      final int end = unitOffset + sliceLen;
-      unitOffset = end;
-      i += sliceLen;
-
-      final double startFrac = (start * perCharStaggerMs) / totalMs;
+    final Paint erase = Paint()..blendMode = BlendMode.clear;
+    for (final _Glyph glyph in glyphs) {
+      final double startFrac = (glyph.start * perCharStaggerMs) / totalMs;
       final double endFrac = startFrac + (charDurationMs / totalMs);
-      final double t;
-      if (animationT <= startFrac) {
-        t = 0;
-      } else if (animationT >= endFrac) {
-        t = 1;
-      } else {
-        t = (animationT - startFrac) / (endFrac - startFrac);
-      }
       // Already-finished chars stay as the master painted them — no
       // baseline shift possible because we don't re-render them.
-      if (t >= 1.0) continue;
+      if (animationT >= endFrac) continue;
 
-      final double eased = Curves.easeOutCubic.transform(t.clamp(0.0, 1.0));
-      final double opacity = eased;
-      final double blur = startBlur * (1 - eased);
+      if (animationT <= startFrac) {
+        // Not started: fully transparent. Erasing is the whole job; drawing
+        // the glyph at zero opacity through a blur layer would cost a layer
+        // for nothing.
+        for (final Rect rect in glyph.rects) {
+          canvas.drawRect(rect, erase);
+        }
+        continue;
+      }
 
-      // Use BoxHeightStyle.max so the box covers the line bounds, not just
-      // the glyph extents — that way our redraw can erase + redraw the
-      // whole line slice for this char without leaving stale pixels above
-      // or below the glyph.
-      final List<ui.TextBox> boxes = master.getBoxesForSelection(
-        TextSelection(baseOffset: start, extentOffset: end),
-        boxHeightStyle: ui.BoxHeightStyle.max,
-      );
-      if (boxes.isEmpty) continue;
+      final double t = (animationT - startFrac) / (endFrac - startFrac);
+      final double opacity = Curves.easeOutCubic.transform(t);
+      final double blur = startBlur * (1 - opacity);
 
-      for (final ui.TextBox box in boxes) {
-        final Rect rect = box.toRect();
-        // Erase the master's drawing of this char from the layer.
-        canvas.drawRect(rect, Paint()..blendMode = BlendMode.clear);
-        // Redraw the same char with current blur + opacity. The glyph's
-        // own TextPainter has the same font/style/line height as master,
-        // and we paint at the master-measured line top — baseline aligns
-        // exactly with what master drew for the surrounding chars.
-        final TextStyle charStyle = style.copyWith(
-          color: (style.color ?? const Color(0xFF000000)).withValues(
-            alpha: opacity,
-          ),
-        );
-        final TextPainter glyph = TextPainter(
-          text: TextSpan(text: slice, style: charStyle),
-          textDirection: TextDirection.ltr,
-        )..layout();
-
-        if (blur > 0.5) {
-          final Rect layerRect = rect.inflate(blur * 4);
-          canvas.saveLayer(
-            layerRect,
-            Paint()
-              ..imageFilter = ui.ImageFilter.blur(
-                sigmaX: blur,
-                sigmaY: blur,
-                tileMode: TileMode.decal,
-              ),
-          );
-          glyph.paint(canvas, Offset(rect.left, rect.top));
+      if (blur > 0.5) {
+        for (final Rect rect in glyph.rects) {
+          // Erase the master's drawing of this char, then redraw it blurred
+          // and faded. Blur is linear, so fading the layer equals fading
+          // the glyph before blurring it. The glyph's painter has the
+          // master's font, style and line height, painted at the
+          // master-measured line top, so its baseline matches the master's.
+          canvas
+            ..drawRect(rect, erase)
+            ..saveLayer(
+              rect.inflate(blur * 4),
+              Paint()
+                ..color = Color.fromRGBO(0, 0, 0, opacity)
+                ..imageFilter = ui.ImageFilter.blur(
+                  sigmaX: blur,
+                  sigmaY: blur,
+                  tileMode: TileMode.decal,
+                ),
+            );
+          glyph.painter.paint(canvas, rect.topLeft);
           canvas.restore();
-        } else {
-          glyph.paint(canvas, Offset(rect.left, rect.top));
+        }
+      } else {
+        // Sharp enough to be the master's own glyph: just fade it in place.
+        // dstOut keeps `dst × (1 − srcAlpha)`, i.e. the master's pixels at
+        // `opacity`, with no layer and no redraw.
+        final Paint fade = Paint()
+          ..blendMode = BlendMode.dstOut
+          ..color = Color.fromRGBO(0, 0, 0, 1 - opacity);
+        for (final Rect rect in glyph.rects) {
+          canvas.drawRect(rect, fade);
         }
       }
     }
@@ -281,7 +362,6 @@ class _BlurInPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BlurInPainter oldDelegate) =>
-      oldDelegate.animationT != animationT ||
-      oldDelegate.text != text ||
-      oldDelegate.style != style;
+      !identical(oldDelegate.layout, layout) ||
+      oldDelegate.animationT != animationT;
 }

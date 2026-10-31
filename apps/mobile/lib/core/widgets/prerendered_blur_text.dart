@@ -49,9 +49,14 @@ class _PrerenderedBlurTextState extends State<PrerenderedBlurText> {
   }
 
   void _resolve() {
+    // Resolved against the inherited text style, as a [Text] would be.
+    final DefaultTextStyle inherited = DefaultTextStyle.of(context);
+    final TextStyle style = widget.style.inherit
+        ? inherited.style.merge(widget.style)
+        : widget.style;
     final _CacheKey key = _CacheKey(
       text: widget.text,
-      style: widget.style,
+      style: style,
       sigma: widget.sigma,
       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
       textScaler: MediaQuery.textScalerOf(context),
@@ -59,8 +64,23 @@ class _PrerenderedBlurTextState extends State<PrerenderedBlurText> {
     if (key == _key) {
       return;
     }
+    _BlurredText? next;
+    try {
+      next = _BlurCache.instance.take(key);
+    } on Object catch (error, stack) {
+      // Rasterising can fail (a bitmap beyond the GPU's texture limit at a
+      // large text scale). Report it and fall back to the live filter.
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'kp_mobile widgets',
+          context: ErrorDescription('while pre-rendering "${widget.text}"'),
+        ),
+      );
+    }
     _entry?.dispose();
-    _entry = _BlurCache.instance.take(key);
+    _entry = next;
     _key = key;
   }
 
@@ -72,7 +92,16 @@ class _PrerenderedBlurTextState extends State<PrerenderedBlurText> {
 
   @override
   Widget build(BuildContext context) {
-    final _BlurredText entry = _entry!;
+    final _BlurredText? entry = _entry;
+    if (entry == null) {
+      return ImageFiltered(
+        imageFilter: ui.ImageFilter.blur(
+          sigmaX: widget.sigma,
+          sigmaY: widget.sigma,
+        ),
+        child: Text(widget.text, style: widget.style, maxLines: 1),
+      );
+    }
     return Semantics(
       label: widget.text,
       child: CustomPaint(size: entry.layoutSize, painter: _BlurPainter(entry)),
@@ -223,8 +252,12 @@ class _BlurCache {
       ..picture = recorder.endRecording();
     blur.append(text);
     root.append(blur);
-    final ui.Image image = root.toImageSync(bounds, pixelRatio: dpr);
-    root.dispose();
+    final ui.Image image;
+    try {
+      image = root.toImageSync(bounds, pixelRatio: dpr);
+    } finally {
+      root.dispose();
+    }
     return _BlurredText(
       image: image,
       layoutSize: layoutSize,

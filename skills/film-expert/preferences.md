@@ -37,9 +37,9 @@ and its director, not by genre.
 
 ## Favourite directors / cycles
 
-Cycles he names: the French New Wave, New Hollywood, "and similar" periods of world
-cinema. No list of directors yet: use judgement about whom a film student and Criterion
-viewer respects, and say so in the reasoning.
+Examples of what he means: the French New Wave, New Hollywood. They stand for all the
+important works and periods of world cinema, which cannot all be listed: judge any film by
+that standard. No list of directors is needed for that.
 
 <!-- TODO(Petr): režiséři, jejichž retrospektivu si nenecháš ujít; kina, jejichž
 dramaturgii věříš naslepo. -->

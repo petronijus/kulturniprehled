@@ -7,16 +7,26 @@ are filled.**
 
 ## Hard preferences
 
-<!-- TODO(Petr): fill in. Examples of the shape:
-- **Veto**: dabing, mainstreamové blockbustery bez důvodu, …
-- **Strong yes**: artová distribuce, restaurované klasiky, projekce
-  s živou hudbou, režisérské Q&A, …
-- Titulky vs. dabing: ?
--->
+Petr studied film. In his words, condensed:
+
+- **Only films, and only ones of significant artistic value:** quality work by respected
+  directors, intellectual cinema. Nothing is recommended just because it is the best of a
+  thin week: no pick is better than a mediocre one.
+- **The pure form:** above all the original language with subtitles. Dubbing is the
+  opposite of what he is after.
+- **How he watches:** he goes to club cinemas, and chooses films by director or by period,
+  such as the French New Wave or New Hollywood.
+- **Touchstone:** the Criterion Collection, for restoring and offering truly fine works
+  of world cinema. A film that belongs in that company is the right kind.
+- **Not for him:** horror (not preferred, though not an absolute veto). On TV, also series,
+  shows and mainstream entertainment, since only films of this kind interest him.
 
 ## Genre / format weights
 
-<!-- TODO(Petr): fill in, multiplier 0.0–1.0. Suggested axes:
+No preference by genre, apart from horror above. Rank by the artistic standing of the film
+and its director, not by genre.
+
+<!-- TODO(Petr): for cinema visits, multiplier 0.0–1.0, not discussed yet:
 - artová distribuce (novinky): ?
 - restaurované klasiky / retrospektivy: ?
 - dokument: ?
@@ -27,8 +37,12 @@ are filled.**
 
 ## Favourite directors / cycles
 
-<!-- TODO(Petr): fill in — režiséři, jejichž retrospektivu si nenecháš
-ujít; kina, jejichž dramaturgii věříš naslepo. -->
+Cycles he names: the French New Wave, New Hollywood, "and similar" periods of world
+cinema. No list of directors yet: use judgement about whom a film student and Criterion
+viewer respects, and say so in the reasoning.
+
+<!-- TODO(Petr): režiséři, jejichž retrospektivu si nenecháš ujít; kina, jejichž
+dramaturgii věříš naslepo. -->
 
 ## Price awareness
 

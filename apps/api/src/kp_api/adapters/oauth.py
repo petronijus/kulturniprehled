@@ -40,12 +40,17 @@ class GoogleIdTokenVerifier:
         self._request = request or google_requests.Request()
 
     def verify(self, id_token: str) -> GoogleIdentity:
+        # Without an audience, google-auth skips the `aud` check and would
+        # accept an ID token Google issued to *any* app the user signed in
+        # to — a token-substitution hole. Fail closed instead.
+        audiences = self._settings.google_oauth_audiences
+        if not audiences:
+            raise OAuthError("Google sign-in is not configured on this server")
         try:
-            audiences = self._settings.google_oauth_audiences
             claims = google_id_token.verify_oauth2_token(  # type: ignore[no-untyped-call]
                 id_token,
                 self._request,
-                audience=audiences or None,
+                audience=audiences,
             )
         except ValueError as exc:
             raise OAuthError(f"invalid id token: {exc}") from exc

@@ -206,25 +206,41 @@ class TicketCodesScreen extends ConsumerStatefulWidget {
 }
 
 class _TicketCodesScreenState extends ConsumerState<TicketCodesScreen> {
-  late final PageController _controller = PageController(
-    initialPage: widget.initialIndex,
-  );
-  late final Future<List<TicketCodeEntry>> _entries = ref
-      .read(kpDatabaseProvider)
-      .ticketsForEvent(widget.eventId)
-      .then(ticketCodeEntries);
-  int? _index;
+  // Created once the entries are known: a PageView built while the list is
+  // still empty settles on page 0 and drops `initialIndex`, so the second
+  // ticket would open as the first.
+  PageController? _controller;
+  List<TicketCodeEntry>? _entries;
+  int _index = 0;
 
   @override
   void initState() {
     super.initState();
     unawaited(_setBrightness(full: true));
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final List<TicketCodeEntry> entries = ticketCodeEntries(
+      await ref.read(kpDatabaseProvider).ticketsForEvent(widget.eventId),
+    );
+    if (!mounted) {
+      return;
+    }
+    final int index = entries.isEmpty
+        ? 0
+        : widget.initialIndex.clamp(0, entries.length - 1);
+    setState(() {
+      _entries = entries;
+      _index = index;
+      _controller = PageController(initialPage: index);
+    });
   }
 
   @override
   void dispose() {
     unawaited(_setBrightness(full: false));
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
@@ -243,62 +259,55 @@ class _TicketCodesScreenState extends ConsumerState<TicketCodesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final List<TicketCodeEntry> entries = _entries ?? const <TicketCodeEntry>[];
+    final PageController? controller = _controller;
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: FutureBuilder<List<TicketCodeEntry>>(
-          future: _entries,
-          builder:
-              (BuildContext context, AsyncSnapshot<List<TicketCodeEntry>> s) {
-                final List<TicketCodeEntry> entries =
-                    s.data ?? const <TicketCodeEntry>[];
-                final int index = _index ?? widget.initialIndex;
-                return Stack(
-                  children: <Widget>[
-                    LayoutBuilder(
-                      builder: (BuildContext context, BoxConstraints box) {
-                        return PageView.builder(
-                          controller: _controller,
-                          itemCount: entries.length,
-                          onPageChanged: (int i) => setState(() => _index = i),
-                          itemBuilder: (BuildContext context, int i) => Center(
-                            child: TicketCodeTile(
-                              entry: entries[i],
-                              maxWidth: box.maxWidth - 32,
-                              // Room for the close button, the digits of a
-                              // linear code, the file name and the counter.
-                              maxHeight: box.maxHeight - 160,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    Positioned(
-                      top: 4,
-                      left: 4,
-                      child: IconButton(
-                        icon: const Icon(Icons.close, color: Colors.black),
-                        onPressed: () => context.pop(),
-                      ),
-                    ),
-                    if (entries.length > 1)
-                      Positioned(
-                        bottom: 24,
-                        left: 0,
-                        right: 0,
-                        child: Text(
-                          '${index + 1} / ${entries.length}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontFamily: 'StackSansHeadline',
-                            fontSize: 14,
-                            color: Colors.black54,
-                          ),
+        child: Stack(
+          children: <Widget>[
+            if (controller != null)
+              LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints box) =>
+                    PageView.builder(
+                      controller: controller,
+                      itemCount: entries.length,
+                      onPageChanged: (int i) => setState(() => _index = i),
+                      itemBuilder: (BuildContext context, int i) => Center(
+                        child: TicketCodeTile(
+                          entry: entries[i],
+                          maxWidth: box.maxWidth - 32,
+                          // Room for the close button, the digits of a
+                          // linear code, the file name and the counter.
+                          maxHeight: box.maxHeight - 160,
                         ),
                       ),
-                  ],
-                );
-              },
+                    ),
+              ),
+            Positioned(
+              top: 4,
+              left: 4,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.black),
+                onPressed: () => context.pop(),
+              ),
+            ),
+            if (entries.length > 1)
+              Positioned(
+                bottom: 24,
+                left: 0,
+                right: 0,
+                child: Text(
+                  '${_index + 1} / ${entries.length}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontFamily: 'StackSansHeadline',
+                    fontSize: 14,
+                    color: Colors.black54,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

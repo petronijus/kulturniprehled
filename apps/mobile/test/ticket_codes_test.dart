@@ -10,62 +10,7 @@ import 'package:kp_mobile/features/tickets/ticket_code.dart';
 import 'package:kp_mobile/features/tickets/ticket_codes_view.dart';
 
 import 'helpers/in_memory_db.dart';
-
-// Payloads produced by the server decoder (`decode_ticket_codes`) for codes
-// printed in a test PDF: module bitmaps, one pixel per module.
-final Map<String, Object?>
-_qrSeat1 = Map<String, Object?>.unmodifiable(<String, Object?>{
-  'format': 'qr',
-  'text': 'SEAT-1',
-  'content_type': 'text',
-  'page': 0,
-  'modules_png_b64':
-      'iVBORw0KGgoAAAANSUhEUgAAABUAAAAVAQAAAACBbJg7AAAAX0lEQVR42gFUAKv/AAEMAAB9BfACyBggAgBwAAIAIAACOKjgAAFUAAD/D/gCxhHIAcIBDQEI0tYAUwvgA/gUGwLeJBgAAYkoAH3yIAMH0hICALVgAgAY4AQ4E1gBAdEGbtQVmvrDrBgAAAAASUVORK5CYII=',
-  'modules_width': 21,
-  'modules_height': 21,
-});
-final Map<String, Object?>
-_qrSeat2 = Map<String, Object?>.unmodifiable(<String, Object?>{
-  'format': 'qr',
-  'text': 'SEAT-2',
-  'content_type': 'text',
-  'page': 0,
-  'modules_png_b64':
-      'iVBORw0KGgoAAAANSUhEUgAAABUAAAAVAQAAAACBbJg7AAAAX0lEQVR42gFUAKv/AAEkAAB9rfAARe0QAgAoAAIAsAACOCDgAAFUAAD/t/gA0ROwASaH8wI3+JgDPFIIAB2fKAD/GsgCAtTYBHwsNgBFENACAOr4AgB5SAQ4BbAAAZ9QAgIZNiM5wMUAAAAASUVORK5CYII=',
-  'modules_width': 21,
-  'modules_height': 21,
-});
-final Map<String, Object?>
-_pdf417 = Map<String, Object?>.unmodifiable(<String, Object?>{
-  'format': 'pdf417',
-  'text': 'PDF417-TICKET-0001',
-  'content_type': 'text',
-  'page': 0,
-  'modules_png_b64':
-      'iVBORw0KGgoAAAANSUhEUgAAAHgAAAAVAQAAAACldRf7AAAAd0lEQVR42mNkWH1dTjXmoIvXrXNCj35eZGJABdj4kn9P/W9gOZWg8wG7PDJgYWDQDDtzMVvxnKbiEwWi1L9UbGqqZlx110vrBSMDMe7xLvZyXCDHlM/XwUCM+necjJdcvZlON/zPIMo9nK1nbfbYNkx/cFKAsHsAuGIlXupybUYAAAAASUVORK5CYII=',
-  'modules_width': 120,
-  'modules_height': 21,
-});
-final Map<String, Object?>
-_code128 = Map<String, Object?>.unmodifiable(<String, Object?>{
-  'format': 'code128',
-  'text': '1234567890128',
-  'content_type': 'text',
-  'page': 0,
-  'modules_png_b64':
-      'iVBORw0KGgoAAAANSUhEUgAAAHsAAAAyAQAAAABU65l2AAAAJUlEQVR42mPUsVVx283qnCN4/DtrgFrYPCYGNDAqMCowKkC8AAC5+gXk/clFeQAAAABJRU5ErkJggg==',
-  'modules_width': 123,
-  'modules_height': 50,
-});
-final Map<String, Object?> _notRedrawn = <String, Object?>{
-  'format': 'other:MaxiCode',
-  'text': 'X',
-  'content_type': 'text',
-  'page': 0,
-  'modules_png_b64': null,
-  'modules_width': 0,
-  'modules_height': 0,
-};
+import 'helpers/ticket_code_fixtures.dart';
 
 final DateTime _base = DateTime.utc(2099);
 
@@ -108,9 +53,7 @@ Future<void> _pumpCarousel(
 
 void main() {
   test('sync payload codes land in the cached row', () {
-    final TicketDto dto = TicketDto.fromMap(
-      _ticketPayload(<Object?>[_qrSeat1]),
-    );
+    final TicketDto dto = TicketDto.fromMap(_ticketPayload(<Object?>[qrSeat1]));
 
     final TicketCode code = TicketCode.listFromJson(dto.codesJson)!.single;
     expect(code.text, 'SEAT-1');
@@ -130,9 +73,9 @@ void main() {
 
   test('entries keep ticket order and skip codes without a redraw', () {
     final List<TicketCodeEntry> entries = ticketCodeEntries(<CachedTicketRow>[
-      _ticket('a', <Map<String, Object?>>[_qrSeat1, _notRedrawn]),
+      _ticket('a', <Map<String, Object?>>[qrSeat1, notRedrawn]),
       _ticket('b', null),
-      _ticket('c', <Map<String, Object?>>[_code128]),
+      _ticket('c', <Map<String, Object?>>[code128Ticket]),
     ]);
 
     expect(
@@ -156,8 +99,8 @@ void main() {
     await _pumpCarousel(
       tester,
       ticketCodeEntries(<CachedTicketRow>[
-        _ticket('first', <Map<String, Object?>>[_qrSeat1]),
-        _ticket('second', <Map<String, Object?>>[_qrSeat2]),
+        _ticket('first', <Map<String, Object?>>[qrSeat1]),
+        _ticket('second', <Map<String, Object?>>[qrSeat2]),
       ]),
     );
 
@@ -178,7 +121,7 @@ void main() {
     await _pumpCarousel(
       tester,
       ticketCodeEntries(<CachedTicketRow>[
-        _ticket('only', <Map<String, Object?>>[_pdf417]),
+        _ticket('only', <Map<String, Object?>>[pdf417Ticket]),
       ]),
     );
 
@@ -194,7 +137,7 @@ void main() {
     await _pumpCarousel(
       tester,
       ticketCodeEntries(<CachedTicketRow>[
-        _ticket('only', <Map<String, Object?>>[_pdf417]),
+        _ticket('only', <Map<String, Object?>>[pdf417Ticket]),
       ]),
     );
 
@@ -212,7 +155,7 @@ void main() {
     await _pumpCarousel(
       tester,
       ticketCodeEntries(<CachedTicketRow>[
-        _ticket('only', <Map<String, Object?>>[_code128]),
+        _ticket('only', <Map<String, Object?>>[code128Ticket]),
       ]),
     );
 
@@ -225,7 +168,7 @@ void main() {
     tearDown(() => db.close());
 
     CachedTicketsCompanion fetched({int version = 2}) => TicketDto.fromMap(
-      _ticketPayload(<Object?>[_qrSeat1])..['version'] = version,
+      _ticketPayload(<Object?>[qrSeat1])..['version'] = version,
     ).toCompanion();
 
     Future<void> seed({

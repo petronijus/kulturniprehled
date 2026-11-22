@@ -23,6 +23,10 @@ import 'package:kp_mobile/features/tickets/ticket_viewer_screen.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_replay_provider.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_screen.dart';
 
+final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'root',
+);
+
 /// Every route asks for a [MaterialPage] by name. go_router 18 picks the page
 /// type by looking for `MaterialApp` from `package:material_ui`, which is not
 /// the `MaterialApp` this app is built on (`package:flutter/material.dart`);
@@ -53,6 +57,7 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
   });
 
   return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: '/agenda',
     refreshListenable: refresh,
     redirect: (BuildContext context, GoRouterState state) {
@@ -107,6 +112,9 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
                       ),
                       GoRoute(
                         path: 'codes',
+                        // Above the shell: no bottom bar or logo over the
+                        // codes while they are held under a scanner.
+                        parentNavigatorKey: _rootNavigatorKey,
                         pageBuilder: _materialPage(
                           (context, state) => TicketCodesScreen(
                             eventId: state.pathParameters['eventId']!,

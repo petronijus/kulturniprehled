@@ -8,6 +8,13 @@ drives the `vX.Y.Z` tags; per-release detail is on the
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-22
+
+### Fixed
+- **Full-screen ticket codes.** Tapping the second ticket's code opened
+  the first one, and the bottom bar and logo covered the code; it now opens
+  on the tapped ticket and fills the screen.
+
 ## [1.4.0] - 2026-11-22
 
 Tickets show their QR and barcodes right in the event detail.

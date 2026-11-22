@@ -21,7 +21,11 @@ from kp_api.adapters.db import get_sessionmaker
 from kp_api.adapters.storage import minio as storage
 from kp_api.domain.enums import ChangeOp
 from kp_api.domain.models import Ticket
-from kp_api.domain.ticket_codes import UnsupportedTicketType, decode_ticket_codes
+from kp_api.domain.ticket_codes import (
+    UnreadableTicket,
+    UnsupportedTicketType,
+    decode_ticket_codes,
+)
 from kp_api.sync.changelog import record_ticket_change
 
 logger = structlog.get_logger("kp_api.ticket_scan")
@@ -29,7 +33,7 @@ logger = structlog.get_logger("kp_api.ticket_scan")
 SWEEP_INTERVAL_SECONDS = 3600.0
 
 
-def _decode_blob(object_key: str, mime_type: str) -> list[dict[str, object]]:
+def _decode_blob(ticket_id: UUID, object_key: str, mime_type: str) -> list[dict[str, object]]:
     data = storage.read_object(object_key)
     try:
         return [code.to_payload() for code in decode_ticket_codes(data, mime_type)]
@@ -37,10 +41,18 @@ def _decode_blob(object_key: str, mime_type: str) -> list[dict[str, object]]:
         # An ICS or other non-visual ticket carries no code; record that it
         # was looked at so it is not rescanned forever.
         return []
+    except UnreadableTicket as exc:
+        # A corrupt file stays corrupt: say so once and record "no codes"
+        # rather than failing it again every hour. Storage and database
+        # errors are not caught here, so those stay NULL and are retried.
+        logger.warning(
+            "ticket_unreadable", ticket_id=str(ticket_id), mime_type=mime_type, error=str(exc)
+        )
+        return []
 
 
-async def _decode(object_key: str, mime_type: str) -> list[dict[str, object]]:
-    return await asyncio.to_thread(_decode_blob, object_key, mime_type)
+async def _decode(ticket_id: UUID, object_key: str, mime_type: str) -> list[dict[str, object]]:
+    return await asyncio.to_thread(_decode_blob, ticket_id, object_key, mime_type)
 
 
 async def _store_codes(
@@ -82,7 +94,7 @@ async def scan_ticket(session: AsyncSession, ticket_id: UUID, *, rescan: bool = 
         object_key, mime_type = ticket.object_key, ticket.mime_type
         # Release the row while the blob is rendered; the write re-reads it.
         await session.rollback()
-        codes = await _decode(object_key, mime_type)
+        codes = await _decode(ticket_id, object_key, mime_type)
         await _store_codes(session, ticket_id, codes)
         return True
     except Exception:

@@ -250,7 +250,7 @@ GET /v1/tickets/{id}/url
 - After an upload the API decodes the QR / barcodes in the file in a
   background task (`kp_api/ticket_scan.py`) and stores them in the ticket's
   `codes` field (`null` = not scanned or scan failed, `[]` = none found;
-  entries `{format, text, content_type, page, modules_png_b64, modules_width, modules_height}`). The ticket
+  entries `{format, text, content_type, page, modules_png_b64, modules_width, modules_height, seat}`). The ticket
   appears twice in sync: once on upload, again with `codes` (payload:
   [sync.md](./sync.md)). A sweep the API starts with itself and repeats
   hourly scans every ticket whose `codes` is still `null` — a scan that

@@ -200,6 +200,25 @@ def _decode_image(image: Image.Image, page: int, seat: str | None) -> list[Ticke
     return codes
 
 
+_MATRIX_FORMATS = frozenset(
+    {"qr", "micro_qr", "rmqr", "aztec", "pdf417", "micro_pdf417", "data_matrix"}
+)
+
+
+def _preferred(page_codes: list[TicketCode]) -> list[TicketCode]:
+    """A page that carries a 2D code (QR, Aztec, …) next to a linear barcode
+    is one ticket printed both ways: keep only the 2D code, so two tickets
+    show as two codes at the door, not four. A 2D code that could not be
+    redrawn does not count — the barcode is then the one to show."""
+
+    drawable_matrix = any(
+        c.format in _MATRIX_FORMATS and c.modules_png is not None for c in page_codes
+    )
+    if not drawable_matrix:
+        return page_codes
+    return [c for c in page_codes if c.format in _MATRIX_FORMATS]
+
+
 def _pdf_pages(data: bytes) -> Iterator[tuple[Image.Image, str | None]]:
     """One rendered page and its text at a time, so a long PDF never holds
     more than one page bitmap in the API's memory."""
@@ -240,7 +259,8 @@ def _raster_pages(data: bytes) -> Iterator[tuple[Image.Image, str | None]]:
 def decode_ticket_codes(data: bytes, mime_type: str) -> list[TicketCode]:
     """Every distinct code in the ticket, page by page, top to bottom.
 
-    A code printed twice (stub and main ticket) is returned once. Raises
+    A code printed twice (stub and main ticket) is returned once, and a
+    page with both a 2D code and a barcode keeps only the 2D code. Raises
     `UnsupportedTicketType` for an ICS or any other non-visual blob and
     `UnreadableTicket` for a corrupt PDF or image.
     """
@@ -258,7 +278,7 @@ def decode_ticket_codes(data: bytes, mime_type: str) -> list[TicketCode]:
     try:
         for index, (image, text) in enumerate(pages):
             seat = seat_label(text) if text else None
-            for code in _decode_image(image, index, seat):
+            for code in _preferred(_decode_image(image, index, seat)):
                 key = (code.format, code.raw)
                 if key in seen:
                     continue

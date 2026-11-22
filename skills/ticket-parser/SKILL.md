@@ -358,6 +358,44 @@ If any of these calls fail (non-2xx), abort the whole flow and report
 which step failed — do not run the Google-side steps with a partial KP
 state.
 
+### 7.5. Check the codes the app will show at the door
+
+The API decodes each uploaded ticket by itself (QR / Aztec / PDF417 /
+barcodes, plus the seat printed on the code's page) a few seconds after
+step 7, and the phones show those codes in the event detail. Confirm it
+found what the tickets carry:
+
+```bash
+for _ in $(seq 1 20); do
+  CODES=$(curl -fsS -A 'kp-skill/1.0' -H "Authorization: Bearer $KP_TOKEN" \
+    "$KP_API_BASE/v1/events/$EVENT_ID/tickets")
+  printf '%s' "$CODES" | jq -e 'all(.items[]; .codes != null)' >/dev/null && break
+  sleep 3
+done
+printf '%s' "$CODES" | jq -r '.items[] | .original_filename as $f
+  | if .codes == null then "\($f)\tNOT SCANNED"
+    elif (.codes | length) == 0 then "\($f)\tNO CODE"
+    else (.codes[] | "\($f)\tp\(.page + 1)\t\(.format)\t\(.seat // "no seat")"
+      + (if .modules_png_b64 == null then "\tNOT DRAWABLE" else "" end))
+    end'
+```
+
+Compare it with step 2 and put every mismatch in the report (step 11):
+
+- **One code per ticket.** Each ticket from step 2 should have one code
+  (a page with a QR code and a barcode keeps only the QR code). A ticket
+  with `NO CODE`, `NOT SCANNED` after a minute, or `NOT DRAWABLE` will
+  only open as a PDF at the door — say which one.
+- **Seats.** Where a code has a seat, it must be one of the seats read in
+  step 2. `no seat` is expected for free seating and for tickets that do
+  not label row and seat (Národní divadlo prints "Přízemí vlevo 6 11");
+  a seat that differs from step 2 is a parsing bug in
+  `apps/api/src/kp_api/domain/ticket_seat.py` — report it, do not fix it
+  here.
+
+A failure here does not undo anything: the event and tickets are in KP
+and the PDFs still open in the app. Continue with step 8.
+
 ### 8. Record the ticket price as a cost (feeds Stats)
 
 For every ticket post a `cost` row so the price lands in the Stats
@@ -600,6 +638,10 @@ Reply to the user in Czech:
   (při příští synchronizaci, obvykle do 30 min)." (Omit the "Playlist na přípravu:" sentence when `PLAYLIST_URL` is empty.)
 - `{N}` is the number of tickets from step 2, not of files. Add the
   page reconciliation when pages and tickets differ.
+- Say whether the app shows a code (and the seat) for every ticket,
+  from step 7.5: "U vchodu ukáže appka kód u všech {N} lístků (se
+  sedadlem)." — or name each ticket that has no code, no seat or a seat
+  that differs from the ticket.
 - Include the KP event id and the Drive links.
 
 There is no e-mail to Běla: the server queues the notification when the

@@ -51,12 +51,14 @@ def _png(image: Image.Image) -> bytes:
 
 
 def _ticket_pdf() -> bytes:
+    # Two 2D codes on the first page; the barcode stands alone on the second,
+    # since a page with a QR code shows only that.
     return _pdf(
         _page(
             (_code_image("SEAT-12-ROW-4", zxingcpp.BarcodeFormat.QRCode), (100, 100)),
             (_code_image("AZTEC-RAIL", zxingcpp.BarcodeFormat.Aztec), (700, 110)),
-            (_code_image("1234567890128", zxingcpp.BarcodeFormat.Code128, 3), (100, 900)),
-        )
+        ),
+        _page((_code_image("1234567890128", zxingcpp.BarcodeFormat.Code128, 3), (100, 100))),
     )
 
 
@@ -66,7 +68,7 @@ def test_decodes_every_code_in_reading_order() -> None:
     assert [(c.format, c.text, c.page) for c in codes] == [
         ("qr", "SEAT-12-ROW-4", 0),
         ("aztec", "AZTEC-RAIL", 0),
-        ("code128", "1234567890128", 0),
+        ("code128", "1234567890128", 1),
     ]
     assert codes[0].content_type == "text"
 
@@ -119,6 +121,23 @@ def test_gs1_code_is_redrawn_as_gs1() -> None:
     [scanned] = _read_redraw(code.to_payload(), zxingcpp.BarcodeFormat.Code128)
     assert scanned.content_type == zxingcpp.ContentType.GS1
     assert scanned.text == "(01)09506000134352"
+
+
+def test_a_qr_code_wins_over_a_barcode_on_the_same_ticket() -> None:
+    qr = _code_image("SEAT-5", zxingcpp.BarcodeFormat.QRCode)
+    barcode = _code_image("105620828490", zxingcpp.BarcodeFormat.ITF, 3)
+    pdf = _pdf(
+        _page((qr, (100, 100)), (barcode, (100, 900))),
+        _page((_code_image("105620830700", zxingcpp.BarcodeFormat.ITF, 3), (100, 100))),
+    )
+
+    codes = decode_ticket_codes(pdf, "application/pdf")
+
+    # Page 0 shows its QR only; page 1 has nothing but the barcode, so it stays.
+    assert [(c.format, c.text, c.page) for c in codes] == [
+        ("qr", "SEAT-5", 0),
+        ("itf", "105620830700", 1),
+    ]
 
 
 def test_one_code_per_page_and_a_repeated_code_once() -> None:

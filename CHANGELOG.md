@@ -8,6 +8,10 @@ drives the `vX.Y.Z` tags; per-release detail is on the
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-22
+
+Tickets show their QR and barcodes right in the event detail.
+
 ### Added
 - **Ticket codes.** The API decodes the QR, Aztec, PDF417, DataMatrix and
   barcodes in uploaded tickets; the event detail shows them in a swipeable

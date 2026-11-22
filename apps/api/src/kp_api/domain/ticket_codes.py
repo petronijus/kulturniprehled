@@ -18,7 +18,7 @@ from typing import Any
 
 import pypdfium2 as pdfium
 import zxingcpp
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 # Rendering at ~300 dpi keeps the narrow bars of a printed Code128 apart;
 # the pixel cap keeps a poster-sized page from eating the container's memory.
@@ -67,6 +67,11 @@ _CONTENT_TYPES: dict[str, str] = {
 
 class UnsupportedTicketType(ValueError):
     """The ticket blob is neither a PDF nor a raster image."""
+
+
+class UnreadableTicket(ValueError):
+    """The blob claims to be a PDF or an image but cannot be opened —
+    retrying will not change that."""
 
 
 @dataclass(frozen=True)
@@ -224,8 +229,8 @@ def decode_ticket_codes(data: bytes, mime_type: str) -> list[TicketCode]:
     """Every distinct code in the ticket, page by page, top to bottom.
 
     A code printed twice (stub and main ticket) is returned once. Raises
-    `UnsupportedTicketType` for an ICS or any other non-visual blob and lets
-    a corrupt PDF or image raise its own error — the caller logs it.
+    `UnsupportedTicketType` for an ICS or any other non-visual blob and
+    `UnreadableTicket` for a corrupt PDF or image.
     """
 
     pages: Iterator[Image.Image]
@@ -238,11 +243,14 @@ def decode_ticket_codes(data: bytes, mime_type: str) -> list[TicketCode]:
 
     seen: set[tuple[str, bytes]] = set()
     codes: list[TicketCode] = []
-    for index, image in enumerate(pages):
-        for code in _decode_image(image, index):
-            key = (code.format, code.raw)
-            if key in seen:
-                continue
-            seen.add(key)
-            codes.append(code)
+    try:
+        for index, image in enumerate(pages):
+            for code in _decode_image(image, index):
+                key = (code.format, code.raw)
+                if key in seen:
+                    continue
+                seen.add(key)
+                codes.append(code)
+    except (pdfium.PdfiumError, UnidentifiedImageError) as exc:
+        raise UnreadableTicket(str(exc)) from exc
     return codes

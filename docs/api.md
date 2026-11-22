@@ -253,8 +253,10 @@ GET /v1/tickets/{id}/url
   entries `{format, text, content_type, page, modules_png_b64, modules_width, modules_height}`). The ticket
   appears twice in sync: once on upload, again with `codes` (payload:
   [sync.md](./sync.md)). A sweep the API starts with itself and repeats
-  hourly scans every ticket whose `codes` is still `null` — a failed scan
-  is retried and logged as `ticket_scan_failed` each time, and the tickets
+  hourly scans every ticket whose `codes` is still `null` — a scan that
+  failed on storage or the database is retried and logged as
+  `ticket_scan_failed` each time (a corrupt PDF or image is logged once as
+  `ticket_unreadable` and stored as `[]`), and the tickets
   uploaded before migration 0020 are filled in on the first start. By hand:
   `docker compose exec api python -m kp_api.cli scan-ticket-codes [--rescan]`
   (`--rescan` also redoes tickets that already have codes; exits 1 when a

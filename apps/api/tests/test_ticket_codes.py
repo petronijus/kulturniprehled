@@ -17,7 +17,12 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from kp_api import ticket_scan
-from kp_api.domain.ticket_codes import UnsupportedTicketType, decode_ticket_codes, to_pil
+from kp_api.domain.ticket_codes import (
+    UnreadableTicket,
+    UnsupportedTicketType,
+    decode_ticket_codes,
+    to_pil,
+)
 from kp_api.ticket_scan import scan_pending_tickets, scan_ticket
 from tests.conftest import auth_header, login_as
 
@@ -232,13 +237,34 @@ async def test_calendar_ticket_is_marked_scanned_with_no_codes(client: AsyncClie
     assert (await _listed(client, headers, ticket))["codes"] == []
 
 
+def test_corrupt_files_are_unreadable() -> None:
+    with pytest.raises(UnreadableTicket):
+        decode_ticket_codes(b"%PDF-1.4 truncated", "application/pdf")
+    with pytest.raises(UnreadableTicket):
+        decode_ticket_codes(b"not a png", "image/png")
+
+
 @pytest.mark.asyncio
-async def test_unreadable_ticket_stays_unscanned_and_is_retried(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_corrupt_ticket_is_marked_scanned_once(client: AsyncClient) -> None:
     headers = auth_header((await login_as(client, "petr@example.com"))["access_token"])
 
     ticket = await _register_ticket(client, headers, b"%PDF-1.4 truncated", "application/pdf")
+
+    assert (await _listed(client, headers, ticket))["codes"] == []
+    assert await scan_pending_tickets() == (0, 0)
+
+
+@pytest.mark.asyncio
+async def test_storage_failure_leaves_ticket_unscanned_for_retry(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = auth_header((await login_as(client, "petr@example.com"))["access_token"])
+
+    def storage_down(object_key: str) -> bytes:
+        raise ConnectionError("minio unreachable")
+
+    monkeypatch.setattr(ticket_scan.storage, "read_object", storage_down)
+    ticket = await _register_ticket(client, headers, _ticket_pdf(), "application/pdf")
 
     listed = await _listed(client, headers, ticket)
     assert listed["codes"] is None
@@ -246,6 +272,10 @@ async def test_unreadable_ticket_stays_unscanned_and_is_retried(
     assert [c["payload"]["version"] for c in await _ticket_changes(client, headers)] == [1]
     assert await scan_ticket(db_session, UUID(ticket["id"])) is False
     assert await scan_pending_tickets() == (0, 1)
+
+    monkeypatch.undo()
+    assert await scan_pending_tickets() == (1, 0)
+    assert len((await _listed(client, headers, ticket))["codes"]) == 3
 
 
 @pytest.mark.asyncio
@@ -296,8 +326,10 @@ async def test_ticket_deleted_while_decoding_is_not_resurrected(
     await db_session.commit()
     real_decode = ticket_scan._decode
 
-    async def decode_then_delete(object_key: str, mime_type: str) -> list[dict[str, object]]:
-        codes = await real_decode(object_key, mime_type)
+    async def decode_then_delete(
+        ticket_id: UUID, object_key: str, mime_type: str
+    ) -> list[dict[str, object]]:
+        codes = await real_decode(ticket_id, object_key, mime_type)
         deleted = await client.delete(f"/v1/tickets/{ticket['id']}", headers=headers)
         assert deleted.status_code == 204
         return codes

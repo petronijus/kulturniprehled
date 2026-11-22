@@ -33,6 +33,7 @@ from kp_api.config import get_settings
 from kp_api.domain.enums import UserRole
 from kp_api.domain.models import User, Workspace, WorkspaceMember
 from kp_api.domain.scopes import ALL_SCOPES
+from kp_api.ticket_scan import scan_pending_tickets
 
 
 async def _cmd_mint_pat(
@@ -104,6 +105,12 @@ async def _cmd_seed_user(email: str, name: str | None) -> int:
         return 0
 
 
+async def _cmd_scan_ticket_codes(rescan: bool) -> int:
+    scanned, failed = await scan_pending_tickets(rescan=rescan)
+    print(f"scanned {scanned} ticket(s), {failed} failed", file=sys.stderr)
+    return 1 if failed else 0
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="kp_api.cli", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -132,6 +139,12 @@ def _parser() -> argparse.ArgumentParser:
     seed.add_argument("--email", required=True)
     seed.add_argument("--name", default=None)
 
+    scan = sub.add_parser(
+        "scan-ticket-codes",
+        help="Decode QR / barcodes in tickets not scanned yet (all of them with --rescan)",
+    )
+    scan.add_argument("--rescan", action="store_true", help="rescan tickets that have codes")
+
     return parser
 
 
@@ -143,6 +156,8 @@ def main(argv: list[str] | None = None) -> int:
         )
     if args.cmd == "seed-user":
         return asyncio.run(_cmd_seed_user(args.email, args.name))
+    if args.cmd == "scan-ticket-codes":
+        return asyncio.run(_cmd_scan_ticket_codes(args.rescan))
     return 1
 
 

@@ -170,6 +170,29 @@ runs (unawaited from the foreground sync — see
    opens the local file directly; MinIO is hit at most once per
    ticket per device.
 
+   **Ticket codes.** The server decodes QR, Aztec, PDF417, DataMatrix and
+   linear barcodes in each uploaded ticket and stores them in
+   `tickets.codes` (JSONB, nullable). `NULL` = not scanned yet or the scan
+   failed; `[]` = scanned, none found. The scan runs as a background task
+   after `POST /v1/tickets` and writes a **second** ticket upsert to
+   `change_log` (version bump) whose payload carries `codes`: a list of
+   `{format, text, content_type, page, modules_png_b64, modules_width,
+   modules_height}`. `format` is a stable id (`qr`, `aztec`, `pdf417`,
+   `data_matrix`, `code128`, `ean13`, …) or `other:<name>`.
+   `modules_png_b64` is a 1-bit PNG with one pixel per module: the server
+   re-encodes the decoded code with zxing-cpp and ships the redraw only if
+   it scans back to exactly the printed bytes and content type (e.g. GS1);
+   otherwise it is `null` with width/height 0 and the phone leaves that
+   code to the PDF. The phone does no symbology work: it scales the bitmap
+   by a whole number of device pixels per module (nearest-neighbour,
+   `FilterQuality.none`) inside a white quiet zone and prints the digits
+   under linear codes. Why server-side: the Dart barcode library
+   mis-encoded DataMatrix from bytes and produced unreadable PDF417. The phone keeps them in `CachedTickets.codesJson` (drift
+   schema 12). Rows cached by an older app version have no codes, so the
+   offline cache re-reads `GET /v1/events/{id}/tickets` on each refresh for upcoming
+   tickets whose codes it has never seen. Tests: `apps/api/tests/test_ticket_codes.py`,
+   `apps/mobile/test/ticket_codes_test.dart`.
+
 3. **Garbage collection.** Walk `Events` where `end_at < now() - 1d`
    and collect every cached URL hash referenced from their covers /
    venue images. Diff against `CachedImages.urlHash`; any hash whose

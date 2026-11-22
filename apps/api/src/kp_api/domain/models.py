@@ -254,6 +254,10 @@ class Ticket(Base):
     original_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
     size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     hash_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Codes found in the blob (`domain/ticket_codes.py`), redrawn by the
+    # phones. NULL = not scanned yet (or the scan failed; the hourly sweep
+    # in `ticket_scan` retries it); [] = scanned, nothing found.
+    codes: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB, nullable=True)
     uploaded_by: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),

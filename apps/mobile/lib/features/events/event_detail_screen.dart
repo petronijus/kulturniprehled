@@ -15,6 +15,7 @@ import 'package:kp_mobile/features/events/agenda_replay_provider.dart';
 import 'package:kp_mobile/features/events/events_repository.dart';
 import 'package:kp_mobile/features/outbox/conflict_dialog.dart';
 import 'package:kp_mobile/features/outbox/outbox_controller.dart';
+import 'package:kp_mobile/features/tickets/ticket_codes_view.dart';
 
 class EventDetailScreen extends ConsumerStatefulWidget {
   const EventDetailScreen({required this.eventId, super.key});
@@ -206,6 +207,7 @@ class _EventDetailBody extends StatelessWidget {
     final String dateLabel = _capitalize(dateFmt.format(local));
     final String timeLabel = timeFmt.format(local);
     final String catLabel = _categoryLabel(event.category);
+    final List<TicketCodeEntry> codes = ticketCodeEntries(tickets);
 
     return ListView(
       padding: EdgeInsets.zero,
@@ -334,6 +336,10 @@ class _EventDetailBody extends StatelessWidget {
             address: event.venueAddress!,
             imageUrl: event.venueImageUrl,
           ),
+        ],
+        if (codes.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 28),
+          TicketCodesCarousel(eventId: event.id, entries: codes),
         ],
         if (tickets.isNotEmpty) ...<Widget>[
           const SizedBox(height: 28),

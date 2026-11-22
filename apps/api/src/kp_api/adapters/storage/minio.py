@@ -230,6 +230,19 @@ def object_exists(object_key: str) -> bool:
         raise
 
 
+def read_object(object_key: str) -> bytes:
+    """The whole ticket blob. Tickets are a few hundred kilobytes, so they
+    are read into memory rather than streamed."""
+
+    settings = get_settings()
+    response = _internal_client().get_object(settings.minio_bucket_tickets, object_key)
+    try:
+        return response.read()
+    finally:
+        response.close()
+        response.release_conn()
+
+
 def remove_object(object_key: str) -> None:
     settings = get_settings()
     _internal_client().remove_object(settings.minio_bucket_tickets, object_key)

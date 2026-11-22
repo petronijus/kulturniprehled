@@ -5,6 +5,7 @@
 import 'package:drift/drift.dart' show Value;
 
 import 'package:kp_mobile/data/drift/database.dart' as drift;
+import 'package:kp_mobile/features/tickets/ticket_code.dart';
 
 class EventDto {
   const EventDto({
@@ -112,6 +113,7 @@ class TicketDto {
     required this.originalFilename,
     required this.sizeBytes,
     required this.hashSha256,
+    required this.codesJson,
     required this.version,
     required this.updatedAt,
     required this.deletedAt,
@@ -134,6 +136,7 @@ class TicketDto {
       originalFilename: map['original_filename'] as String?,
       sizeBytes: map['size_bytes'] as int?,
       hashSha256: map['hash_sha256'] as String?,
+      codesJson: TicketCode.listToJson(map['codes'] as List<dynamic>?),
       version: map['version'] as int,
       updatedAt: DateTime.parse(map['updated_at'] as String),
       deletedAt: maybeDate('deleted_at'),
@@ -147,6 +150,7 @@ class TicketDto {
   final String? originalFilename;
   final int? sizeBytes;
   final String? hashSha256;
+  final String? codesJson;
   final int version;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -160,6 +164,7 @@ class TicketDto {
       originalFilename: Value<String?>(originalFilename),
       sizeBytes: Value<int?>(sizeBytes),
       hashSha256: Value<String?>(hashSha256),
+      codesJson: Value<String?>(codesJson),
       version: version,
       updatedAt: updatedAt,
       deletedAt: Value<DateTime?>(deletedAt),

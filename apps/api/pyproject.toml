@@ -40,6 +40,9 @@ dependencies = [
   # zoneinfo fallback — python:3.12-slim ships no system tz database, and the
   # season planner buckets events into Europe/Prague ISO weeks.
   "tzdata>=2026.4",
+  "zxing-cpp>=2.3",
+  "pypdfium2>=4.30",
+  "pillow>=11",
 ]
 
 [dependency-groups]
@@ -91,7 +94,7 @@ mypy_path = "src"
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["minio.*", "authlib.*", "recurring_ical_events.*"]
+module = ["minio.*", "authlib.*", "recurring_ical_events.*", "pypdfium2.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -100,6 +100,10 @@ outbox op with a `422` for the whole batch. The new app copes by retrying
 op by op and dropping the rejected op, so the manual notification is lost,
 and that API produces no notifications for the app to show at all.
 
+After the deploy that adds migration 0020 (ticket codes), the API's
+ticket sweep scans the tickets uploaded earlier on its first start; check
+`docker compose logs api | grep ticket_sweep` for `ticket_sweep_failures`.
+
 ```bash
 KP_API_TAG=$(git rev-parse --short HEAD) ./scripts/build-push.sh
 ssh petronijus@192.0.2.101 'cd /opt/kp \

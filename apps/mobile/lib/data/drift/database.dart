@@ -49,6 +49,9 @@ class CachedTickets extends Table {
   TextColumn get originalFilename => text().nullable()();
   IntColumn get sizeBytes => integer().nullable()();
   TextColumn get hashSha256 => text().nullable()();
+  // JSON list of the codes the server decoded (`TicketCode`); null until
+  // the server has scanned the ticket.
+  TextColumn get codesJson => text().nullable()();
   IntColumn get version => integer()();
   DateTimeColumn get updatedAt => dateTime()();
   DateTimeColumn get deletedAt => dateTime().nullable()();
@@ -212,7 +215,7 @@ class KpDatabase extends _$KpDatabase {
   KpDatabase.test(super.executor);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -254,6 +257,9 @@ class KpDatabase extends _$KpDatabase {
       }
       if (from < 11) {
         await m.createTable(cachedNotifications);
+      }
+      if (from < 12) {
+        await m.addColumn(cachedTickets, cachedTickets.codesJson);
       }
     },
   );
@@ -330,6 +336,28 @@ class KpDatabase extends _$KpDatabase {
 
   Future<void> upsertTicket(CachedTicketsCompanion row) =>
       into(cachedTickets).insertOnConflictUpdate(row);
+
+  /// Stores a ticket row read over REST only to fill in codes this device
+  /// never got: the local row must still exist, be live, lack codes and not
+  /// be newer. Checked inside one transaction, so a sync that applied a
+  /// tombstone or a newer version while the request was in flight wins.
+  /// The same version is accepted — an older app synced it but dropped its
+  /// `codes` — and is the same server state, since the server gives every
+  /// change its own version.
+  Future<bool> fillMissingTicketCodes(CachedTicketsCompanion fetched) {
+    return transaction(() async {
+      final CachedTicketRow? row = await findTicket(fetched.id.value);
+      if (row == null ||
+          row.deletedAt != null ||
+          row.codesJson != null ||
+          fetched.version.value < row.version ||
+          fetched.codesJson.value == null) {
+        return false;
+      }
+      await upsertTicket(fetched);
+      return true;
+    });
+  }
 
   Future<int?> readCursor() async {
     final SyncCursorRow? row = await (select(

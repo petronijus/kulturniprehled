@@ -177,7 +177,7 @@ runs (unawaited from the foreground sync — see
    after `POST /v1/tickets` and writes a **second** ticket upsert to
    `change_log` (version bump) whose payload carries `codes`: a list of
    `{format, text, content_type, page, modules_png_b64, modules_width,
-   modules_height}`. `format` is a stable id (`qr`, `aztec`, `pdf417`,
+   modules_height, seat}`. `format` is a stable id (`qr`, `aztec`, `pdf417`,
    `data_matrix`, `code128`, `ean13`, …) or `other:<name>`.
    `modules_png_b64` is a 1-bit PNG with one pixel per module: the server
    re-encodes the decoded code with zxing-cpp and ships the redraw only if
@@ -186,7 +186,12 @@ runs (unawaited from the foreground sync — see
    code to the PDF. The phone does no symbology work: it scales the bitmap
    by a whole number of device pixels per module (nearest-neighbour,
    `FilterQuality.none`) inside a white quiet zone and prints the digits
-   under linear codes. Why server-side: the Dart barcode library
+   under linear codes. `seat` is the seat printed on the code's page in the
+   ticket's own words ("Přízemí vpravo · Řada 10 · Místo 19",
+   `kp_api/domain/ticket_seat.py`), shown above the code; `null` when the
+   page labels no seat or names more than one. After a change to the seat
+   reader, `scan-ticket-codes --rescan` re-sends every ticket whose label
+   changed. Why server-side: the Dart barcode library
    mis-encoded DataMatrix from bytes and produced unreadable PDF417. The phone keeps them in `CachedTickets.codesJson` (drift
    schema 12). Rows cached by an older app version have no codes, so the
    offline cache re-reads `GET /v1/events/{id}/tickets` on each refresh for upcoming

@@ -73,7 +73,8 @@ class _TicketCodesCarouselState extends State<TicketCodesCarousel> {
     return Column(
       children: <Widget>[
         SizedBox(
-          height: 300,
+          // Code, seat, file name; the counter sits below the pager.
+          height: 330,
           child: PageView.builder(
             controller: _controller,
             itemCount: entries.length,
@@ -125,12 +126,21 @@ class TicketCodeTile extends StatelessWidget {
     required this.entry,
     required this.maxWidth,
     required this.maxHeight,
+    this.counter,
+    this.large = false,
     super.key,
   });
 
   final TicketCodeEntry entry;
+
+  /// Room for the code and its quiet zone; the seat and captions come on top.
   final double maxWidth;
   final double maxHeight;
+
+  /// "2 / 3" under the file name, kept next to the code so nothing at the
+  /// screen's edge can cover it.
+  final String? counter;
+  final bool large;
 
   static const double _quietZone = 16;
 
@@ -148,9 +158,24 @@ class TicketCodeTile extends StatelessWidget {
     );
     final double width = code.modulesWidth * pixelsPerModule / dpr;
     final double height = code.modulesHeight * pixelsPerModule / dpr;
+    final String? seat = code.seat;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
+        if (seat != null) ...<Widget>[
+          Text(
+            seat,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'StackSansHeadline',
+              fontWeight: FontWeight.w600,
+              fontSize: large ? 20 : 15,
+              letterSpacing: 0.48,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
         Container(
           color: Colors.white,
           // Quiet zone: scanners need white around the code.
@@ -184,6 +209,18 @@ class TicketCodeTile extends StatelessWidget {
             color: Colors.black,
           ),
         ),
+        if (counter != null) ...<Widget>[
+          const SizedBox(height: 12),
+          Text(
+            counter!,
+            style: TextStyle(
+              fontFamily: 'StackSansHeadline',
+              fontSize: large ? 14 : 12,
+              letterSpacing: 0.48,
+              color: Colors.black54,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -211,7 +248,6 @@ class _TicketCodesScreenState extends ConsumerState<TicketCodesScreen> {
   // ticket would open as the first.
   PageController? _controller;
   List<TicketCodeEntry>? _entries;
-  int _index = 0;
 
   @override
   void initState() {
@@ -232,7 +268,6 @@ class _TicketCodesScreenState extends ConsumerState<TicketCodesScreen> {
         : widget.initialIndex.clamp(0, entries.length - 1);
     setState(() {
       _entries = entries;
-      _index = index;
       _controller = PageController(initialPage: index);
     });
   }
@@ -272,14 +307,17 @@ class _TicketCodesScreenState extends ConsumerState<TicketCodesScreen> {
                     PageView.builder(
                       controller: controller,
                       itemCount: entries.length,
-                      onPageChanged: (int i) => setState(() => _index = i),
                       itemBuilder: (BuildContext context, int i) => Center(
                         child: TicketCodeTile(
                           entry: entries[i],
+                          large: true,
+                          counter: entries.length > 1
+                              ? '${i + 1} / ${entries.length}'
+                              : null,
                           maxWidth: box.maxWidth - 32,
-                          // Room for the close button, the digits of a
-                          // linear code, the file name and the counter.
-                          maxHeight: box.maxHeight - 160,
+                          // Room for the close button, the seat, the digits
+                          // of a linear code, the file name and the counter.
+                          maxHeight: box.maxHeight - 220,
                         ),
                       ),
                     ),
@@ -292,21 +330,6 @@ class _TicketCodesScreenState extends ConsumerState<TicketCodesScreen> {
                 onPressed: () => context.pop(),
               ),
             ),
-            if (entries.length > 1)
-              Positioned(
-                bottom: 24,
-                left: 0,
-                right: 0,
-                child: Text(
-                  '${_index + 1} / ${entries.length}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontFamily: 'StackSansHeadline',
-                    fontSize: 14,
-                    color: Colors.black54,
-                  ),
-                ),
-              ),
           ],
         ),
       ),

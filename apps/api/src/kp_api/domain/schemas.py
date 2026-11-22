@@ -160,6 +160,7 @@ class TicketCodeResponse(BaseModel):
     modules_png_b64: str | None
     modules_width: int
     modules_height: int
+    seat: str | None = None
 
 
 class TicketResponse(BaseModel):

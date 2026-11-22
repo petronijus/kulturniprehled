@@ -8,6 +8,14 @@ drives the `vX.Y.Z` tags; per-release detail is on the
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-11-22
+
+### Added
+- **Seat above the ticket code.** The event detail and the full-screen
+  view show each ticket's seat ("Přízemí vpravo · Řada 10 · Místo 19") above
+  its code, read from the ticket itself; the full-screen counter now sits
+  right under the code.
+
 ## [1.4.1] - 2026-11-22
 
 ### Fixed

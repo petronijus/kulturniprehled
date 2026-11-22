@@ -20,6 +20,8 @@ import pypdfium2 as pdfium
 import zxingcpp
 from PIL import Image, UnidentifiedImageError
 
+from kp_api.domain.ticket_seat import seat_label
+
 # Rendering at ~300 dpi keeps the narrow bars of a printed Code128 apart;
 # the pixel cap keeps a poster-sized page from eating the container's memory.
 _PDF_SCALE = 300 / 72
@@ -86,6 +88,8 @@ class TicketCode:
     modules_png: bytes | None
     modules_width: int
     modules_height: int
+    # The seat printed on the code's page (`ticket_seat.seat_label`).
+    seat: str | None = None
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -100,6 +104,7 @@ class TicketCode:
             ),
             "modules_width": self.modules_width,
             "modules_height": self.modules_height,
+            "seat": self.seat,
         }
 
 
@@ -171,7 +176,7 @@ def _png(modules: Image.Image) -> bytes:
     return buffer.getvalue()
 
 
-def _decode_image(image: Image.Image, page: int) -> list[TicketCode]:
+def _decode_image(image: Image.Image, page: int, seat: str | None) -> list[TicketCode]:
     found = sorted(
         (b for b in zxingcpp.read_barcodes(image.convert("L")) if b.valid),
         key=_reading_order(max(image.height // 20, 1)),
@@ -189,14 +194,15 @@ def _decode_image(image: Image.Image, page: int) -> list[TicketCode]:
                 modules_png=_png(modules) if modules is not None else None,
                 modules_width=modules.width if modules is not None else 0,
                 modules_height=modules.height if modules is not None else 0,
+                seat=seat,
             )
         )
     return codes
 
 
-def _pdf_pages(data: bytes) -> Iterator[Image.Image]:
-    """One rendered page at a time, so a long PDF never holds more than one
-    page bitmap in the API's memory."""
+def _pdf_pages(data: bytes) -> Iterator[tuple[Image.Image, str | None]]:
+    """One rendered page and its text at a time, so a long PDF never holds
+    more than one page bitmap in the API's memory."""
 
     pdf = pdfium.PdfDocument(data)
     try:
@@ -205,14 +211,19 @@ def _pdf_pages(data: bytes) -> Iterator[Image.Image]:
             try:
                 width, height = page.get_size()
                 scale = min(_PDF_SCALE, _MAX_RENDER_PX / max(width, height, 1))
-                yield page.render(scale=scale, grayscale=True).to_pil()
+                text_page = page.get_textpage()
+                try:
+                    text = text_page.get_text_range()
+                finally:
+                    text_page.close()
+                yield page.render(scale=scale, grayscale=True).to_pil(), text
             finally:
                 page.close()
     finally:
         pdf.close()
 
 
-def _raster_pages(data: bytes) -> Iterator[Image.Image]:
+def _raster_pages(data: bytes) -> Iterator[tuple[Image.Image, str | None]]:
     with Image.open(io.BytesIO(data)) as image:
         if max(image.size) > _MAX_RENDER_PX:
             # draft() lets JPEG decode at a reduced size instead of
@@ -222,7 +233,8 @@ def _raster_pages(data: bytes) -> Iterator[Image.Image]:
         page = image.convert("L")
     if max(page.size) > _MAX_RENDER_PX:
         page.thumbnail((_MAX_RENDER_PX, _MAX_RENDER_PX))
-    yield page
+    # A photo or screenshot carries no text layer; its seat stays unknown.
+    yield page, None
 
 
 def decode_ticket_codes(data: bytes, mime_type: str) -> list[TicketCode]:
@@ -233,7 +245,7 @@ def decode_ticket_codes(data: bytes, mime_type: str) -> list[TicketCode]:
     `UnreadableTicket` for a corrupt PDF or image.
     """
 
-    pages: Iterator[Image.Image]
+    pages: Iterator[tuple[Image.Image, str | None]]
     if mime_type == "application/pdf" or data.startswith(b"%PDF"):
         pages = _pdf_pages(data)
     elif mime_type.startswith("image/"):
@@ -244,8 +256,9 @@ def decode_ticket_codes(data: bytes, mime_type: str) -> list[TicketCode]:
     seen: set[tuple[str, bytes]] = set()
     codes: list[TicketCode] = []
     try:
-        for index, image in enumerate(pages):
-            for code in _decode_image(image, index):
+        for index, (image, text) in enumerate(pages):
+            seat = seat_label(text) if text else None
+            for code in _decode_image(image, index, seat):
                 key = (code.format, code.raw)
                 if key in seen:
                     continue

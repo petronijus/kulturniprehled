@@ -13,6 +13,7 @@ class TicketCode {
     required this.modulesPng,
     required this.modulesWidth,
     required this.modulesHeight,
+    this.seat,
   });
 
   factory TicketCode.fromMap(Map<String, dynamic> map) {
@@ -24,6 +25,7 @@ class TicketCode {
       modulesPng: png == null ? null : base64Decode(png),
       modulesWidth: map['modules_width'] as int,
       modulesHeight: map['modules_height'] as int,
+      seat: map['seat'] as String?,
     );
   }
 
@@ -50,6 +52,11 @@ class TicketCode {
   final Uint8List? modulesPng;
   final int modulesWidth;
   final int modulesHeight;
+
+  /// The seat printed on the code's page, in the ticket's own words
+  /// ("Přízemí vpravo · Řada 10 · Místo 19"); null when the ticket names
+  /// none or the server could not tell which.
+  final String? seat;
 
   bool get isDrawable =>
       modulesPng != null && modulesWidth > 0 && modulesHeight > 0;

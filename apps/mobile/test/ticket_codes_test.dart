@@ -149,6 +149,34 @@ void main() {
     expect(image.height! * 2.75 / 21, closeTo(modulePixels, 1e-9));
   });
 
+  testWidgets('the seat of the ticket sits above its code', (
+    WidgetTester tester,
+  ) async {
+    await _pumpCarousel(
+      tester,
+      ticketCodeEntries(<CachedTicketRow>[
+        _ticket('seated', <Map<String, Object?>>[
+          <String, Object?>{
+            ...qrSeat1,
+            'seat': 'Přízemí vpravo · Řada 10 · Místo 19',
+          },
+        ]),
+        _ticket('standing', <Map<String, Object?>>[qrSeat2]),
+      ]),
+    );
+
+    final Offset seat = tester.getCenter(
+      find.text('Přízemí vpravo · Řada 10 · Místo 19'),
+    );
+    expect(seat.dy, lessThan(tester.getTopLeft(find.byType(Image)).dy));
+
+    await tester.fling(find.byType(PageView), const Offset(-400, 0), 1000);
+    await tester.pumpAndSettle();
+
+    expect(find.text('standing.pdf'), findsOneWidget);
+    expect(find.textContaining('Řada'), findsNothing);
+  });
+
   testWidgets('linear codes print their digits under the bars', (
     WidgetTester tester,
   ) async {

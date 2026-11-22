@@ -4,12 +4,15 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'package:kp_mobile/data/api_client/kp_client.dart';
 import 'package:kp_mobile/data/drift/database.dart';
+import 'package:kp_mobile/features/events/event_dto.dart';
 
 /// Proactively materialises everything a user might want to look at when
 /// they're offline at a venue: cover images, venue images, and ticket
@@ -57,6 +60,7 @@ class OfflineCacheService {
       for (final CachedTicketRow ticket in tickets) {
         await _ensureTicketCached(ticket);
       }
+      await _refreshMissingCodes(tickets);
     }
 
     await _gcPastEvents(stillNeededImageUrls: upcomingImageUrls);
@@ -136,6 +140,53 @@ class OfflineCacheService {
       await db.deleteTicketFiles(ticketIdsToDrop);
     }
   }
+
+  /// Re-reads the tickets of upcoming events whose codes this device has
+  /// never seen. Sync delivers codes as a ticket upsert, but a row synced by
+  /// an app version without `codesJson` would otherwise wait for a change
+  /// that never comes. Runs on every refresh until the server has codes.
+  Future<void> _refreshMissingCodes(List<CachedTicketRow> tickets) async {
+    final KpDatabase db = _ref.read(kpDatabaseProvider);
+    final Set<String> eventIds = <String>{
+      for (final CachedTicketRow t in tickets)
+        if (t.codesJson == null) t.eventId,
+    };
+    final KpClient client = _ref.read(kpClientProvider);
+    for (final String eventId in eventIds) {
+      try {
+        final Response<dynamic> resp = await client.dio.get<dynamic>(
+          '/v1/events/$eventId/tickets',
+        );
+        final List<dynamic> items =
+            (resp.data! as Map<String, dynamic>)['items'] as List<dynamic>;
+        for (final dynamic item in items) {
+          await db.fillMissingTicketCodes(
+            TicketDto.fromMap(item as Map<String, dynamic>).toCompanion(),
+          );
+        }
+      } on DioException catch (e) {
+        if (_isOffline(e)) {
+          // The normal case at the venue; the next refresh retries.
+          debugPrint('kp-cache: ticket codes for $eventId: offline');
+          continue;
+        }
+        debugPrint('kp-cache: ticket codes for $eventId failed: $e');
+        await Sentry.captureException(e, stackTrace: e.stackTrace);
+      } catch (e, st) {
+        debugPrint('kp-cache: ticket codes for $eventId failed: $e\n$st');
+        await Sentry.captureException(e, stackTrace: st);
+      }
+    }
+  }
+
+  static bool _isOffline(DioException e) => switch (e.type) {
+    DioExceptionType.connectionError ||
+    DioExceptionType.connectionTimeout ||
+    DioExceptionType.sendTimeout ||
+    DioExceptionType.receiveTimeout ||
+    DioExceptionType.cancel => true,
+    _ => false,
+  };
 
   Future<File?> _ensureImageCached(String url) async {
     final KpDatabase db = _ref.read(kpDatabaseProvider);

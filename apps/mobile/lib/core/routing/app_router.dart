@@ -18,6 +18,7 @@ import 'package:kp_mobile/features/stats/stats_replay_provider.dart';
 import 'package:kp_mobile/features/stats/stats_screen.dart';
 import 'package:kp_mobile/features/sync/sync_controller.dart';
 import 'package:kp_mobile/features/system/app_version.dart';
+import 'package:kp_mobile/features/tickets/ticket_codes_view.dart';
 import 'package:kp_mobile/features/tickets/ticket_viewer_screen.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_replay_provider.dart';
 import 'package:kp_mobile/features/watchlist/watchlist_screen.dart';
@@ -101,6 +102,19 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
                         pageBuilder: _materialPage(
                           (context, state) => EditEventScreen(
                             eventId: state.pathParameters['eventId']!,
+                          ),
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'codes',
+                        pageBuilder: _materialPage(
+                          (context, state) => TicketCodesScreen(
+                            eventId: state.pathParameters['eventId']!,
+                            initialIndex:
+                                int.tryParse(
+                                  state.uri.queryParameters['i'] ?? '',
+                                ) ??
+                                0,
                           ),
                         ),
                       ),

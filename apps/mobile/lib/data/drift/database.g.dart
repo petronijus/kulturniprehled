@@ -1169,6 +1169,17 @@ class $CachedTicketsTable extends CachedTickets
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _codesJsonMeta = const VerificationMeta(
+    'codesJson',
+  );
+  @override
+  late final GeneratedColumn<String> codesJson = GeneratedColumn<String>(
+    'codes_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _versionMeta = const VerificationMeta(
     'version',
   );
@@ -1222,6 +1233,7 @@ class $CachedTicketsTable extends CachedTickets
     originalFilename,
     sizeBytes,
     hashSha256,
+    codesJson,
     version,
     updatedAt,
     deletedAt,
@@ -1292,6 +1304,12 @@ class $CachedTicketsTable extends CachedTickets
         hashSha256.isAcceptableOrUnknown(data['hash_sha256']!, _hashSha256Meta),
       );
     }
+    if (data.containsKey('codes_json')) {
+      context.handle(
+        _codesJsonMeta,
+        codesJson.isAcceptableOrUnknown(data['codes_json']!, _codesJsonMeta),
+      );
+    }
     if (data.containsKey('version')) {
       context.handle(
         _versionMeta,
@@ -1359,6 +1377,10 @@ class $CachedTicketsTable extends CachedTickets
         DriftSqlType.string,
         data['${effectivePrefix}hash_sha256'],
       ),
+      codesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}codes_json'],
+      ),
       version: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}version'],
@@ -1392,6 +1414,7 @@ class CachedTicketRow extends DataClass implements Insertable<CachedTicketRow> {
   final String? originalFilename;
   final int? sizeBytes;
   final String? hashSha256;
+  final String? codesJson;
   final int version;
   final DateTime updatedAt;
   final DateTime? deletedAt;
@@ -1404,6 +1427,7 @@ class CachedTicketRow extends DataClass implements Insertable<CachedTicketRow> {
     this.originalFilename,
     this.sizeBytes,
     this.hashSha256,
+    this.codesJson,
     required this.version,
     required this.updatedAt,
     this.deletedAt,
@@ -1424,6 +1448,9 @@ class CachedTicketRow extends DataClass implements Insertable<CachedTicketRow> {
     }
     if (!nullToAbsent || hashSha256 != null) {
       map['hash_sha256'] = Variable<String>(hashSha256);
+    }
+    if (!nullToAbsent || codesJson != null) {
+      map['codes_json'] = Variable<String>(codesJson);
     }
     map['version'] = Variable<int>(version);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -1449,6 +1476,9 @@ class CachedTicketRow extends DataClass implements Insertable<CachedTicketRow> {
       hashSha256: hashSha256 == null && nullToAbsent
           ? const Value.absent()
           : Value(hashSha256),
+      codesJson: codesJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(codesJson),
       version: Value(version),
       updatedAt: Value(updatedAt),
       deletedAt: deletedAt == null && nullToAbsent
@@ -1471,6 +1501,7 @@ class CachedTicketRow extends DataClass implements Insertable<CachedTicketRow> {
       originalFilename: serializer.fromJson<String?>(json['originalFilename']),
       sizeBytes: serializer.fromJson<int?>(json['sizeBytes']),
       hashSha256: serializer.fromJson<String?>(json['hashSha256']),
+      codesJson: serializer.fromJson<String?>(json['codesJson']),
       version: serializer.fromJson<int>(json['version']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
@@ -1488,6 +1519,7 @@ class CachedTicketRow extends DataClass implements Insertable<CachedTicketRow> {
       'originalFilename': serializer.toJson<String?>(originalFilename),
       'sizeBytes': serializer.toJson<int?>(sizeBytes),
       'hashSha256': serializer.toJson<String?>(hashSha256),
+      'codesJson': serializer.toJson<String?>(codesJson),
       'version': serializer.toJson<int>(version),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
@@ -1503,6 +1535,7 @@ class CachedTicketRow extends DataClass implements Insertable<CachedTicketRow> {
     Value<String?> originalFilename = const Value.absent(),
     Value<int?> sizeBytes = const Value.absent(),
     Value<String?> hashSha256 = const Value.absent(),
+    Value<String?> codesJson = const Value.absent(),
     int? version,
     DateTime? updatedAt,
     Value<DateTime?> deletedAt = const Value.absent(),
@@ -1517,6 +1550,7 @@ class CachedTicketRow extends DataClass implements Insertable<CachedTicketRow> {
         : this.originalFilename,
     sizeBytes: sizeBytes.present ? sizeBytes.value : this.sizeBytes,
     hashSha256: hashSha256.present ? hashSha256.value : this.hashSha256,
+    codesJson: codesJson.present ? codesJson.value : this.codesJson,
     version: version ?? this.version,
     updatedAt: updatedAt ?? this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
@@ -1537,6 +1571,7 @@ class CachedTicketRow extends DataClass implements Insertable<CachedTicketRow> {
       hashSha256: data.hashSha256.present
           ? data.hashSha256.value
           : this.hashSha256,
+      codesJson: data.codesJson.present ? data.codesJson.value : this.codesJson,
       version: data.version.present ? data.version.value : this.version,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
@@ -1554,6 +1589,7 @@ class CachedTicketRow extends DataClass implements Insertable<CachedTicketRow> {
           ..write('originalFilename: $originalFilename, ')
           ..write('sizeBytes: $sizeBytes, ')
           ..write('hashSha256: $hashSha256, ')
+          ..write('codesJson: $codesJson, ')
           ..write('version: $version, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -1571,6 +1607,7 @@ class CachedTicketRow extends DataClass implements Insertable<CachedTicketRow> {
     originalFilename,
     sizeBytes,
     hashSha256,
+    codesJson,
     version,
     updatedAt,
     deletedAt,
@@ -1587,6 +1624,7 @@ class CachedTicketRow extends DataClass implements Insertable<CachedTicketRow> {
           other.originalFilename == this.originalFilename &&
           other.sizeBytes == this.sizeBytes &&
           other.hashSha256 == this.hashSha256 &&
+          other.codesJson == this.codesJson &&
           other.version == this.version &&
           other.updatedAt == this.updatedAt &&
           other.deletedAt == this.deletedAt &&
@@ -1601,6 +1639,7 @@ class CachedTicketsCompanion extends UpdateCompanion<CachedTicketRow> {
   final Value<String?> originalFilename;
   final Value<int?> sizeBytes;
   final Value<String?> hashSha256;
+  final Value<String?> codesJson;
   final Value<int> version;
   final Value<DateTime> updatedAt;
   final Value<DateTime?> deletedAt;
@@ -1614,6 +1653,7 @@ class CachedTicketsCompanion extends UpdateCompanion<CachedTicketRow> {
     this.originalFilename = const Value.absent(),
     this.sizeBytes = const Value.absent(),
     this.hashSha256 = const Value.absent(),
+    this.codesJson = const Value.absent(),
     this.version = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
@@ -1628,6 +1668,7 @@ class CachedTicketsCompanion extends UpdateCompanion<CachedTicketRow> {
     this.originalFilename = const Value.absent(),
     this.sizeBytes = const Value.absent(),
     this.hashSha256 = const Value.absent(),
+    this.codesJson = const Value.absent(),
     required int version,
     required DateTime updatedAt,
     this.deletedAt = const Value.absent(),
@@ -1648,6 +1689,7 @@ class CachedTicketsCompanion extends UpdateCompanion<CachedTicketRow> {
     Expression<String>? originalFilename,
     Expression<int>? sizeBytes,
     Expression<String>? hashSha256,
+    Expression<String>? codesJson,
     Expression<int>? version,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
@@ -1662,6 +1704,7 @@ class CachedTicketsCompanion extends UpdateCompanion<CachedTicketRow> {
       if (originalFilename != null) 'original_filename': originalFilename,
       if (sizeBytes != null) 'size_bytes': sizeBytes,
       if (hashSha256 != null) 'hash_sha256': hashSha256,
+      if (codesJson != null) 'codes_json': codesJson,
       if (version != null) 'version': version,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
@@ -1678,6 +1721,7 @@ class CachedTicketsCompanion extends UpdateCompanion<CachedTicketRow> {
     Value<String?>? originalFilename,
     Value<int?>? sizeBytes,
     Value<String?>? hashSha256,
+    Value<String?>? codesJson,
     Value<int>? version,
     Value<DateTime>? updatedAt,
     Value<DateTime?>? deletedAt,
@@ -1692,6 +1736,7 @@ class CachedTicketsCompanion extends UpdateCompanion<CachedTicketRow> {
       originalFilename: originalFilename ?? this.originalFilename,
       sizeBytes: sizeBytes ?? this.sizeBytes,
       hashSha256: hashSha256 ?? this.hashSha256,
+      codesJson: codesJson ?? this.codesJson,
       version: version ?? this.version,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
@@ -1724,6 +1769,9 @@ class CachedTicketsCompanion extends UpdateCompanion<CachedTicketRow> {
     if (hashSha256.present) {
       map['hash_sha256'] = Variable<String>(hashSha256.value);
     }
+    if (codesJson.present) {
+      map['codes_json'] = Variable<String>(codesJson.value);
+    }
     if (version.present) {
       map['version'] = Variable<int>(version.value);
     }
@@ -1752,6 +1800,7 @@ class CachedTicketsCompanion extends UpdateCompanion<CachedTicketRow> {
           ..write('originalFilename: $originalFilename, ')
           ..write('sizeBytes: $sizeBytes, ')
           ..write('hashSha256: $hashSha256, ')
+          ..write('codesJson: $codesJson, ')
           ..write('version: $version, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
@@ -6495,6 +6544,7 @@ typedef $$CachedTicketsTableCreateCompanionBuilder =
       Value<String?> originalFilename,
       Value<int?> sizeBytes,
       Value<String?> hashSha256,
+      Value<String?> codesJson,
       required int version,
       required DateTime updatedAt,
       Value<DateTime?> deletedAt,
@@ -6510,6 +6560,7 @@ typedef $$CachedTicketsTableUpdateCompanionBuilder =
       Value<String?> originalFilename,
       Value<int?> sizeBytes,
       Value<String?> hashSha256,
+      Value<String?> codesJson,
       Value<int> version,
       Value<DateTime> updatedAt,
       Value<DateTime?> deletedAt,
@@ -6558,6 +6609,11 @@ class $$CachedTicketsTableFilterComposer
 
   ColumnFilters<String> get hashSha256 => $composableBuilder(
     column: $table.hashSha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get codesJson => $composableBuilder(
+    column: $table.codesJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6626,6 +6682,11 @@ class $$CachedTicketsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get codesJson => $composableBuilder(
+    column: $table.codesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get version => $composableBuilder(
     column: $table.version,
     builder: (column) => ColumnOrderings(column),
@@ -6683,6 +6744,9 @@ class $$CachedTicketsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get codesJson =>
+      $composableBuilder(column: $table.codesJson, builder: (column) => column);
+
   GeneratedColumn<int> get version =>
       $composableBuilder(column: $table.version, builder: (column) => column);
 
@@ -6734,6 +6798,7 @@ class $$CachedTicketsTableTableManager
                 Value<String?> originalFilename = const Value.absent(),
                 Value<int?> sizeBytes = const Value.absent(),
                 Value<String?> hashSha256 = const Value.absent(),
+                Value<String?> codesJson = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -6747,6 +6812,7 @@ class $$CachedTicketsTableTableManager
                 originalFilename: originalFilename,
                 sizeBytes: sizeBytes,
                 hashSha256: hashSha256,
+                codesJson: codesJson,
                 version: version,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
@@ -6762,6 +6828,7 @@ class $$CachedTicketsTableTableManager
                 Value<String?> originalFilename = const Value.absent(),
                 Value<int?> sizeBytes = const Value.absent(),
                 Value<String?> hashSha256 = const Value.absent(),
+                Value<String?> codesJson = const Value.absent(),
                 required int version,
                 required DateTime updatedAt,
                 Value<DateTime?> deletedAt = const Value.absent(),
@@ -6775,6 +6842,7 @@ class $$CachedTicketsTableTableManager
                 originalFilename: originalFilename,
                 sizeBytes: sizeBytes,
                 hashSha256: hashSha256,
+                codesJson: codesJson,
                 version: version,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,

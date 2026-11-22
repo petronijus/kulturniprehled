@@ -110,6 +110,7 @@ def serialize_ticket(ticket: Ticket) -> dict[str, Any]:
         "original_filename": ticket.original_filename,
         "size_bytes": ticket.size_bytes,
         "hash_sha256": ticket.hash_sha256,
+        "codes": ticket.codes,
         "uploaded_by": str(ticket.uploaded_by),
         "version": ticket.version,
         "created_at": _isoformat(ticket.created_at),

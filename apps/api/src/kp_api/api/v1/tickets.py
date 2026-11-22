@@ -10,7 +10,9 @@ Flow:
    MinIO (defence against a forged success report), records the ticket
    row, and emits a `change_log` upsert so other devices learn about it
    on their next sync.
-3. To download a ticket later the client calls `GET /v1/tickets/{id}/url`
+3. After the response a background task decodes the QR / barcodes in the
+   blob into `codes` (`kp_api.ticket_scan`) and emits another upsert.
+4. To download a ticket later the client calls `GET /v1/tickets/{id}/url`
    and gets a fresh presigned GET URL.
 """
 
@@ -20,7 +22,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +39,7 @@ from kp_api.domain.schemas import (
     TicketUploadUrlResponse,
 )
 from kp_api.sync.changelog import record_ticket_change
+from kp_api.ticket_scan import scan_ticket_in_background
 
 router = APIRouter(prefix="/v1/tickets", tags=["tickets"])
 events_router = APIRouter(prefix="/v1/events", tags=["tickets"])
@@ -72,15 +75,19 @@ async def _event_in_workspace(session: AsyncSession, workspace: Workspace, event
 
 
 async def _ticket_in_workspace(
-    session: AsyncSession, workspace: Workspace, ticket_id: UUID
+    session: AsyncSession, workspace: Workspace, ticket_id: UUID, *, for_update: bool = False
 ) -> Ticket:
-    ticket = await session.scalar(
-        select(Ticket).where(
-            Ticket.id == ticket_id,
-            Ticket.workspace_id == workspace.id,
-            Ticket.deleted_at.is_(None),
-        )
+    stmt = select(Ticket).where(
+        Ticket.id == ticket_id,
+        Ticket.workspace_id == workspace.id,
+        Ticket.deleted_at.is_(None),
     )
+    if for_update:
+        # The background code scan also bumps `version`; without the lock a
+        # delete that read the row before the scan committed would reuse
+        # the scan's version number.
+        stmt = stmt.with_for_update()
+    ticket = await session.scalar(stmt)
     if ticket is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "ticket not found")
     return ticket
@@ -111,6 +118,7 @@ async def register_ticket(
     body: TicketCreate,
     session: SessionDep,
     user: CurrentUser,
+    background: BackgroundTasks,
 ) -> TicketResponse:
     workspace = await _user_workspace(session, user)
     event = await _event_in_workspace(session, workspace, body.event_id)
@@ -136,6 +144,8 @@ async def register_ticket(
     await record_ticket_change(session, ticket, user.id, ChangeOp.UPSERT)
     await session.commit()
     await session.refresh(ticket)
+    # The codes arrive on the phones as a second upsert once decoded.
+    background.add_task(scan_ticket_in_background, ticket.id)
     return TicketResponse.model_validate(ticket)
 
 
@@ -161,7 +171,7 @@ async def delete_ticket(
     user: CurrentUser,
 ) -> Response:
     workspace = await _user_workspace(session, user)
-    ticket = await _ticket_in_workspace(session, workspace, ticket_id)
+    ticket = await _ticket_in_workspace(session, workspace, ticket_id, for_update=True)
     ticket.deleted_at = _utcnow()
     ticket.version += 1
     await session.flush()

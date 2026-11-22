@@ -1,14 +1,15 @@
 """FastAPI application entrypoint."""
 
+import asyncio
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from kp_api import __version__
+from kp_api import __version__, ticket_scan
 from kp_api.adapters.storage import minio as storage
 from kp_api.api.v1 import (
     auth,
@@ -43,7 +44,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         storage.ensure_all_buckets()
     except Exception:  # noqa: S110 (bootstrap is best-effort; healthz still serves)
         pass
-    yield
+    sweep = asyncio.create_task(ticket_scan.sweep_forever())
+    try:
+        yield
+    finally:
+        sweep.cancel()
+        with suppress(asyncio.CancelledError):
+            await sweep
 
 
 def create_app() -> FastAPI:

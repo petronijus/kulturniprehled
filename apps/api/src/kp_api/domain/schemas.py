@@ -148,6 +148,20 @@ class TicketCreate(BaseModel):
     hash_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
 
 
+class TicketCodeResponse(BaseModel):
+    """One scannable code found in the ticket. `modules_png_b64` is the
+    verified redraw, one pixel per module, for the phone to scale up; null
+    when the code could not be redrawn faithfully."""
+
+    format: str
+    text: str
+    content_type: str
+    page: int
+    modules_png_b64: str | None
+    modules_width: int
+    modules_height: int
+
+
 class TicketResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -158,6 +172,7 @@ class TicketResponse(BaseModel):
     original_filename: str | None
     size_bytes: int | None
     hash_sha256: str | None
+    codes: list[TicketCodeResponse] | None
     uploaded_by: UUID
     version: int
     created_at: datetime

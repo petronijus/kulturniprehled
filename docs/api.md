@@ -247,6 +247,18 @@ GET /v1/tickets/{id}/url
 - Uploads go through `POST /v1/tickets` (multipart), which streams the
   payload server-side to MinIO. The Claude skill is the only writer
   today.
+- After an upload the API decodes the QR / barcodes in the file in a
+  background task (`kp_api/ticket_scan.py`) and stores them in the ticket's
+  `codes` field (`null` = not scanned or scan failed, `[]` = none found;
+  entries `{format, text, content_type, page, modules_png_b64, modules_width, modules_height}`). The ticket
+  appears twice in sync: once on upload, again with `codes` (payload:
+  [sync.md](./sync.md)). A sweep the API starts with itself and repeats
+  hourly scans every ticket whose `codes` is still `null` — a failed scan
+  is retried and logged as `ticket_scan_failed` each time, and the tickets
+  uploaded before migration 0020 are filled in on the first start. By hand:
+  `docker compose exec api python -m kp_api.cli scan-ticket-codes [--rescan]`
+  (`--rescan` also redoes tickets that already have codes; exits 1 when a
+  scan failed).
 
 ## Operational notes
 

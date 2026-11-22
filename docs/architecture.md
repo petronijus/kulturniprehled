@@ -54,7 +54,9 @@ desktop-browser workflow.
 - **Offline-first mobile** — tickets must be readable at venues where
   signal is unreliable. The app pre-caches every upcoming event's
   cover image and ticket PDF to disk after each sync, and reads from
-  disk first on every render. See [sync.md](./sync.md) for the
+  disk first on every render. The event detail also shows the QR / barcodes
+  the API decoded from each ticket, full screen and at full brightness
+  for the venue scanner. See [sync.md](./sync.md) for the
   caching layer's invariants.
 - **One-way Google Calendar sync** — Google Calendar cannot represent
   tickets, costs or ratings; round-tripping would silently lose data

@@ -8,6 +8,12 @@ drives the `vX.Y.Z` tags; per-release detail is on the
 
 ## [Unreleased]
 
+### Added
+- **Ticket codes.** The API decodes the QR, Aztec, PDF417, DataMatrix and
+  barcodes in uploaded tickets; the event detail shows them in a swipeable
+  carousel, and a tap opens one full screen at full brightness. Tickets
+  uploaded earlier are scanned by the API's hourly sweep, first on start.
+
 ## [1.3.2] - 2026-11-01
 
 Page transitions are back.

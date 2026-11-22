@@ -8,6 +8,10 @@ drives the `vX.Y.Z` tags; per-release detail is on the
 
 ## [Unreleased]
 
+### Changed
+- **One code per ticket.** When a ticket carries both a QR code and a
+  barcode, only the QR code is shown (server-side; no app update needed).
+
 ## [1.4.2] - 2026-11-22
 
 ### Added

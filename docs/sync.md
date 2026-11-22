@@ -189,7 +189,9 @@ runs (unawaited from the foreground sync — see
    under linear codes. `seat` is the seat printed on the code's page in the
    ticket's own words ("Přízemí vpravo · Řada 10 · Místo 19",
    `kp_api/domain/ticket_seat.py`), shown above the code; `null` when the
-   page labels no seat or names more than one. After a change to the seat
+   page labels no seat or names more than one. A page with a drawable 2D
+   code (QR, Aztec, PDF417, DataMatrix) next to a linear barcode is one
+   ticket printed both ways and keeps only the 2D code. After a change to the seat
    reader, `scan-ticket-codes --rescan` re-sends every ticket whose label
    changed. Why server-side: the Dart barcode library
    mis-encoded DataMatrix from bytes and produced unreadable PDF417. The phone keeps them in `CachedTickets.codesJson` (drift

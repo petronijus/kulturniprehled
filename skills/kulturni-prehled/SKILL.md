@@ -207,9 +207,9 @@ SUBJECT="Kulturní přehled — novinky, týden CW${WEEK}"
     <h2 style="font-size:17px;margin:0 0 6px;">{{title}}</h2>
     {{#if source_name}}
     <span style="display:inline-block;margin:0 0 6px;padding:2px 8px 2px 4px;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:0.3px;
-      {{#if (eq source_type 'festival')}}background:#FFF3E0;color:#E65100;{{/if}}
-      {{#if (eq source_type 'sezona')}}background:#F5F5F5;color:#616161;{{/if}}
-      {{#if (eq source_type 'objev')}}background:#E8F5E9;color:#2E7D32;{{/if}}
+      {{#if (eq source_type 'festival')}}border:1px solid #E65100;color:#E65100;{{/if}}
+      {{#if (eq source_type 'sezona')}}border:1px solid #616161;color:#616161;{{/if}}
+      {{#if (eq source_type 'objev')}}border:1px solid #2E7D32;color:#2E7D32;{{/if}}
     ">{{#if source_logo_url}}<img src="{{source_logo_url}}" width="16" height="16" alt="" style="vertical-align:-4px;border-radius:3px;margin-right:4px">{{/if}}{{source_name}}</span>
     {{/if}}
     <p style="margin:0 0 4px;color:#444;font-size:14px;">
@@ -218,7 +218,7 @@ SUBJECT="Kulturní přehled — novinky, týden CW${WEEK}"
     <p style="margin:6px 0;font-size:13px;">{{fit_line}}</p>
     <p style="margin:8px 0 12px;font-style:italic;color:#222;font-size:14px;">{{why_cs}}</p>
     <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
-      <a href="{{url}}" style="display:inline-block;padding:8px 14px;background:#111;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;">Detail + lístky →</a>
+      <a href="{{url}}" style="display:inline-block;padding:8px 14px;border:1px solid #111;color:#111;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;">Detail + lístky →</a>
       <a href="{{url_up}}" style="text-decoration:none;font-size:22px;" title="Líbí se">👍</a>
       <a href="{{url_down}}" style="text-decoration:none;font-size:22px;" title="Nelíbí se">👎</a>
     </div>
@@ -253,6 +253,10 @@ SUBJECT="Kulturní přehled — novinky, týden CW${WEEK}"
   </p>
 </div>
 ```
+
+**Never put text in a colour that only reads on a background** (white on
+black): a mail that went out without its `background` declarations left the
+button white on white. Buttons and labels carry a border and dark text.
 
 `date_human` computed programmatically (Czech weekday map, never
 guessed) as in `klasika-expert/SKILL.md` step 0.
